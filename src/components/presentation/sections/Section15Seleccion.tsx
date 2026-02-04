@@ -10,6 +10,7 @@ import { SectionWrapper, ContainerWrapper } from '../SectionWrapper';
 import { useThemeClasses } from '../ThemeProvider';
 import { cn } from '@/lib/utils';
 import { Users, Filter, TrendingDown } from 'lucide-react';
+import { YouTubeEmbed, extractYouTubeId } from '../shared/YouTubeEmbed';
 
 interface Section15SeleccionProps {
   data: Section15_Seleccion;
@@ -112,6 +113,17 @@ export function Section15Seleccion({ data }: Section15SeleccionProps) {
               </div>
             ))}
           </div>
+        </div>
+        
+        {/* Video: Verificación de antecedentes */}
+        <div className="mt-16 max-w-4xl mx-auto">
+          <h3 className={cn('text-2xl font-bold text-center mb-8', theme.text)}>
+            Verificación de antecedentes penales
+          </h3>
+          <YouTubeEmbed 
+            videoId={extractYouTubeId('https://youtu.be/a6TSsPvaoZM')}
+            title="Verificación de antecedentes penales"
+          />
         </div>
         
         {/* Retention stat */}

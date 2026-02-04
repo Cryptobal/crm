@@ -11,6 +11,7 @@ import { useThemeClasses } from '../ThemeProvider';
 import { cn } from '@/lib/utils';
 import { Eye, Clock } from 'lucide-react';
 import { TrustBadges } from '../shared/TrustBadges';
+import { YouTubeEmbed, extractYouTubeId } from '../shared/YouTubeEmbed';
 
 interface Section10SupervisionProps {
   data: Section10_Supervision;
@@ -109,6 +110,17 @@ export function Section10Supervision({ data }: Section10SupervisionProps) {
               </div>
             ))}
           </div>
+        </div>
+        
+        {/* Video: Control de rondas y supervisión */}
+        <div className="mb-12 max-w-4xl mx-auto">
+          <h3 className={cn('text-2xl font-bold text-center mb-8', theme.text)}>
+            Control de rondas y supervisión en acción
+          </h3>
+          <YouTubeEmbed 
+            videoId={extractYouTubeId('https://www.youtube.com/watch?v=bRo7dBBb0MQ')}
+            title="Control de rondas y supervisión"
+          />
         </div>
         
         {/* SLA badges */}

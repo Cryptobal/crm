@@ -36,10 +36,8 @@ export function PresentationFooter({
 }: PresentationFooterProps) {
   const currentYear = new Date().getFullYear();
   
-  // Google Maps link
-  const googleMapsLink = address 
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
-    : null;
+  // Google Maps link directo a Gard Security
+  const googleMapsLink = 'https://www.google.com/maps/place/Gard+Security/@-33.3829252,-70.5343354,1028m/data=!3m2!1e3!4b1!4m6!3m5!1s0xad000dfe016a150d:0x3fcad00015b6e4bd!8m2!3d-33.3829252!4d-70.5317605!16s%2Fg%2F11vsbpgym7?entry=ttu&g_ep=EgoyMDI2MDIwMS4wIKXMDSoKLDEwMDc5MjA2N0gBUAM%3D';
   
   return (
     <footer className={cn('relative overflow-hidden', className)}>

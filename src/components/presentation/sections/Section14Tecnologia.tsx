@@ -10,6 +10,7 @@ import { SectionWrapper, ContainerWrapper, StaggerContainer, StaggerItem } from 
 import { useThemeClasses } from '../ThemeProvider';
 import { cn } from '@/lib/utils';
 import { Smartphone, Camera, BarChart, Info } from 'lucide-react';
+import { YouTubeEmbed, extractYouTubeId } from '../shared/YouTubeEmbed';
 
 interface Section14TecnologiaProps {
   data: Section14_Tecnologia;
@@ -99,6 +100,17 @@ export function Section14Tecnologia({ data }: Section14TecnologiaProps) {
             );
           })}
         </StaggerContainer>
+        
+        {/* Video: Control de acceso */}
+        <div className="mb-12 max-w-4xl mx-auto">
+          <h3 className={cn('text-2xl font-bold text-center mb-8', theme.text)}>
+            Sistema de control de acceso en funcionamiento
+          </h3>
+          <YouTubeEmbed 
+            videoId={extractYouTubeId('https://youtu.be/rGbyIwpIkYU')}
+            title="Control de acceso"
+          />
+        </div>
         
         {/* Important note */}
         <div className={cn('p-6 rounded-lg border text-center max-w-3xl mx-auto', theme.border, theme.accent, 'bg-opacity-10')}>
