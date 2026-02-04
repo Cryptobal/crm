@@ -63,16 +63,16 @@ const executiveTheme: ThemeConfig = {
   description: 'Diseño sobrio y premium orientado a CFOs y alta dirección',
   
   colors: {
-    primary: 'bg-slate-900',
-    primaryHover: 'hover:bg-slate-800',
-    secondary: 'bg-slate-800',
-    accent: 'bg-teal-500',
-    accentHover: 'hover:bg-teal-600',
-    background: 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900',
-    backgroundAlt: 'bg-slate-950',
-    text: 'text-slate-100',
-    textMuted: 'text-slate-400',
-    border: 'border-slate-700',
+    primary: 'bg-gradient-to-br from-slate-900 to-slate-800',
+    primaryHover: 'hover:from-slate-800 hover:to-slate-700',
+    secondary: 'bg-slate-800/50',
+    accent: 'bg-gradient-to-r from-teal-500 to-teal-400',
+    accentHover: 'hover:from-teal-400 hover:to-teal-300',
+    background: 'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950',
+    backgroundAlt: 'bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50',
+    text: 'text-white',
+    textMuted: 'text-slate-300',
+    border: 'border-white/10',
   },
   
   typography: {
@@ -107,16 +107,16 @@ const opsTheme: ThemeConfig = {
   description: 'Orientado a operaciones con énfasis en métricas y control',
   
   colors: {
-    primary: 'bg-blue-900',
-    primaryHover: 'hover:bg-blue-800',
-    secondary: 'bg-blue-800',
-    accent: 'bg-green-500',
-    accentHover: 'hover:bg-green-600',
+    primary: 'bg-gradient-to-br from-blue-900 to-blue-800',
+    primaryHover: 'hover:from-blue-800 hover:to-blue-700',
+    secondary: 'bg-blue-900/50',
+    accent: 'bg-gradient-to-r from-green-500 to-emerald-400',
+    accentHover: 'hover:from-green-400 hover:to-emerald-300',
     background: 'bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900',
-    backgroundAlt: 'bg-blue-950',
-    text: 'text-blue-50',
-    textMuted: 'text-blue-300',
-    border: 'border-blue-700',
+    backgroundAlt: 'bg-gradient-to-br from-blue-900/50 via-blue-800/30 to-slate-900/50',
+    text: 'text-white',
+    textMuted: 'text-blue-200',
+    border: 'border-blue-500/20',
   },
   
   typography: {
@@ -151,16 +151,16 @@ const trustTheme: ThemeConfig = {
   description: 'Enfoque humano con énfasis en equipo y cultura organizacional',
   
   colors: {
-    primary: 'bg-indigo-900',
-    primaryHover: 'hover:bg-indigo-800',
-    secondary: 'bg-indigo-800',
-    accent: 'bg-amber-400',
-    accentHover: 'hover:bg-amber-500',
+    primary: 'bg-gradient-to-br from-indigo-900 to-indigo-800',
+    primaryHover: 'hover:from-indigo-800 hover:to-indigo-700',
+    secondary: 'bg-indigo-900/50',
+    accent: 'bg-gradient-to-r from-amber-400 to-orange-400',
+    accentHover: 'hover:from-amber-300 hover:to-orange-300',
     background: 'bg-gradient-to-br from-indigo-950 via-indigo-900 to-slate-900',
-    backgroundAlt: 'bg-indigo-950',
-    text: 'text-indigo-50',
-    textMuted: 'text-indigo-300',
-    border: 'border-indigo-700',
+    backgroundAlt: 'bg-gradient-to-br from-indigo-900/50 via-indigo-800/30 to-slate-900/50',
+    text: 'text-white',
+    textMuted: 'text-indigo-200',
+    border: 'border-indigo-500/20',
   },
   
   typography: {

@@ -1,15 +1,16 @@
 'use client';
 
 /**
- * Section28Cierre - CTA Final / Cierre
- * Última sección antes del footer con call-to-action fuerte
+ * Section28Cierre - CTA Final espectacular
+ * Full screen con animaciones y gradientes impactantes
  */
 
 import { Section28_Cierre } from '@/types/presentation';
 import { SectionWrapper, ContainerWrapper } from '../SectionWrapper';
 import { useThemeClasses } from '../ThemeProvider';
 import { cn } from '@/lib/utils';
-import { Calendar, Mail, ArrowRight } from 'lucide-react';
+import { Calendar, Mail, ArrowRight, Sparkles, Zap, CheckCircle2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface Section28CierreProps {
   data: Section28_Cierre;
@@ -19,77 +20,119 @@ export function Section28Cierre({ data }: Section28CierreProps) {
   const theme = useThemeClasses();
   
   return (
-    <SectionWrapper id="s28-cierre" animation="scale" className="relative overflow-hidden">
-      {/* Background gradient */}
-      <div className={cn('absolute inset-0', theme.background)} />
+    <SectionWrapper id="s28-cierre" animation="scale" className="relative overflow-hidden min-h-screen flex items-center">
+      {/* Background espectacular con múltiples gradientes */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" />
+      <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 via-transparent to-blue-500/10" />
+      
+      {/* Glows animados */}
+      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-teal-500/20 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      
+      {/* Particulas decorativas */}
+      <Sparkles className="absolute top-20 right-20 w-8 h-8 text-teal-400/30 animate-pulse" />
+      <Zap className="absolute bottom-20 left-20 w-10 h-10 text-blue-400/30 animate-pulse" style={{ animationDelay: '0.5s' }} />
       
       <ContainerWrapper className="relative z-10 py-32">
-        <div className="text-center max-w-4xl mx-auto">
-          {/* Headline */}
-          <h2 className={cn(
-            'text-4xl md:text-6xl font-bold mb-6',
-            'text-white',
-            theme.headlineWeight
-          )}>
+        <div className="text-center max-w-5xl mx-auto">
+          {/* Headline épico */}
+          <motion.h2
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 1, type: 'spring' }}
+            className="text-5xl md:text-7xl lg:text-8xl font-black mb-8 text-white leading-[1.1] tracking-tight text-shadow-lg"
+          >
             {data.headline}
-          </h2>
+          </motion.h2>
           
-          {/* Microcopy */}
-          <p className="text-xl md:text-2xl text-white/80 mb-12 max-w-2xl mx-auto">
+          {/* Microcopy con gradient */}
+          <motion.p
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2, duration: 0.8 }}
+            className="text-2xl md:text-4xl mb-16 font-bold bg-gradient-to-r from-teal-400 to-blue-400 bg-clip-text text-transparent max-w-3xl mx-auto"
+          >
             {data.microcopy}
-          </p>
+          </motion.p>
           
-          {/* CTAs */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+          {/* CTAs épicos */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.4, duration: 0.8 }}
+            className="flex flex-col sm:flex-row gap-6 justify-center mb-12"
+          >
             <a
               href={data.cta_primary.link}
               target="_blank"
               rel="noopener noreferrer"
               className={cn(
-                'inline-flex items-center justify-center gap-3',
-                'px-8 py-5 rounded-lg',
-                'text-lg font-semibold text-white',
-                theme.accent,
-                theme.accentHover,
-                'transition-all hover:scale-105',
-                'shadow-2xl'
+                'btn-premium group relative overflow-hidden',
+                'inline-flex items-center justify-center gap-4',
+                'px-12 py-6 rounded-2xl',
+                'text-xl md:text-2xl font-black text-white',
+                'bg-gradient-to-r from-teal-500 to-teal-400',
+                'hover:from-teal-400 hover:to-teal-300',
+                'transition-all duration-300',
+                'hover:scale-110',
+                'shadow-2xl shadow-teal-500/50 hover:shadow-teal-500/80',
+                'border-4 border-teal-400/50 hover:border-teal-300/70',
+                'glow-teal-strong'
               )}
             >
-              <Calendar className="w-6 h-6" />
-              {data.cta_primary.text}
-              <ArrowRight className="w-5 h-5" />
+              <Sparkles className="w-6 h-6 animate-pulse" />
+              <Calendar className="w-7 h-7" />
+              <span>{data.cta_primary.text}</span>
+              <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
             </a>
             
             <a
               href={data.cta_secondary.link}
               className={cn(
-                'inline-flex items-center justify-center gap-3',
-                'px-8 py-5 rounded-lg',
-                'text-lg font-semibold text-white',
-                'bg-white/10 backdrop-blur-sm border-2 border-white/30',
-                'hover:bg-white/20 transition-all'
+                'group',
+                'inline-flex items-center justify-center gap-4',
+                'px-12 py-6 rounded-2xl',
+                'text-xl md:text-2xl font-black text-white',
+                'glass-card border-4 border-white/30',
+                'hover:bg-white/20 hover:border-white/60',
+                'transition-all duration-300 hover:scale-105',
+                'shadow-2xl'
               )}
             >
-              <Mail className="w-6 h-6" />
-              {data.cta_secondary.text}
+              <Mail className="w-7 h-7" />
+              <span>{data.cta_secondary.text}</span>
             </a>
-          </div>
+          </motion.div>
           
-          {/* Trust indicators */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 text-white/60 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-400" />
-              <span>Respuesta en 24 horas hábiles</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-400" />
-              <span>Visita técnica sin costo</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-400" />
-              <span>Sin compromiso</span>
-            </div>
-          </div>
+          {/* Trust indicators con animación */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.6 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-8 text-base"
+          >
+            {[
+              'Respuesta en 24 horas hábiles',
+              'Visita técnica sin costo',
+              'Sin compromiso'
+            ].map((text, index) => (
+              <motion.div
+                key={index}
+                initial={{ scale: 0 }}
+                whileInView={{ scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.8 + index * 0.1, type: 'spring' }}
+                className="flex items-center gap-3 glass-card px-5 py-3 rounded-full border border-white/10"
+              >
+                <CheckCircle2 className="w-5 h-5 text-teal-400" />
+                <span className="font-semibold text-white">{text}</span>
+              </motion.div>
+            ))}
+          </motion.div>
         </div>
       </ContainerWrapper>
     </SectionWrapper>
