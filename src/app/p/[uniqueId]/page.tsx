@@ -21,10 +21,17 @@ interface PublicPresentationPageProps {
   params: Promise<{
     uniqueId: string;
   }>;
+  searchParams: Promise<{
+    preview?: string;
+  }>;
 }
 
-export default async function PublicPresentationPage({ params }: PublicPresentationPageProps) {
+export default async function PublicPresentationPage({ params, searchParams }: PublicPresentationPageProps) {
   const { uniqueId } = await params;
+  const { preview } = await searchParams;
+  
+  // Detectar si es vista de admin/preview (no trackear)
+  const isAdminPreview = preview === 'true';
 
   // 1. Buscar presentación
   const presentation = await prisma.presentation.findUnique({
@@ -89,15 +96,29 @@ export default async function PublicPresentationPage({ params }: PublicPresentat
   // 8. Renderizar presentación
   return (
     <div className="relative">
-      {/* Tracker de vistas (Client Component) */}
-      <PublicPresentationTracker
-        presentationId={presentation.id}
-        ipAddress={ipAddress}
-        userAgent={userAgent}
-      />
+      {/* Banner de Admin Preview */}
+      {isAdminPreview && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-black py-2 px-4 text-center font-semibold text-sm shadow-lg">
+          <div className="max-w-6xl mx-auto flex items-center justify-center gap-2">
+            <span>👁️ VISTA PREVIA DE ADMINISTRADOR</span>
+            <span className="text-xs opacity-75">• Esta vista no se contabiliza</span>
+          </div>
+        </div>
+      )}
+
+      {/* Tracker de vistas (Client Component) - SOLO si NO es admin preview */}
+      {!isAdminPreview && (
+        <PublicPresentationTracker
+          presentationId={presentation.id}
+          ipAddress={ipAddress}
+          userAgent={userAgent}
+        />
+      )}
 
       {/* Presentación */}
-      <PresentationRenderer payload={presentationData} />
+      <div className={isAdminPreview ? 'pt-10' : ''}>
+        <PresentationRenderer payload={presentationData} />
+      </div>
 
       {/* Footer con branding */}
       <footer className="bg-slate-900 text-white py-8 border-t border-white/10">

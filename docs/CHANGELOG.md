@@ -4,6 +4,33 @@ Todos los cambios notables del proyecto están documentados aquí.
 
 ---
 
+## [1.2.1] - 2026-02-05 👁️
+
+### 🔧 MODO PREVIEW - VISTAS DE ADMIN NO SE CONTABILIZAN
+
+**Implementado sistema para que vistas desde dashboard no inflen los datos.**
+
+#### ✅ Features Implementadas
+
+**Modo Preview:**
+- ✅ Parámetro `?preview=true` en links de admin
+- ✅ Detección automática en página pública
+- ✅ No se trackean vistas con preview=true
+- ✅ Banner amarillo: "Vista Previa de Administrador"
+- ✅ Links copiados y WhatsApp sin parámetro (trackean normal)
+
+**Archivos Modificados:**
+- `src/app/p/[uniqueId]/page.tsx` - Detección de preview mode
+- `src/components/admin/PresentationsList.tsx` - Links con preview
+- `src/components/admin/DashboardHeader.tsx` - Notificaciones con preview
+
+**Beneficio:**
+- Datos precisos sin inflación
+- Admin puede revisar sin afectar métricas
+- Banner claro indica cuándo no se trackea
+
+---
+
 ## [1.2.0] - 2026-02-05 🔔
 
 ### 🚀 DASHBOARD v2.0 - REDISEÑO COMPLETO + NOTIFICACIONES

@@ -169,7 +169,7 @@ export function DashboardHeader({ presentations }: DashboardHeaderProps) {
                         </p>
                       </div>
                       <a
-                        href={`/p/${presentation.uniqueId}`}
+                        href={`/p/${presentation.uniqueId}?preview=true`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-2 py-1 rounded-md bg-blue-500/20 text-blue-300 text-xs font-medium hover:bg-blue-500/30 transition-colors flex-shrink-0"

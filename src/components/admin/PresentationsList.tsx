@@ -109,17 +109,17 @@ export function PresentationsList({ presentations, initialFilter = 'all' }: Pres
     });
   }, [presentations, searchTerm, viewFilter, emailStatusFilter, dateFilter, initialFilter]);
 
-  // Copiar link al portapapeles
+  // Copiar link al portapapeles (SIN preview=true para que el cliente sí trackee)
   const copyToClipboard = async (uniqueId: string) => {
-    const url = `${window.location.origin}/p/${uniqueId}`;
+    const url = `${window.location.origin}/p/${uniqueId}`; // Sin preview=true
     await navigator.clipboard.writeText(url);
     setCopiedId(uniqueId);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Compartir por WhatsApp
+  // Compartir por WhatsApp (SIN preview=true para que el cliente sí trackee)
   const shareWhatsApp = (uniqueId: string, clientData: any) => {
-    const url = `${window.location.origin}/p/${uniqueId}`;
+    const url = `${window.location.origin}/p/${uniqueId}`; // Sin preview=true
     const phone = clientData?.contact?.Mobile || clientData?.contact?.Phone || '';
     const cleanPhone = phone.replace(/[^0-9]/g, '');
     const companyName = clientData?.account?.Account_Name || 'Cliente';
@@ -311,13 +311,13 @@ export function PresentationsList({ presentations, initialFilter = 'all' }: Pres
 
                   {/* Acciones - Derecha */}
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {/* Ver */}
+                    {/* Ver - con preview=true para no trackear */}
                     <a
-                      href={`/p/${presentation.uniqueId}`}
+                      href={`/p/${presentation.uniqueId}?preview=true`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-1.5 rounded-md bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 transition-colors"
-                      title="Ver"
+                      title="Ver (modo preview, no se contabiliza)"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>

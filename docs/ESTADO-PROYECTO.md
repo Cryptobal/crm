@@ -30,6 +30,7 @@
 - ✅ **Sistema de Notificaciones**: Campana con alertas de presentaciones pendientes
 - ✅ **Tracking de Email**: Estados en español (Enviado, Entregado, Abierto, Clicked)
 - ✅ **Filtros Avanzados**: Vistas, Estado Email, Fecha
+- ✅ **Modo Preview**: Vistas de admin no se contabilizan (parámetro ?preview=true)
 - ✅ **Navegación unificada**: Botones para volver al dashboard desde templates
 - ✅ **Vista Mobile-First**: 100% responsive sin scroll horizontal
 
@@ -329,6 +330,13 @@ formatCurrency(value, currency)
 - Colores distintivos por estado
 - Tooltips explicativos
 - Prioridad automática (muestra el estado más relevante)
+
+**6. Modo Preview para Admin:**
+- Links desde dashboard con `?preview=true`
+- No se trackean vistas de admin
+- Banner amarillo indicando "Vista Previa de Administrador"
+- Links copiados y WhatsApp sin parámetro (trackean normal)
+- Datos precisos sin inflación por vistas de admin
 
 **Componentes Creados/Actualizados:**
 1. `/app/inicio/page.tsx` - Página simplificada
