@@ -11,7 +11,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { PresentationRenderer } from '@/components/presentation/PresentationRenderer';
 import { mapZohoDataToPresentation } from '@/lib/zoho-mapper';
-import Link from 'next/link';
+import { PreviewActions } from '@/components/preview/PreviewActions';
 
 interface PreviewPageProps {
   params: Promise<{
@@ -99,28 +99,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
       </div>
 
       {/* Botones de acción */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900/95 backdrop-blur-lg border-t border-white/10 p-4 shadow-2xl">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row gap-3 justify-center items-center">
-          <Link
-            href={`/api/presentations/send-email?sessionId=${sessionId}`}
-            className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-teal-500 to-blue-500 text-white font-bold rounded-lg hover:scale-105 transition-transform text-center shadow-lg shadow-teal-500/50"
-          >
-            📧 Enviar por Email
-          </Link>
-          <Link
-            href="/admin/presentations"
-            className="w-full sm:w-auto px-8 py-3 bg-white/10 text-white font-semibold rounded-lg hover:bg-white/20 transition-colors text-center"
-          >
-            💾 Guardar como Borrador
-          </Link>
-          <button
-            onClick={() => window.close()}
-            className="w-full sm:w-auto px-8 py-3 bg-red-500/20 text-red-300 font-semibold rounded-lg hover:bg-red-500/30 transition-colors"
-          >
-            ❌ Cancelar
-          </button>
-        </div>
-      </div>
+      <PreviewActions sessionId={sessionId} companyName={presentationData.client.company_name} />
       
       {/* Espaciador para los botones */}
       <div className="h-24" />
