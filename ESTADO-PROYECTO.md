@@ -1,8 +1,9 @@
 # 📊 Estado del Proyecto - Gard Docs
 
-**Última actualización:** 05 de Febrero de 2026  
-**Versión:** 0.2.0 (MVP Visual Completo)  
+**Última actualización:** 05 de Febrero de 2026 (Noche)  
+**Versión:** 0.3.0 (MVP Visual + PDF Generation)  
 **Repositorio:** git@github.com:Cryptobal/gard-docs.git
+**Último commit:** ffcb3a7 - Playwright PDF generation
 
 ---
 
@@ -13,6 +14,7 @@
 ### Estado Actual
 - ✅ **Frontend completo**: 24/24 secciones implementadas
 - ✅ **Modo admin**: Vista previa con sidebar navegación
+- ✅ **PDF Generation**: Playwright - PDFs idénticos al preview web
 - ✅ **Diseño premium**: Glassmorphism, contadores animados, glow effects
 - ✅ **Responsive 100%**: Mobile-first design
 - ⏳ **Backend**: Pendiente (Prisma + PostgreSQL + API)
@@ -24,15 +26,16 @@
 
 | Métrica | Valor |
 |---------|-------|
-| **Commits GitHub** | 28 commits |
-| **Líneas de código** | ~16,800 líneas |
-| **Archivos creados** | 147 archivos |
+| **Commits GitHub** | 30 commits |
+| **Líneas de código** | ~17,750 líneas |
+| **Archivos creados** | 149 archivos |
 | **Secciones** | 24/24 (100%) |
-| **Componentes UI** | 17 reutilizables |
+| **Componentes UI** | 18 reutilizables |
 | **Videos incrustados** | 3 YouTube |
 | **Logos clientes** | 15 logos |
 | **Build time** | ~15 segundos |
 | **Bundle size** | 191 KB |
+| **Playwright/Chromium** | 253 MB |
 
 ---
 
@@ -66,7 +69,21 @@ http://localhost:3000/templates/commercial/preview?admin=true
 
 ---
 
-### 2. Modo Cliente (Presentación pública)
+### 2. Preview Formato Propuesta Económica (Para revisar PDF)
+```
+http://localhost:3000/templates/pricing-format?admin=true
+```
+
+**Características:**
+- ✅ Vista previa del formato PDF de propuesta económica
+- ✅ Logo Gard Security en blanco
+- ✅ Header con gradiente teal-azul
+- ✅ Diseño idéntico al PDF que se descarga
+- ✅ Acceso desde sidebar con botón "Ver formato propuesta"
+
+---
+
+### 3. Modo Cliente (Presentación pública)
 ```
 http://localhost:3000/p/[uniqueId]
 ```
@@ -161,16 +178,20 @@ http://localhost:3000/p/demo-polpaico-2026-02
 13. **SectionHeader** - Títulos responsive
 
 ### Componentes Admin
-14. **TemplateSidebar** - Navegación lateral acordeón
+14. **TemplateSidebar** - Navegación lateral acordeón (con link a pricing-format)
 15. **PreviewModeToggle** - Botón flotante teal
 16. **TemplatePreviewWrapper** - Wrapper con estado
 
+### Componentes PDF
+17. **DownloadPricingButtonV2** - Genera PDF con Playwright (fidelidad 100%)
+18. **PricingPDF** - Template PDF legacy (@react-pdf/renderer - deprecated)
+
 ### Componentes Layout
-17. **PresentationHeader** - Header sticky con glassmorphism
-18. **PresentationFooter** - Footer con contacto y redes
-19. **StickyCTA** - CTA fixed mobile bottom
-20. **ScrollProgress** - Progress bar superior
-21. **NavigationDots** - Dots laterales (desktop)
+19. **PresentationHeader** - Header sticky con glassmorphism
+20. **PresentationFooter** - Footer con contacto y redes
+21. **StickyCTA** - CTA fixed mobile bottom
+22. **ScrollProgress** - Progress bar superior
+23. **NavigationDots** - Dots laterales (desktop)
 
 ---
 
@@ -208,6 +229,11 @@ http://localhost:3000/p/demo-polpaico-2026-02
 - **date-fns** (formateo fechas)
 - **nanoid** (IDs únicos)
 - **clsx + tailwind-merge** (className helpers)
+
+### PDF Generation
+- **Playwright** - Navegador headless para capturar HTML como PDF
+- **Chromium** - Browser engine (253MB instalado)
+- **@react-pdf/renderer** - Legacy (ya no se usa para pricing)
 
 ### Backend (Pendiente)
 - **Prisma** (ORM)
@@ -267,24 +293,31 @@ http://localhost:3000/p/demo-polpaico-2026-02
 gard-docs/
 ├── public/
 │   ├── logos/                    # 15 logos de clientes
-│   └── images/                   # 8 fotos equipo + hero
+│   ├── images/                   # 8 fotos equipo + hero
+│   └── Logo Gard Blanco.png      # Logo blanco para PDF y preview
 │
 ├── src/
 │   ├── app/
 │   │   ├── layout.tsx
 │   │   ├── page.tsx
-│   │   ├── p/[uniqueId]/page.tsx           # Presentación pública
-│   │   └── templates/commercial/preview/
-│   │       └── page.tsx                     # Vista preview admin
+│   │   ├── p/[uniqueId]/page.tsx                    # Presentación pública
+│   │   ├── api/pdf/generate-pricing/route.ts       # API Playwright PDF
+│   │   └── templates/
+│   │       ├── commercial/preview/page.tsx          # Vista preview admin
+│   │       └── pricing-format/page.tsx              # Preview formato PDF
 │   │
 │   ├── components/
 │   │   ├── ui/                              # shadcn/ui components
 │   │   ├── layout/                          # Header, Footer
 │   │   ├── presentation/
-│   │   │   ├── PresentationRenderer.tsx    # ⭐ Orquestador principal
-│   │   │   ├── sections/                   # S01-S28
-│   │   │   └── shared/                     # Componentes reutilizables
-│   │   └── admin/                          # Sidebar, Toggle, Wrapper
+│   │   │   ├── PresentationRenderer.tsx         # ⭐ Orquestador principal
+│   │   │   ├── DownloadPricingButtonV2.tsx      # 🆕 Botón PDF con Playwright
+│   │   │   ├── DownloadPricingButton.tsx        # Legacy (@react-pdf - deprecated)
+│   │   │   ├── sections/                        # S01-S28
+│   │   │   └── shared/                          # Componentes reutilizables
+│   │   ├── pdf/
+│   │   │   └── PricingPDF.tsx                   # Legacy PDF template (no se usa)
+│   │   └── admin/                               # Sidebar, Toggle, Wrapper
 │   │
 │   ├── lib/
 │   │   ├── tokens.ts                       # Sistema de reemplazo
@@ -388,11 +421,11 @@ gard-docs/
 - [ ] Analytics básico
 
 ### Funcionalidades Avanzadas
+- [x] **Export a PDF (Playwright)** - ✅ Implementado con fidelidad 100%
 - [ ] Sistema de envío por email (Resend)
 - [ ] Templates de email (React Email)
 - [ ] Tracking de visualizaciones (IP, user agent, timestamp)
 - [ ] Compartir por WhatsApp (URL scheme)
-- [ ] Export a PDF (Playwright)
 - [ ] Gestión de templates admin
 
 ---
@@ -551,17 +584,20 @@ npx prisma generate
 - [x] Modo preview admin
 - [x] Header + Footer + StickyCTA
 - [x] Progress bar + Navigation dots
+- [x] **Generación PDF con Playwright** (fidelidad 100%)
+- [x] Preview formato propuesta económica
+- [x] Fix searchParams Next.js 15
 
 ### Backend
+- [x] **API PDF Generation** - `/api/pdf/generate-pricing` (Playwright)
 - [ ] Prisma + Neon PostgreSQL
 - [ ] Schema de base de datos
-- [ ] API endpoints
+- [ ] API endpoints CRUD
 - [ ] Webhook Zoho
 - [ ] Autenticación
 - [ ] Dashboard admin
 - [ ] Envío emails
 - [ ] Tracking vistas
-- [ ] Export PDF
 
 ### Deploy
 - [ ] Variables de entorno en Vercel
@@ -571,21 +607,35 @@ npx prisma generate
 
 ---
 
-## 🎉 **LOGRO ACTUAL**
+## 🎉 **LOGROS ACTUALES**
 
 **✅ MVP VISUAL 100% COMPLETO**
+**✅ GENERACIÓN PDF CON FIDELIDAD 100%**
+
+### Implementado hoy (05 Feb 2026 - Noche):
+- ✅ Fix crítico de searchParams en Next.js 15
+- ✅ Playwright instalado (253 MB Chromium)
+- ✅ Endpoint API `/api/pdf/generate-pricing`
+- ✅ Componente `DownloadPricingButtonV2` con Playwright
+- ✅ Preview formato propuesta económica (`/templates/pricing-format`)
+- ✅ Logo Gard Security en blanco en preview y PDF
+- ✅ PDFs idénticos al preview web (gradientes, estilos, todo)
+- ✅ Commit `ffcb3a7` subido a GitHub
 
 **Listo para:**
-- Presentar a clientes finales
-- Demos profesionales
-- Modo preview para editar
-- Validación de diseño y contenido
+- ✅ Presentar a clientes finales
+- ✅ Demos profesionales con descarga PDF
+- ✅ Modo preview para editar
+- ✅ Generar PDFs profesionales de propuestas
+- ✅ Validación de diseño y contenido
 
 **Siguiente hito:**
 - Backend funcional para guardar presentaciones reales
+- Integración con Zoho CRM
 
 ---
 
-**Última actualización:** 05 de Febrero de 2026, 02:30 hrs  
-**Desarrollado con:** Cursor AI + Next.js 15  
-**Estado:** ✅ MVP Visual completo, listo para backend
+**Última actualización:** 05 de Febrero de 2026, 05:00 hrs  
+**Desarrollado con:** Cursor AI + Next.js 15 + Playwright  
+**Estado:** ✅ MVP Visual + PDF Generation completo, listo para backend  
+**Commit actual:** ffcb3a7

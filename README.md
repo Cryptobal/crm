@@ -11,6 +11,7 @@ Sistema de presentaciones comerciales inteligente tipo Qwilr para Gard Security.
 - ✅ **24 secciones estructuradas** - Desde hero hasta CTA final
 - ✅ **Diseño premium** - Glassmorphism, animaciones, glow effects
 - ✅ **Sistema de tokens dinámicos** - `[ACCOUNT_NAME]` → datos reales
+- ✅ **PDF Generation con Playwright** - PDFs idénticos al preview web
 - ✅ **Modo preview admin** - Sidebar navegación + toggle tokens
 - ✅ **100% responsive** - Mobile-first design
 - ✅ **Componentes reutilizables** - KPI Cards, Timelines, Pricing Tables
@@ -25,11 +26,16 @@ cd gard-docs
 # Instalar dependencias
 npm install
 
+# Instalar navegador Chromium para Playwright (253MB)
+npx playwright install chromium
+
 # Iniciar servidor de desarrollo
 npm run dev
 ```
 
 El proyecto estará disponible en `http://localhost:3000`
+
+**⚠️ Nota:** La primera instalación descarga Chromium (253MB) para generación de PDFs.
 
 ## 🌐 Rutas principales
 
@@ -43,12 +49,18 @@ http://localhost:3000/p/demo-polpaico-2026-02
 http://localhost:3000/templates/commercial/preview?admin=true
 ```
 
+**Preview formato PDF propuesta:**
+```
+http://localhost:3000/templates/pricing-format?admin=true
+```
+
 ## 🏗️ Stack
 
 - **Framework:** Next.js 15 (App Router)
 - **Lenguaje:** TypeScript 5.6
 - **Estilos:** TailwindCSS 3.4 + shadcn/ui
 - **Animaciones:** Framer Motion 11
+- **PDF Generation:** Playwright + Chromium
 - **Backend:** Prisma + Neon PostgreSQL (pendiente)
 
 ## 📖 Documentación completa
@@ -71,8 +83,9 @@ Ver **[PRESENTACION-COMERCIAL-BASE.md](PRESENTACION-COMERCIAL-BASE.md)** para:
 
 ## 📊 Estado
 
-**Versión:** 0.2.0  
-**Estado:** ✅ MVP Visual 100% completo  
+**Versión:** 0.3.0  
+**Estado:** ✅ MVP Visual + PDF Generation 100% completo  
+**Último commit:** ffcb3a7  
 **Siguiente paso:** Backend + Persistencia
 
 ## 👨‍💻 Equipo
