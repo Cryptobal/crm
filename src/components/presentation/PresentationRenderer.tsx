@@ -153,6 +153,11 @@ export function PresentationRenderer({ payload, showTokens = false }: Presentati
           <Section23PropuestaEconomica 
             data={sections.s23_propuesta_economica} 
             showTokens={showTokens}
+            clientName={payload.client.company_name}
+            quoteNumber={payload.quote.number}
+            quoteDate={payload.quote.date}
+            contactEmail={contact.email}
+            contactPhone={contact.phone}
           />
           
           {/* S24 - Términos y Condiciones */}

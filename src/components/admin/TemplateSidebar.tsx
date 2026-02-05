@@ -14,7 +14,8 @@ import {
   CheckCircle2,
   Eye,
   Link as LinkIcon,
-  X
+  X,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -312,6 +313,16 @@ export function TemplateSidebar({
                 <LinkIcon className="w-3 h-3" />
                 Copiar link
               </button>
+              
+              <a
+                href="/templates/pricing-format?admin=true"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30 transition-all text-xs font-bold text-white"
+              >
+                <FileText className="w-3 h-3" />
+                Ver formato propuesta
+              </a>
               
               <a
                 href="/p/demo-polpaico-2026-02"

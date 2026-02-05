@@ -11,13 +11,27 @@ import { cn } from '@/lib/utils';
 import { formatCurrency, formatUF } from '@/lib/utils';
 import { FileText, Calendar, TrendingUp, Sparkles, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { DownloadPricingButton } from '../DownloadPricingButton';
 
 interface Section23PropuestaEconomicaProps {
   data: Section23_PropuestaEconomica;
   showTokens?: boolean;
+  clientName?: string;
+  quoteNumber?: string;
+  quoteDate?: string;
+  contactEmail?: string;
+  contactPhone?: string;
 }
 
-export function Section23PropuestaEconomica({ data, showTokens = false }: Section23PropuestaEconomicaProps) {
+export function Section23PropuestaEconomica({ 
+  data, 
+  showTokens = false,
+  clientName = 'Cliente',
+  quoteNumber = 'COT-000',
+  quoteDate = new Date().toLocaleDateString('es-CL'),
+  contactEmail = 'carlos.irigoyen@gard.cl',
+  contactPhone = '+56 98 230 7771'
+}: Section23PropuestaEconomicaProps) {
   const theme = useThemeClasses();
   const { pricing } = data;
   
@@ -261,16 +275,30 @@ export function Section23PropuestaEconomica({ data, showTokens = false }: Sectio
           </motion.div>
         )}
         
-        {/* CTA */}
-        <div className="text-center">
-          <p className="text-white/60 mb-6">¿Preguntas sobre la propuesta?</p>
-          <a
-            href="mailto:comercial@gard.cl"
-            className="btn-premium inline-flex items-center gap-3 px-8 py-4 rounded-xl text-base font-bold text-white bg-gradient-to-r from-teal-500 to-blue-500 hover:from-teal-400 hover:to-blue-400 shadow-xl shadow-teal-500/30 border-2 border-teal-400/30 transition-all duration-300 hover:scale-105"
-          >
-            <FileText className="w-5 h-5" />
-            Solicitar reunión comercial
-          </a>
+        {/* CTAs */}
+        <div className="text-center space-y-4">
+          <p className="text-white/60">¿Preguntas sobre la propuesta?</p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            {/* Descarga PDF */}
+            <DownloadPricingButton
+              clientName={clientName}
+              quoteNumber={quoteNumber}
+              quoteDate={quoteDate}
+              pricing={data.pricing}
+              contactEmail={contactEmail}
+              contactPhone={contactPhone}
+            />
+            
+            {/* Reunión comercial */}
+            <a
+              href={`mailto:${contactEmail}`}
+              className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-base font-bold text-white glass-card border-2 border-white/30 hover:bg-white/10 hover:border-white/50 shadow-xl transition-all duration-300 hover:scale-105"
+            >
+              <FileText className="w-5 h-5" />
+              Solicitar reunión
+            </a>
+          </div>
         </div>
       </ContainerWrapper>
     </SectionWrapper>
