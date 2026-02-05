@@ -43,7 +43,7 @@ Presentación guardada y enviada al cliente
 
 ## 📝 CÓDIGO DELUGE (Zoho CRM)
 
-### **Función: `button.crearDocumento`**
+### **Función: `button.crearDocumento` - Versión con Debugging**
 
 **Ubicación:** Zoho CRM → Quotes → Custom Button  
 **Trigger:** Click en botón personalizado  
@@ -54,6 +54,9 @@ string button.crearDocumento(String quoteId)
 {
     try 
     {
+        info "🚀 Iniciando creación de documento...";
+        info "📋 Quote ID: " + quoteId;
+        
         // 1. Obtener datos de la cotización
         quoteInfo = zoho.crm.getRecordById("Quotes",quoteId);
         if(quoteInfo.isNull())
@@ -61,6 +64,7 @@ string button.crearDocumento(String quoteId)
             info "❌ Error: No se pudo obtener la cotización";
             return "error";
         }
+        info "✅ Cotización obtenida";
         
         // 2. Obtener productos
         productDetails = quoteInfo.get("Product_Details");
@@ -69,14 +73,13 @@ string button.crearDocumento(String quoteId)
             info "❌ Error: La cotización no tiene productos";
             return "error";
         }
+        info "✅ Productos obtenidos: " + productDetails.size();
         
         // 3. Preparar payload
         payload = Map();
-        
-        // ⭐ NUEVO: Enviar TODA la cotización como objeto
         payload.put("quote",quoteInfo);
         
-        // 4. Obtener y enviar información COMPLETA del cliente (Account)
+        // 4. Obtener Account
         accountLookup = quoteInfo.get("Account_Name");
         if(!accountLookup.isNull())
         {
@@ -84,12 +87,12 @@ string button.crearDocumento(String quoteId)
             accountInfo = zoho.crm.getRecordById("Accounts",accountId);
             if(!accountInfo.isNull())
             {
-                // ⭐ NUEVO: Enviar TODO el objeto Account
                 payload.put("account",accountInfo);
+                info "✅ Account obtenida: " + accountInfo.get("Account_Name");
             }
         }
         
-        // 5. Obtener y enviar información COMPLETA del contacto
+        // 5. Obtener Contact
         contactLookup = quoteInfo.get("Contact_Name");
         if(!contactLookup.isNull())
         {
@@ -97,12 +100,12 @@ string button.crearDocumento(String quoteId)
             contactInfo = zoho.crm.getRecordById("Contacts",contactId);
             if(!contactInfo.isNull())
             {
-                // ⭐ NUEVO: Enviar TODO el objeto Contact
                 payload.put("contact",contactInfo);
+                info "✅ Contact obtenido: " + contactInfo.get("Full_Name");
             }
         }
         
-        // 6. Obtener y enviar información COMPLETA del Deal
+        // 6. Obtener Deal
         dealLookup = quoteInfo.get("Deal_Name");
         if(!dealLookup.isNull())
         {
@@ -110,12 +113,12 @@ string button.crearDocumento(String quoteId)
             dealInfo = zoho.crm.getRecordById("Deals",dealId);
             if(!dealInfo.isNull())
             {
-                // ⭐ NUEVO: Enviar TODO el objeto Deal
                 payload.put("deal",dealInfo);
+                info "✅ Deal obtenido";
             }
         }
         
-        // 7. Procesar productos (mantener como está, ya funciona bien)
+        // 7. Procesar productos
         products = List();
         for each  product in productDetails
         {
@@ -138,17 +141,19 @@ string button.crearDocumento(String quoteId)
         }
         payload.put("product_details",products);
         
-        // 8. Agregar metadatos útiles
+        // 8. Agregar metadatos
         payload.put("quote_id",quoteId);
         payload.put("timestamp",zoho.currenttime.toString("yyyy-MM-dd'T'HH:mm:ss"));
         
-        // 9. Configurar webhook (mantener igual)
+        // 9. Configurar headers
         headers = Map();
         headers.put("Authorization","Bearer 2da045c6e8e4edb4d02b03907c223ed1d8ab401410e20788acaf39b30497ac0d");
         headers.put("Content-Type","application/json");
         
-        // 10. Enviar a docs.gard.cl
+        // 10. Enviar webhook
+        info "📤 Enviando webhook a Gard Docs...";
         webhookUrl = "https://docs.gard.cl/api/webhook/zoho";
+        
         response = invokeurl
         [
             url :webhookUrl
@@ -157,26 +162,57 @@ string button.crearDocumento(String quoteId)
             headers:headers
         ];
         
-        // 11. Procesar respuesta
-        if(response.get("success"))
+        // 11. DEBUGGING - Ver respuesta completa
+        info "📥 Respuesta recibida:";
+        info "   - success: " + response.get("success");
+        info "   - token: " + response.get("token");
+        info "   - preview_url: " + response.get("preview_url");
+        info "   - sessionId: " + response.get("sessionId");
+        
+        // 12. Procesar respuesta
+        if(response.get("success") == true)
         {
             previewUrl = response.get("preview_url");
             token = response.get("token");
-            info "✅ Documento creado: " + token;
             
-            // Abrir documento
-            openUrl(previewUrl,"popup","width=1200,height=900,scrollbars=yes");
+            // Verificar que previewUrl existe
+            if(previewUrl == null || previewUrl == "")
+            {
+                info "❌ ERROR CRÍTICO: preview_url está vacío!";
+                info "   Respuesta completa: " + response;
+                return "error";
+            }
+            
+            info "✅ Documento creado exitosamente";
+            info "   📋 Token: " + token;
+            info "   🔗 URL: " + previewUrl;
+            info "   🌐 Intentando abrir URL...";
+            
+            // Intentar abrir URL (puede ser bloqueado por navegador)
+            try
+            {
+                openUrl(previewUrl,"same window");
+                info "✅ openUrl ejecutado (si no abrió, revisa bloqueador de popups)";
+            }
+            catch (openError)
+            {
+                info "❌ Error al ejecutar openUrl: " + openError;
+                info "💡 Abre manualmente: " + previewUrl;
+            }
+            
             return "success";
         }
         else
         {
-            info "❌ Error: " + response.get("error");
+            errorMsg = response.get("error");
+            info "❌ Error del webhook: " + errorMsg;
+            info "   Respuesta completa: " + response;
             return "error";
         }
     }
     catch (e)
     {
-        info "❌ Error: " + e.toString();
+        info "❌ Error crítico: " + e.toString();
         return "error";
     }
 }
