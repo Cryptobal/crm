@@ -235,3 +235,176 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 ---
 
 **Última actualización:** 05 de Febrero de 2026
+
+---
+
+## 🆕 SISTEMA DE INVITACIÓN DE USUARIOS (v2.0)
+
+### Flujo de Invitación
+
+**Versión:** 2.0  
+**Fecha:** 05 de Febrero de 2026  
+
+#### 1. Invitación por Email
+
+Un administrador o propietario puede invitar nuevos usuarios al sistema:
+
+```
+1. Admin accede a /usuarios
+2. Click en "Invitar Usuario"
+3. Ingresa email y selecciona rol (owner, admin, editor, viewer)
+4. Sistema genera token seguro (hash bcrypt)
+5. Envía email con link de activación
+6. Link expira en 48 horas
+```
+
+#### 2. Activación de Cuenta
+
+El usuario invitado activa su cuenta:
+
+```
+1. Click en link del email → /activate?token=XYZ
+2. Completa nombre y define contraseña
+3. Sistema valida token y crea usuario
+4. Estado cambia: invited → active
+5. Usuario puede hacer login
+```
+
+#### 3. Estados de Usuario
+
+- **invited**: Usuario invitado, pendiente de activación
+- **active**: Usuario activo, puede autenticarse
+- **disabled**: Usuario desactivado, no puede autenticarse
+
+### Modelo de Datos
+
+```prisma
+model Admin {
+  id        String   @id
+  email     String   @unique
+  password  String   // Hash bcrypt
+  name      String
+  role      String   // "owner", "admin", "editor", "viewer"
+  status    String   // "invited", "active", "disabled"
+  tenantId  String
+  
+  lastLoginAt DateTime?
+  invitedBy   String?
+  invitedAt   DateTime?
+  activatedAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model UserInvitation {
+  id        String   @id
+  email     String
+  role      String
+  tenantId  String
+  token     String   @unique // Hash del token
+  expiresAt DateTime
+  
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+  invitedBy  String?
+  
+  createdAt  DateTime @default(now())
+}
+```
+
+### Seguridad
+
+#### Tokens de Invitación
+
+- **Generación**: `randomBytes(32).toString('hex')`
+- **Almacenamiento**: Hash bcrypt del token en BD
+- **Validación**: Comparación bcrypt al activar
+- **Expiración**: 48 horas desde creación
+- **One-time use**: Se marca como `acceptedAt` al usarse
+
+#### Validaciones
+
+- Solo owner/admin pueden invitar usuarios
+- No permitir desactivar al último owner activo
+- No permitir cambiar el propio rol
+- Verificar que el email no exista antes de invitar
+
+### Roles y Permisos (RBAC)
+
+#### Jerarquía de Roles
+
+```
+owner > admin > editor > viewer
+```
+
+#### Matriz de Permisos
+
+| Permiso | Owner | Admin | Editor | Viewer |
+|---------|-------|-------|--------|--------|
+| Gestionar usuarios | ✅ | ✅ | ❌ | ❌ |
+| Invitar usuarios | ✅ | ✅ | ❌ | ❌ |
+| Gestionar templates | ✅ | ✅ | ❌ | ❌ |
+| Editar templates | ✅ | ✅ | ✅ | ❌ |
+| Enviar presentaciones | ✅ | ✅ | ✅ | ❌ |
+| Ver presentaciones | ✅ | ✅ | ✅ | ✅ |
+| Ver analytics | ✅ | ✅ | ❌ | ❌ |
+| Gestionar configuración | ✅ | ❌ | ❌ | ❌ |
+
+### API Reference
+
+#### Server Actions
+
+```typescript
+// Invitar usuario
+await inviteUser(email: string, role: Role)
+
+// Activar cuenta
+await activateAccount(token: string, name: string, password: string)
+
+// Cambiar rol
+await changeUserRole(userId: string, newRole: Role)
+
+// Activar/desactivar usuario
+await toggleUserStatus(userId: string)
+
+// Revocar invitación
+await revokeInvitation(invitationId: string)
+
+// Listar usuarios
+await listUsers()
+
+// Listar invitaciones pendientes
+await listPendingInvitations()
+```
+
+#### RBAC Helpers
+
+```typescript
+import { hasPermission, PERMISSIONS, type Role } from '@/lib/rbac';
+
+// Verificar permiso
+hasPermission(role, PERMISSIONS.MANAGE_USERS)
+
+// Verificar jerarquía
+hasRoleOrHigher(userRole, requiredRole)
+hasHigherRole(userRole, targetRole)
+
+// Validar rol
+isValidRole(role)
+```
+
+### Auditoría
+
+Todos los eventos de usuarios se registran en `AuditLog`:
+
+- `user.invited` - Usuario invitado
+- `user.activated` - Cuenta activada
+- `user.role_changed` - Rol modificado
+- `user.disabled` - Usuario desactivado
+- `user.enabled` - Usuario reactivado
+- `invitation.revoked` - Invitación revocada
+
+---
+
+**Última actualización:** 05 de Febrero de 2026

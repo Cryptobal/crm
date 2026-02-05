@@ -345,3 +345,83 @@ El dashboard debe:
 ---
 
 **Última actualización:** 05 de Febrero de 2026
+
+---
+
+## 👥 GESTIÓN DE USUARIOS MULTI-TENANT (v2.0)
+
+**Versión:** 2.0  
+**Fecha:** 05 de Febrero de 2026  
+
+### Modelo de Usuarios
+
+Cada usuario (Admin) pertenece a un único tenant pero el sistema está preparado para evolucionar a many-to-many via tabla Membership.
+
+#### Estado Actual
+
+```prisma
+model Admin {
+  tenantId  String  // Un usuario, un tenant
+  tenant    Tenant @relation(...)
+}
+```
+
+#### Evolución Futura (Many-to-Many)
+
+```prisma
+model Membership {
+  id        String @id
+  adminId   String
+  tenantId  String
+  role      String
+  active    Boolean
+  
+  @@unique([adminId, tenantId])
+}
+```
+
+### Invitaciones por Tenant
+
+Las invitaciones están scoped al tenant del usuario que invita:
+
+```typescript
+// Al invitar
+const invitation = await prisma.userInvitation.create({
+  data: {
+    email,
+    role,
+    tenantId: session.user.tenantId, // ← Del admin que invita
+    ...
+  },
+});
+```
+
+### Filtrado de Usuarios
+
+Todas las queries de usuarios filtran por `tenantId`:
+
+```typescript
+// Listar usuarios
+const users = await prisma.admin.findMany({
+  where: { tenantId: session.user.tenantId }, // ← Solo del tenant actual
+});
+```
+
+### Seguridad Multi-Tenant
+
+1. **Invitaciones**
+   - Solo se pueden enviar invitaciones al tenant propio
+   - Token de invitación incluye `tenantId`
+   - Usuario creado se asocia al `tenantId` de la invitación
+
+2. **Gestión de usuarios**
+   - Solo se pueden gestionar usuarios del mismo tenant
+   - Verificación en cada server action
+
+3. **Roles**
+   - Los roles son globales pero se aplican por tenant
+   - Un usuario puede tener diferentes roles en diferentes tenants (futuro)
+
+---
+
+**Última actualización:** 05 de Febrero de 2026

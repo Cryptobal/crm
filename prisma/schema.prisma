@@ -193,20 +193,55 @@ model Admin {
   email     String   @unique
   password  String   // Hash bcrypt
   name      String
-  role      String   @default("admin") // "admin", "editor", "viewer"
-  active    Boolean  @default(true)
+  role      String   @default("admin") // "owner", "admin", "editor", "viewer"
+  status    String   @default("active") // "invited", "active", "disabled"
   
   tenantId   String   // Tenant por defecto / activo (para tenant switcher)
   tenant     Tenant   @relation(fields: [tenantId], references: [id])
   
   // Metadata
   lastLoginAt DateTime?
+  invitedBy   String?  // User ID del que invitó
+  invitedAt   DateTime? // Cuándo fue invitado
+  activatedAt DateTime? // Cuándo activó su cuenta
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([email])
-  @@index([active])
+  @@index([status])
   @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+// ─── USER INVITATIONS ─────────────────────────────────
+
+model UserInvitation {
+  id        String   @id @default(cuid())
+  
+  email     String   // Email del invitado
+  role      String   // Rol inicial: "owner", "admin", "editor", "viewer"
+  
+  tenantId   String   // Tenant al que se invita
+  
+  // Token seguro (hasheado)
+  token      String   @unique // Hash del token de invitación
+  expiresAt  DateTime // Expira después de 48h
+  
+  // Lifecycle
+  acceptedAt DateTime? // Cuándo se aceptó la invitación
+  revokedAt  DateTime? // Si se revocó manualmente
+  
+  // Metadata
+  invitedBy  String?  // User ID del que invitó
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([token])
+  @@index([email])
+  @@index([tenantId])
+  @@index([expiresAt])
+  @@index([tenantId, email])
 }
 
 // ─── AUDIT LOG (opcional) ─────────────────────────────

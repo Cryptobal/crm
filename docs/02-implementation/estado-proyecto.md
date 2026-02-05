@@ -581,3 +581,214 @@ curl https://docs.gard.cl/api/templates
 **Estado:** ✅ SISTEMA MULTI-TENANT + AUTH.JS v5 - 100% OPERATIVO  
 **Milestone v1.3.0:** ✅ COMPLETADO  
 **Siguiente:** Tenant switcher UI, AdminTenant table, Notificaciones Slack, Mejoras UX
+
+---
+
+## 🆕 **NUEVA FUNCIONALIDAD: GESTIÓN DE USUARIOS Y RBAC**
+
+**Versión:** 2.0.0  
+**Fecha:** 05 de Febrero de 2026  
+**Estado:** ✅ IMPLEMENTADO
+
+### 📋 Resumen
+
+Sistema completo de administración de usuarios internos con invitación por email y control de acceso basado en roles (RBAC MVP).
+
+### ✅ Features Implementadas
+
+#### 1. Invitación por Email
+- ✅ Modal de invitación en /usuarios
+- ✅ Generación de token seguro (bcrypt)
+- ✅ Email con template React Email profesional
+- ✅ Token expirable (48 horas)
+- ✅ One-time use token
+- ✅ Revocación manual de invitaciones
+
+#### 2. Activación de Cuenta
+- ✅ Página /activate con validación de token
+- ✅ Formulario para nombre y contraseña
+- ✅ Validación de contraseña (mínimo 8 caracteres)
+- ✅ Creación automática de usuario al activar
+- ✅ Estado: invited → active
+
+#### 3. Sistema RBAC (Roles y Permisos)
+- ✅ 4 roles: owner, admin, editor, viewer
+- ✅ Matriz de permisos por rol
+- ✅ Helpers de validación (hasPermission, hasRoleOrHigher)
+- ✅ Middleware de autorización (en server actions)
+- ✅ Protección en UI (ocultación de acciones no permitidas)
+- ✅ Protección en server (validación de permisos)
+
+#### 4. Gestión de Usuarios
+- ✅ Ruta privada /usuarios (solo owner/admin)
+- ✅ Tabla de usuarios activos con columnas:
+  - Nombre, Email, Rol, Estado, Último login
+- ✅ Tabla de invitaciones pendientes
+- ✅ Acciones disponibles:
+  - Invitar nuevo usuario
+  - Cambiar rol (futuro, UI pendiente)
+  - Desactivar/reactivar usuario
+  - Revocar invitación pendiente
+
+#### 5. Seguridad
+- ✅ Tokens hasheados en BD (bcrypt)
+- ✅ Validación: no eliminar último owner
+- ✅ Validación: no modificar propio rol/estado
+- ✅ Scope por tenant (multi-tenancy compliant)
+- ✅ Rate limiting en invitaciones
+- ✅ Logging de eventos en AuditLog
+
+#### 6. Auditoría
+- ✅ Eventos registrados:
+  - user.invited
+  - user.activated
+  - user.role_changed
+  - user.disabled / enabled
+  - invitation.revoked
+- ✅ Detalles completos (quien, qué, cuándo, dónde)
+- ✅ Filtrado por tenant
+
+#### 7. Modelo de Datos
+- ✅ Tabla Admin actualizada (status, invitedBy, invitedAt, activatedAt)
+- ✅ Tabla UserInvitation completa
+- ✅ Migración segura (active → status)
+- ✅ Índices optimizados
+
+#### 8. Email Templates
+- ✅ UserInvitationEmail con React Email
+- ✅ Diseño profesional con branding Gard
+- ✅ Información clara (rol, quien invita, expiración)
+- ✅ CTA prominente (botón de activación)
+
+### 📊 Archivos Creados/Modificados
+
+#### Backend
+```
+src/lib/rbac.ts                    ← RBAC helpers
+src/lib/auth.ts                    ← Actualizado (status, lastLoginAt)
+src/app/actions/users.ts           ← Server actions de usuarios
+prisma/schema.prisma               ← UserInvitation model
+prisma/migrations/.../migration.sql ← Migración
+```
+
+#### Frontend
+```
+src/app/usuarios/page.tsx          ← Página de gestión
+src/app/activate/page.tsx          ← Página de activación
+src/components/usuarios/
+  ├── UsersTable.tsx               ← Tabla de usuarios
+  ├── InvitationsTable.tsx         ← Tabla de invitaciones
+  └── InviteUserButton.tsx         ← Modal de invitación
+```
+
+#### Email
+```
+src/emails/UserInvitation.tsx      ← Template React Email
+```
+
+#### Documentación
+```
+docs/01-architecture/auth.md         ← Flujo de invitación
+docs/01-architecture/multitenancy.md ← Usuarios multi-tenant
+docs/02-implementation/estado-proyecto.md ← Este archivo
+```
+
+### 🔄 Flujo Completo
+
+```
+✅ Admin → /usuarios → "Invitar Usuario"
+    ↓
+✅ Modal: email + rol → Submit
+    ↓
+✅ Sistema:
+   - Genera token seguro (hash)
+   - Guarda en UserInvitation
+   - Envía email (React Email + Resend)
+   - Registra en AuditLog
+    ↓
+✅ Usuario recibe email → Click "Activar cuenta"
+    ↓
+✅ /activate?token=XYZ
+   - Formulario: nombre + contraseña
+   - Submit
+    ↓
+✅ Sistema:
+   - Valida token (bcrypt compare)
+   - Crea usuario (Admin) con status="active"
+   - Marca invitación como acceptedAt
+   - Registra en AuditLog
+    ↓
+✅ Redirect a /login → Usuario puede autenticarse
+```
+
+### 🎯 Casos de Uso Cubiertos
+
+1. ✅ **Invitación de usuario**
+   - Owner/Admin invita a nuevo miembro del equipo
+   - Email automático con link seguro
+   - Expiración de 48 horas
+
+2. ✅ **Activación de cuenta**
+   - Usuario define su propia contraseña
+   - Proceso guiado y simple
+   - Validaciones de seguridad
+
+3. ✅ **Gestión de permisos**
+   - Diferentes niveles de acceso (viewer → owner)
+   - Control granular de funcionalidades
+   - Prevención de acciones no permitidas
+
+4. ✅ **Desactivación temporal**
+   - Suspender acceso sin eliminar usuario
+   - Mantiene historial y asociaciones
+   - Reactivación simple
+
+5. ✅ **Auditoría completa**
+   - Trazabilidad de todas las acciones
+   - Investigación de incidentes
+   - Compliance y reporting
+
+### 🚀 Próximos Pasos (Futuro)
+
+- [ ] UI para cambiar rol desde tabla de usuarios
+- [ ] Búsqueda y filtros en tabla de usuarios
+- [ ] Exportar lista de usuarios (CSV/PDF)
+- [ ] Página de perfil de usuario
+- [ ] 2FA (Two-Factor Authentication)
+- [ ] SSO (Single Sign-On) con proveedores externos
+- [ ] Membership many-to-many (usuario en múltiples tenants)
+- [ ] Roles personalizados por tenant
+- [ ] Grupos de usuarios
+- [ ] Permisos granulares por recurso
+
+### 📈 Métricas
+
+| Métrica | Valor |
+|---------|-------|
+| **Modelos Prisma** | +1 (UserInvitation) |
+| **Campos Admin** | +4 (status, invitedBy, invitedAt, activatedAt) |
+| **Server Actions** | 7 funciones |
+| **Páginas** | 2 (/usuarios, /activate) |
+| **Componentes** | 3 (UsersTable, InvitationsTable, InviteUserButton) |
+| **Email Templates** | 1 (UserInvitationEmail) |
+| **Roles** | 4 (owner, admin, editor, viewer) |
+| **Permisos** | 9 permisos definidos |
+| **Eventos Audit** | 6 tipos |
+
+---
+
+## ✅ **DEFINICIÓN DE HECHO - COMPLETADA**
+
+- ✅ Un admin puede invitar usuarios por email
+- ✅ El usuario define su contraseña vía link seguro
+- ✅ Roles restringen acciones correctamente (UI + server)
+- ✅ Existe auditoría completa de acciones
+- ✅ El sistema está listo para cotizador y firma electrónica
+- ✅ Documentación actualizada (auth.md, multitenancy.md)
+- ✅ No se modificó lógica de /p/* ni presentaciones
+- ✅ Multi-tenancy preservado y mejorado
+
+---
+
+**Última actualización:** 05 de Febrero de 2026  
+**Versión:** 2.0.0 - Gestión de Usuarios y RBAC MVP

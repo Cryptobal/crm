@@ -49,7 +49,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const password = String(credentials.password);
 
         const admin = await prisma.admin.findUnique({
-          where: { email, active: true },
+          where: { email, status: 'active' },
           include: { tenant: true },
         });
         if (!admin) return null;
@@ -95,3 +95,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   trustHost: true,
 });
+
+/**
+ * Helper para actualizar último login
+ */
+export async function updateLastLogin(userId: string) {
+  await prisma.admin.update({
+    where: { id: userId },
+    data: { lastLoginAt: new Date() },
+  });
+}
