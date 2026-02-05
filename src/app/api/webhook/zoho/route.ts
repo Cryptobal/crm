@@ -56,7 +56,12 @@ export async function POST(request: NextRequest) {
     });
 
     // 7. Construir URL de preview
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
+    // Usar SITE_URL primero (para API routes del servidor)
+    // Fallback a NEXT_PUBLIC_SITE_URL (para desarrollo local)
+    const baseUrl = process.env.SITE_URL || 
+                    process.env.NEXT_PUBLIC_SITE_URL || 
+                    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                    'https://docs.gard.cl';
     const previewUrl = `${baseUrl}/preview/${sessionId}`;
 
     // 8. Log de éxito
