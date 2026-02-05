@@ -14,11 +14,11 @@ interface TemplatePreviewPageProps {
   }>;
 }
 
-export default async function TemplatePreviewPage({ searchParams }: TemplatePreviewPageProps) {
-  const params = await searchParams;
+export default async function TemplatePreviewPage(props: TemplatePreviewPageProps) {
+  const searchParams = await props.searchParams;
   
   // Solo accesible con ?admin=true (por ahora, luego con auth)
-  if (params.admin !== 'true') {
+  if (searchParams.admin !== 'true') {
     redirect('/');
   }
   
@@ -26,7 +26,7 @@ export default async function TemplatePreviewPage({ searchParams }: TemplatePrev
   const payload = getMockPresentationPayload();
   
   // Theme desde query param
-  const theme = params.theme || 'executive';
+  const theme = searchParams.theme || 'executive';
   
   return (
     <TemplatePreviewWrapper

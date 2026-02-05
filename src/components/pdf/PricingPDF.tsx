@@ -16,48 +16,58 @@ interface PricingPDFProps {
   contactPhone?: string;
 }
 
-// Estilos branded de Gard
+// Estilos branded de Gard - ACTUALIZADO para match con preview
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
+    padding: 0,
     backgroundColor: '#ffffff',
     fontFamily: 'Helvetica',
   },
   header: {
-    marginBottom: 30,
-    paddingBottom: 20,
-    borderBottom: '2 solid #00d4aa',
+    backgroundColor: '#14b8a6', // Teal-500
+    padding: 32,
+    marginBottom: 0,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   logo: {
     width: 120,
-    height: 40,
-    marginBottom: 15,
+    height: 48,
+  },
+  pageNumber: {
+    fontSize: 10,
+    color: '#ffffff',
+    textAlign: 'right',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: '#64748b',
-    marginBottom: 3,
+    color: '#ffffff',
+    marginBottom: 16,
   },
   clientInfo: {
-    fontSize: 14,
-    color: '#334155',
-    marginBottom: 2,
+    fontSize: 11,
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  clientInfoLabel: {
+    fontWeight: 'bold',
   },
   table: {
-    marginTop: 20,
+    marginTop: 0,
     marginBottom: 20,
+    marginLeft: 32,
+    marginRight: 32,
   },
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: '#f1f5f9',
-    padding: 10,
-    borderBottom: '2 solid #00d4aa',
+    padding: 12,
+    borderBottom: '2 solid #14b8a6',
   },
   tableHeaderCell: {
     fontSize: 10,
@@ -81,20 +91,23 @@ const styles = StyleSheet.create({
   },
   totalRow: {
     flexDirection: 'row',
-    padding: 12,
-    backgroundColor: '#ecfdf5',
-    borderTop: '2 solid #00d4aa',
-    marginTop: 10,
+    padding: 16,
+    backgroundColor: '#d1fae5',
+    border: '2 solid #14b8a6',
+    borderRadius: 8,
+    marginTop: 16,
+    marginLeft: 32,
+    marginRight: 32,
   },
   totalLabel: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#0f172a',
   },
   totalAmount: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#00d4aa',
+    color: '#14b8a6',
   },
   note: {
     fontSize: 9,
@@ -104,9 +117,11 @@ const styles = StyleSheet.create({
   },
   termsSection: {
     marginTop: 20,
-    padding: 15,
-    backgroundColor: '#f8fafc',
-    borderRadius: 4,
+    marginLeft: 32,
+    marginRight: 32,
+    padding: 20,
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
   },
   termsTitle: {
     fontSize: 12,
@@ -122,8 +137,8 @@ const styles = StyleSheet.create({
   footer: {
     position: 'absolute',
     bottom: 30,
-    left: 40,
-    right: 40,
+    left: 32,
+    right: 32,
     paddingTop: 15,
     borderTop: '1 solid #e2e8f0',
     flexDirection: 'row',
@@ -132,10 +147,6 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 9,
     color: '#64748b',
-  },
-  pageNumber: {
-    fontSize: 9,
-    color: '#94a3b8',
   },
 });
 
@@ -169,18 +180,27 @@ export function PricingPDF({
     <Document>
       {pages.map((pageItems, pageIndex) => (
         <Page key={pageIndex} size="A4" style={styles.page}>
-          {/* Header en cada página */}
+          {/* Header con gradiente teal (simulado con color sólido) */}
           <View style={styles.header}>
-            {/* Logo Gard - Imagen real */}
-            <PDFImage 
-              src="/Logo Gard azul.webp"
-              style={styles.logo}
-            />
+            <View style={styles.headerTop}>
+              {/* Logo Gard Blanco */}
+              <PDFImage 
+                src="/Logo Gard Blanco.png"
+                style={styles.logo}
+              />
+              <Text style={styles.pageNumber}>Página {pageIndex + 1} de {totalPages}</Text>
+            </View>
             
-            <Text style={styles.title}>Propuesta Económica</Text>
-            <Text style={styles.clientInfo}>Para: {clientName}</Text>
-            <Text style={styles.subtitle}>Cotización: {quoteNumber}</Text>
-            <Text style={styles.subtitle}>Fecha: {quoteDate}</Text>
+            <Text style={styles.title}>PROPUESTA ECONÓMICA</Text>
+            <Text style={styles.clientInfo}>
+              <Text style={styles.clientInfoLabel}>Para:</Text> {clientName}
+            </Text>
+            <Text style={styles.clientInfo}>
+              <Text style={styles.clientInfoLabel}>Cotización:</Text> {quoteNumber}
+            </Text>
+            <Text style={styles.clientInfo}>
+              <Text style={styles.clientInfoLabel}>Fecha:</Text> {quoteDate}
+            </Text>
           </View>
           
           {/* Tabla */}
@@ -239,7 +259,10 @@ export function PricingPDF({
               <Text style={styles.footerText}>{contactEmail}</Text>
               <Text style={styles.footerText}>{contactPhone}</Text>
             </View>
-            <Text style={styles.pageNumber}>Página {pageIndex + 1} de {totalPages}</Text>
+            <View>
+              <Text style={styles.footerText}>Gard Security</Text>
+              <Text style={styles.footerText}>www.gard.cl</Text>
+            </View>
           </View>
         </Page>
       ))}

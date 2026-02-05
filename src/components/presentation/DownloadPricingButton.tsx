@@ -2,6 +2,7 @@
 
 /**
  * DownloadPricingButton - Botón para descargar PDF de pricing
+ * IMPORTANTE: Este componente solo se carga en el cliente (ver dynamic import en Section23)
  */
 
 import { PDFDownloadLink } from '@react-pdf/renderer';
@@ -55,7 +56,7 @@ export function DownloadPricingButton({
         className
       )}
     >
-      {({ loading }) => (
+      {({ loading }: { loading: boolean }) => (
         <>
           <Download className="w-5 h-5" />
           <span>{loading ? 'Generando PDF...' : 'Descargar Propuesta PDF'}</span>
@@ -64,3 +65,6 @@ export function DownloadPricingButton({
     </PDFDownloadLink>
   );
 }
+
+// Export default para dynamic import
+export default DownloadPricingButton;

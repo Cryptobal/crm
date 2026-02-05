@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { formatCurrency, formatUF } from '@/lib/utils';
 import { FileText, Calendar, TrendingUp, Sparkles, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { DownloadPricingButton } from '../DownloadPricingButton';
+import { DownloadPricingButtonV2 } from '../DownloadPricingButtonV2';
 
 interface Section23PropuestaEconomicaProps {
   data: Section23_PropuestaEconomica;
@@ -280,14 +280,10 @@ export function Section23PropuestaEconomica({
           <p className="text-white/60">¿Preguntas sobre la propuesta?</p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            {/* Descarga PDF */}
-            <DownloadPricingButton
+            {/* Descarga PDF - Ahora usa Playwright para PDF idéntico */}
+            <DownloadPricingButtonV2
               clientName={clientName}
               quoteNumber={quoteNumber}
-              quoteDate={quoteDate}
-              pricing={data.pricing}
-              contactEmail={contactEmail}
-              contactPhone={contactPhone}
             />
             
             {/* Reunión comercial */}

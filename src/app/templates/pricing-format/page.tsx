@@ -14,10 +14,10 @@ interface PricingFormatPageProps {
   }>;
 }
 
-export default async function PricingFormatPage({ searchParams }: PricingFormatPageProps) {
-  const params = await searchParams;
+export default async function PricingFormatPage(props: PricingFormatPageProps) {
+  const searchParams = await props.searchParams;
   
-  if (params.admin !== 'true') {
+  if (searchParams.admin !== 'true') {
     redirect('/');
   }
   
@@ -32,7 +32,14 @@ export default async function PricingFormatPage({ searchParams }: PricingFormatP
         <div className="bg-gradient-to-r from-teal-500 to-blue-500 p-8 text-white">
           <div className="flex items-center justify-between mb-6">
             <div className="relative w-32 h-12">
-              <div className="text-2xl font-black">GARD SECURITY</div>
+              <Image
+                src="/Logo Gard Blanco.png"
+                alt="Gard Security"
+                width={128}
+                height={48}
+                className="object-contain"
+                priority
+              />
             </div>
             <div className="text-right text-sm">
               <div>Página 1 de 1</div>
