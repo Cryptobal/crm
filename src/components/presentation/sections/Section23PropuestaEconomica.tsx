@@ -78,21 +78,27 @@ export function Section23PropuestaEconomica({
         </div>
         
         {/* Pricing table (desktop) */}
-        <div className="hidden md:block mb-12 max-w-5xl mx-auto">
+        <div className="hidden md:block mb-12 max-w-6xl mx-auto">
           <div className="glass-card rounded-2xl overflow-hidden border-2 border-white/10 shadow-2xl">
-            <table className="w-full">
+            <table className="w-full table-fixed">
+              <colgroup>
+                <col className="w-[50%]" />
+                <col className="w-[12%]" />
+                <col className="w-[19%]" />
+                <col className="w-[19%]" />
+              </colgroup>
               <thead>
                 <tr className="bg-white/5 border-b border-white/10">
-                  <th className="px-8 py-5 text-left font-bold text-white text-lg">
+                  <th className="px-6 py-5 text-left font-bold text-white text-base">
                     Descripción
                   </th>
-                  <th className="px-6 py-5 text-center font-bold text-white text-lg">
+                  <th className="px-4 py-5 text-center font-bold text-white text-base whitespace-nowrap">
                     Cant.
                   </th>
-                  <th className="px-6 py-5 text-right font-bold text-white text-lg">
+                  <th className="px-4 py-5 text-right font-bold text-white text-base whitespace-nowrap">
                     P. Unitario
                   </th>
-                  <th className="px-8 py-5 text-right font-bold text-white text-lg">
+                  <th className="px-6 py-5 text-right font-bold text-white text-base">
                     Subtotal
                   </th>
                 </tr>
@@ -107,8 +113,8 @@ export function Section23PropuestaEconomica({
                     transition={{ delay: index * 0.1, duration: 0.5 }}
                     className="border-b border-white/5 hover:bg-white/5 transition-colors"
                   >
-                    <td className="px-8 py-5">
-                      <div className="font-semibold text-white">
+                    <td className="px-6 py-5">
+                      <div className="font-semibold text-white text-sm leading-relaxed">
                         {showTokens && item.description.includes('Guardias') 
                           ? '[ITEM_DESCRIPTION_1]' 
                           : showTokens && item.description.includes('Supervisor')
@@ -118,19 +124,19 @@ export function Section23PropuestaEconomica({
                           : item.description}
                       </div>
                       {item.notes && !showTokens && (
-                        <div className="text-sm mt-1 text-white/50">{item.notes}</div>
+                        <div className="text-xs mt-1 text-white/50">{item.notes}</div>
                       )}
                       {showTokens && (
-                        <div className="text-sm mt-1 text-amber-400/70">[ITEM_NOTES]</div>
+                        <div className="text-xs mt-1 text-amber-400/70">[ITEM_NOTES]</div>
                       )}
                     </td>
-                    <td className="px-6 py-5 text-center text-white/80 font-medium">
+                    <td className="px-4 py-5 text-center text-white/80 font-medium text-sm">
                       {showTokens ? '[CANT]' : item.quantity}
                     </td>
-                    <td className="px-6 py-5 text-right text-white/60">
+                    <td className="px-4 py-5 text-right text-white/70 font-medium text-sm">
                       {showTokens ? '[P_UNIT]' : formatPrice(item.unit_price)}
                     </td>
-                    <td className="px-8 py-5 text-right font-bold text-white">
+                    <td className="px-6 py-5 text-right font-bold text-white text-base">
                       {showTokens ? '[SUBTOTAL]' : formatPrice(item.subtotal)}
                     </td>
                   </motion.tr>
@@ -138,11 +144,11 @@ export function Section23PropuestaEconomica({
                 
                 {/* Total Neto - SIN IVA */}
                 <tr className="bg-gradient-to-r from-teal-500/20 to-blue-500/20 border-t-2 border-teal-400/50">
-                  <td colSpan={3} className="px-8 py-6 text-right text-2xl font-black text-white">
+                  <td colSpan={3} className="px-6 py-8 text-right text-xl font-black text-white">
                     TOTAL NETO MENSUAL
                   </td>
-                  <td className="px-8 py-6 text-right">
-                    <div className="text-4xl font-black bg-gradient-to-br from-teal-400 to-blue-400 bg-clip-text text-transparent">
+                  <td className="px-6 py-8 text-right">
+                    <div className="text-4xl font-black bg-gradient-to-br from-teal-400 to-blue-400 bg-clip-text text-transparent leading-tight">
                       {showTokens ? '[QUOTE_SUBTOTAL]' : formatPrice(pricing.subtotal)}
                     </div>
                     <div className="text-xs text-white/50 mt-2">
