@@ -53,7 +53,7 @@ export function PresentationRenderer({ payload, showTokens = false }: Presentati
   const { theme, sections, assets, cta, contact } = payload;
   
   return (
-    <ThemeProvider variant={theme}>
+    <ThemeProvider key={theme} variant={theme}>
       <div className="presentation-container min-h-screen">
         {/* Progress Bar Superior */}
         <ScrollProgress />
