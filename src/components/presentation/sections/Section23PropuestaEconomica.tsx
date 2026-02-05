@@ -121,34 +121,17 @@ export function Section23PropuestaEconomica({ data, showTokens = false }: Sectio
                   </motion.tr>
                 ))}
                 
-                {/* Subtotal */}
-                <tr className="border-t-2 border-white/20">
-                  <td colSpan={3} className="px-8 py-4 text-right font-bold text-white/80">
-                    Subtotal
-                  </td>
-                  <td className="px-8 py-4 text-right text-xl font-bold text-white">
-                    {showTokens ? '[QUOTE_SUBTOTAL]' : formatPrice(pricing.subtotal)}
-                  </td>
-                </tr>
-                
-                {/* IVA */}
-                <tr>
-                  <td colSpan={3} className="px-8 py-4 text-right font-bold text-white/80">
-                    IVA (19%)
-                  </td>
-                  <td className="px-8 py-4 text-right text-xl font-bold text-white">
-                    {showTokens ? '[QUOTE_TAX]' : formatPrice(pricing.tax)}
-                  </td>
-                </tr>
-                
-                {/* Total */}
+                {/* Total Neto - SIN IVA */}
                 <tr className="bg-gradient-to-r from-teal-500/20 to-blue-500/20 border-t-2 border-teal-400/50">
                   <td colSpan={3} className="px-8 py-6 text-right text-2xl font-black text-white">
-                    TOTAL MENSUAL
+                    TOTAL NETO MENSUAL
                   </td>
                   <td className="px-8 py-6 text-right">
                     <div className="text-4xl font-black bg-gradient-to-br from-teal-400 to-blue-400 bg-clip-text text-transparent">
-                      {showTokens ? '[QUOTE_TOTAL]' : formatPrice(pricing.total)}
+                      {showTokens ? '[QUOTE_SUBTOTAL]' : formatPrice(pricing.subtotal)}
+                    </div>
+                    <div className="text-xs text-white/50 mt-2">
+                      Valores netos. IVA se factura según ley.
                     </div>
                   </td>
                 </tr>
@@ -191,13 +174,16 @@ export function Section23PropuestaEconomica({ data, showTokens = false }: Sectio
             </motion.div>
           ))}
           
-          {/* Total mobile */}
+          {/* Total Neto mobile */}
           <div className="glass-card rounded-xl p-6 border-2 border-teal-400/50 glow-teal">
-            <div className="flex justify-between items-center">
-              <span className="text-2xl font-black text-white">TOTAL</span>
-              <span className="text-3xl font-black bg-gradient-to-br from-teal-400 to-blue-400 bg-clip-text text-transparent">
-                {showTokens ? '[TOTAL]' : formatPrice(pricing.total)}
-              </span>
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xl font-black text-white">TOTAL NETO MENSUAL</span>
+                <span className="text-3xl font-black bg-gradient-to-br from-teal-400 to-blue-400 bg-clip-text text-transparent">
+                  {showTokens ? '[SUBTOTAL]' : formatPrice(pricing.subtotal)}
+                </span>
+              </div>
+              <p className="text-xs text-white/50">Valores netos. IVA se factura según ley.</p>
             </div>
           </div>
         </div>
