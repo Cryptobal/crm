@@ -4,6 +4,50 @@ Todos los cambios notables del proyecto están documentados aquí.
 
 ---
 
+## [1.0.0] - 2026-02-05 🎉
+
+### 🚀 VERSIÓN 1.0 - MVP COMPLETO EN PRODUCCIÓN
+
+**Sistema de email 100% funcional y operativo en producción.**
+
+#### ✅ Features Completadas
+
+**Sistema de Email:**
+- ✅ Envío de emails con Resend + React Email
+- ✅ Template profesional con logo de Gard
+- ✅ Destinatario editable (nombre + email)
+- ✅ CC adicionales (hasta 5 emails)
+- ✅ Links públicos correctos: `https://docs.gard.cl/p/[uniqueId]`
+- ✅ WhatsApp share con número del contacto de Zoho
+- ✅ Tracking completo (opens, clicks, delivered)
+- ✅ Preview de email en sidebar y página dedicada
+
+**Fixes Importantes:**
+- 🔧 URL pública correcta (sin "undefined")
+- 🔧 WhatsApp abre directo al número del contacto
+- 🔧 Logo de Gard visible en emails
+- 🔧 Destinatario editable en modal
+- 🔧 Build de Prisma automático en Vercel
+
+**Archivos Principales:**
+- Template: `src/emails/PresentationEmail.tsx`
+- Endpoint: `src/app/api/presentations/send-email/route.ts`
+- Webhook: `src/app/api/webhook/resend/route.ts`
+- Modales: `SendEmailModal.tsx`, `SuccessModal.tsx`
+- Preview: `src/app/templates/email/preview/page.tsx`
+
+#### 📊 Commits de esta versión
+
+Total: ~8 commits desde v0.5.0
+- feat: sistema de email con tracking completo
+- fix: prisma generate en build script
+- feat: destinatario principal editable
+- fix: url pública correcta y whatsapp con número
+- fix: interfaz TypeScript de SendEmailModal
+- Múltiples fixes de hidratación y rendering
+
+---
+
 ## [0.5.1] - 2026-02-05
 
 ### ✨ AGREGADO: Preview de Email en Sidebar
