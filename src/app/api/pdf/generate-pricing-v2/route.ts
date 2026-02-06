@@ -59,9 +59,9 @@ function generatePricingHTML(data: PricingRequest): string {
   `).join('');
 
   const conditionsHTML = `
-    ${pricing.payment_terms ? `<div class="text-sm text-gray-700 mb-2">• Forma de pago: ${pricing.payment_terms}</div>` : ''}
-    ${pricing.adjustment_terms ? `<div class="text-sm text-gray-700 mb-2">• Reajuste: ${pricing.adjustment_terms}</div>` : ''}
-    ${pricing.notes ? pricing.notes.map(note => `<div class="text-sm text-gray-700 mb-2">• ${note}</div>`).join('') : ''}
+    ${pricing.payment_terms ? `<div style="font-size: 10px; color: #334155; margin-bottom: 6px; line-height: 1.4;">• <strong>Forma de pago:</strong> ${pricing.payment_terms}</div>` : ''}
+    ${pricing.adjustment_terms ? `<div style="font-size: 10px; color: #334155; margin-bottom: 6px; line-height: 1.4;">• <strong>Reajuste:</strong> ${pricing.adjustment_terms}</div>` : ''}
+    ${pricing.notes ? pricing.notes.map(note => `<div style="font-size: 10px; color: #334155; margin-bottom: 6px; line-height: 1.4;">• ${note}</div>`).join('') : ''}
   `;
 
   return `
@@ -78,11 +78,16 @@ function generatePricingHTML(data: PricingRequest): string {
       box-sizing: border-box;
     }
     
+    @page {
+      margin: 0;
+      size: A4;
+    }
+    
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
       background: white;
       color: #1e293b;
-      line-height: 1.5;
+      line-height: 1.4;
     }
     
     .page {
@@ -94,8 +99,8 @@ function generatePricingHTML(data: PricingRequest): string {
     }
     
     .header {
-      background: #5dc1b9;
-      padding: 35px 45px;
+      background: linear-gradient(135deg, #5dc1b9 0%, #4a9d96 100%);
+      padding: 20px 40px 18px 40px;
       margin-bottom: 0;
     }
     
@@ -103,7 +108,7 @@ function generatePricingHTML(data: PricingRequest): string {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 25px;
+      margin-bottom: 12px;
     }
     
     .logo-container {
@@ -112,61 +117,59 @@ function generatePricingHTML(data: PricingRequest): string {
     }
     
     .logo {
-      width: 125px;
+      width: 100px;
       height: auto;
     }
     
-    .page-number {
-      color: white;
-      font-size: 10px;
-      font-weight: 400;
-    }
-    
     .title {
-      font-size: 28px;
+      font-size: 22px;
       font-weight: 700;
       color: white;
-      letter-spacing: 0.3px;
-      margin-bottom: 18px;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
     }
     
     .client-info {
-      color: white;
-      font-size: 11px;
-      margin-bottom: 4px;
+      color: rgba(255, 255, 255, 0.95);
+      font-size: 10px;
+      margin-bottom: 2px;
       font-weight: 400;
-      line-height: 1.6;
+      line-height: 1.5;
     }
     
     .client-info strong {
       font-weight: 600;
-      margin-right: 2px;
+      margin-right: 3px;
     }
     
     .content {
-      padding: 40px 50px 20px 50px;
-      min-height: 600px;
+      padding: 30px 40px;
     }
     
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 30px;
+      margin-bottom: 20px;
+      page-break-inside: auto;
+    }
+    
+    thead {
+      display: table-header-group;
     }
     
     thead tr {
-      background: #f1f5f9;
+      background: #f8fafc;
       border-bottom: 2px solid #5dc1b9;
     }
     
     th {
-      padding: 12px 14px;
+      padding: 10px 12px;
       text-align: left;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 700;
       color: #1e293b;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.5px;
     }
     
     th:nth-child(2) {
@@ -178,68 +181,75 @@ function generatePricingHTML(data: PricingRequest): string {
       text-align: right;
     }
     
-    tbody tr:hover {
-      background: #f8fafc;
+    tbody tr {
+      page-break-inside: avoid;
+      border-bottom: 1px solid #f1f5f9;
     }
     
     td {
-      padding: 14px 16px;
+      padding: 10px 12px;
+      font-size: 11px;
+      color: #334155;
+      line-height: 1.4;
     }
     
     .total-box {
-      background: #d1fae5;
-      border: 2.5px solid #5dc1b9;
-      border-radius: 10px;
-      padding: 22px 28px;
-      margin: 25px 0 10px 0;
+      background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+      border: 2px solid #5dc1b9;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 20px 0 8px 0;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      page-break-inside: avoid;
     }
     
     .total-label {
-      font-size: 20px;
+      font-size: 16px;
       font-weight: 700;
       color: #1e293b;
       letter-spacing: 0.3px;
     }
     
     .total-amount {
-      font-size: 32px;
+      font-size: 28px;
       font-weight: 700;
-      color: #5dc1b9;
-      letter-spacing: -0.3px;
+      color: #0d9488;
+      letter-spacing: -0.5px;
     }
     
     .note {
-      font-size: 9px;
+      font-size: 8px;
       color: #64748b;
       font-style: italic;
-      margin-bottom: 25px;
+      margin-bottom: 18px;
       padding-left: 2px;
     }
     
     .conditions {
       background: #f9fafb;
-      border-radius: 12px;
-      padding: 24px 30px;
-      margin-bottom: 40px;
+      border-left: 3px solid #5dc1b9;
+      border-radius: 6px;
+      padding: 18px 22px;
+      margin-bottom: 30px;
+      page-break-inside: avoid;
     }
     
     .conditions-title {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 700;
       color: #0f172a;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
     
     .footer {
-      padding: 20px 50px 40px 50px;
-      margin-top: auto;
+      padding: 18px 40px 25px 40px;
+      margin-top: 30px;
       border-top: 1px solid #e2e8f0;
       display: flex;
       justify-content: space-between;
-      font-size: 10px;
+      font-size: 9px;
       color: #64748b;
       page-break-inside: avoid;
     }
@@ -257,6 +267,14 @@ function generatePricingHTML(data: PricingRequest): string {
       .page {
         margin: 0;
         padding: 0;
+      }
+      
+      .header {
+        page-break-after: avoid;
+      }
+      
+      .content {
+        page-break-before: avoid;
       }
     }
   </style>
