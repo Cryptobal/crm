@@ -53,6 +53,8 @@ export function DocumentosContent({ presentations, stats, conversionRate }: Docu
             title="Total"
             value={stats.total}
             icon={<FileText className="h-4 w-4" />}
+            trend="neutral"
+            trendValue="Todas"
             className={activeFilter === 'all' ? 'ring-2 ring-primary' : 'hover:ring-2 hover:ring-muted cursor-pointer'}
           />
         </button>
@@ -63,6 +65,7 @@ export function DocumentosContent({ presentations, stats, conversionRate }: Docu
             value={stats.sent}
             icon={<Send className="h-4 w-4" />}
             trend={stats.sent > 0 ? 'up' : 'neutral'}
+            trendValue={`${stats.total > 0 ? ((stats.sent / stats.total) * 100).toFixed(0) : 0}% del total`}
             className={activeFilter === 'sent' ? 'ring-2 ring-primary' : 'hover:ring-2 hover:ring-muted cursor-pointer'}
           />
         </button>
