@@ -116,15 +116,15 @@ export function getMockPresentationPayload(): PresentationPayload {
     
     // CTA y contacto
     cta: {
-      meeting_link: 'https://calendar.app.google/pZyyqzUgXoMgacYz7',
+      meeting_link: 'https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ1Pw1jeKf---C8bRMp7lqkoSZHhwwqW1kA5QkCjRSvOVGoDda0qVwbzELTHf8vIJCwX4bMkiH0Z',
       whatsapp_link: 'https://wa.me/56982307771',
       phone: '+56 98 230 7771',
-      email: 'carlos.irigoyen@gard.cl',
+      email: 'comercial@gard.cl',
     },
     
     contact: {
-      name: 'Carlos Irigoyen',
-      email: 'carlos.irigoyen@gard.cl',
+      name: 'Equipo Comercial',
+      email: 'comercial@gard.cl',
       phone: '+56 98 230 7771',
       position: 'Gerente Comercial',
     },

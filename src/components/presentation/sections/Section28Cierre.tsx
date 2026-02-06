@@ -22,7 +22,7 @@ interface Section28CierrePropsExtended {
   contactPhone?: string;
 }
 
-export function Section28Cierre({ data, contactEmail = 'carlos.irigoyen@gard.cl', contactPhone = '+56982307771' }: Section28CierrePropsExtended) {
+export function Section28Cierre({ data, contactEmail = 'comercial@gard.cl', contactPhone = '+56982307771' }: Section28CierrePropsExtended) {
   const theme = useThemeClasses();
   
   // WhatsApp link para hablar con quien envió la propuesta

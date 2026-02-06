@@ -155,7 +155,7 @@ export function PricingPDF({
   quoteNumber, 
   quoteDate,
   pricing,
-  contactEmail = 'carlos.irigoyen@gard.cl',
+  contactEmail = 'comercial@gard.cl',
   contactPhone = '+56 98 230 7771'
 }: PricingPDFProps) {
   // Calcular paginación

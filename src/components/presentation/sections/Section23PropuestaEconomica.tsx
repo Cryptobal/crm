@@ -30,7 +30,7 @@ export function Section23PropuestaEconomica({
   clientName = 'Cliente',
   quoteNumber = 'COT-000',
   quoteDate = new Date().toLocaleDateString('es-CL'),
-  contactEmail = 'carlos.irigoyen@gard.cl',
+  contactEmail = 'comercial@gard.cl',
   contactPhone = '+56 98 230 7771'
 }: Section23PropuestaEconomicaProps) {
   const theme = useThemeClasses();
@@ -370,7 +370,9 @@ export function Section23PropuestaEconomica({
             
             {/* Reunión comercial */}
             <a
-              href={`mailto:${contactEmail}`}
+              href="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ1Pw1jeKf---C8bRMp7lqkoSZHhwwqW1kA5QkCjRSvOVGoDda0qVwbzELTHf8vIJCwX4bMkiH0Z"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-base font-bold text-white glass-card border-2 border-white/30 hover:bg-white/10 hover:border-white/50 shadow-xl transition-all duration-300 hover:scale-105"
             >
               <FileText className="w-5 h-5" />

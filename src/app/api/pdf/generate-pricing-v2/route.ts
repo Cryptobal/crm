@@ -318,7 +318,7 @@ function generatePricingHTML(data: PricingRequest): string {
     <!-- Footer -->
     <div class="footer">
       <div class="footer-left">
-        <div>${contactEmail || 'carlos.irigoyen@gard.cl'}</div>
+        <div>${contactEmail || 'comercial@gard.cl'}</div>
         <div>${contactPhone || '+56 98 230 7771'}</div>
       </div>
       <div class="footer-right">
