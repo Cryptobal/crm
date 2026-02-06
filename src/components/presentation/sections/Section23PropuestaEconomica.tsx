@@ -370,7 +370,7 @@ export function Section23PropuestaEconomica({
             
             {/* Reunión comercial */}
             <a
-              href="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ1Pw1jeKf---C8bRMp7lqkoSZHhwwqW1kA5QkCjRSvOVGoDda0qVwbzELTHf8vIJCwX4bMkiH0Z"
+              href="https://calendar.app.google/MfyKXvYxURJSnUBe9"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-base font-bold text-white glass-card border-2 border-white/30 hover:bg-white/10 hover:border-white/50 shadow-xl transition-all duration-300 hover:scale-105"

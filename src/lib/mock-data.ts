@@ -116,7 +116,7 @@ export function getMockPresentationPayload(): PresentationPayload {
     
     // CTA y contacto
     cta: {
-      meeting_link: 'https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ1Pw1jeKf---C8bRMp7lqkoSZHhwwqW1kA5QkCjRSvOVGoDda0qVwbzELTHf8vIJCwX4bMkiH0Z',
+      meeting_link: 'https://calendar.app.google/MfyKXvYxURJSnUBe9',
       whatsapp_link: 'https://wa.me/56982307771',
       phone: '+56 98 230 7771',
       email: 'comercial@gard.cl',
@@ -820,7 +820,7 @@ export function getMockPresentationPayload(): PresentationPayload {
         headline: 'Seguridad que se gestiona. No seguridad que se espera.',
         cta_primary: {
           text: 'Agendar visita técnica sin costo',
-          link: 'https://calendly.com/gard-security/visita-tecnica',
+          link: 'https://calendar.app.google/MfyKXvYxURJSnUBe9',
         },
         cta_secondary: {
           text: 'Solicitar propuesta directa',
