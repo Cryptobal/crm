@@ -510,7 +510,18 @@ export async function PUT(
       });
 
       const mealMap = new Map(
-        existingMeals.map((meal) => [meal.mealType.toLowerCase(), meal])
+        existingMeals.map((meal) => [
+          meal.mealType.toLowerCase(),
+          {
+            quoteId: id,
+            mealType: meal.mealType,
+            mealsPerDay: meal.mealsPerDay ?? 0,
+            daysOfService: meal.daysOfService ?? 0,
+            priceOverride: meal.priceOverride ?? null,
+            isEnabled: meal.isEnabled ?? true,
+            visibility: meal.visibility || "visible",
+          },
+        ])
       );
       meals.forEach((meal: any) => {
         mealMap.set(meal.mealType.toLowerCase(), {
@@ -518,7 +529,10 @@ export async function PUT(
           quoteId: id,
           mealsPerDay: meal.mealsPerDay ?? 0,
           daysOfService: meal.daysOfService ?? 0,
-          priceOverride: meal.priceOverride ?? null,
+          priceOverride:
+            meal.priceOverride === null || meal.priceOverride === undefined
+              ? null
+              : normalizeDecimal(meal.priceOverride),
           isEnabled: meal.isEnabled ?? true,
           visibility: meal.visibility || "visible",
         });
@@ -543,7 +557,10 @@ export async function PUT(
           mealType: meal.mealType,
           mealsPerDay: meal.mealsPerDay ?? 0,
           daysOfService: meal.daysOfService ?? 0,
-          priceOverride: meal.priceOverride ?? null,
+          priceOverride:
+            meal.priceOverride === null || meal.priceOverride === undefined
+              ? null
+              : normalizeDecimal(meal.priceOverride),
           isEnabled: meal.isEnabled ?? true,
           visibility: meal.visibility || "visible",
         })),
