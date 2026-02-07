@@ -108,23 +108,23 @@ export function CpqPricingCalc({
         </div>
         <div className="flex justify-between items-center pl-2">
           <span className="text-muted-foreground text-xs">Equipos operativos</span>
-          <span className="font-mono text-xs">{formatCurrency(operationalTotal)}</span>
+          <span className="font-mono text-xs">{formatCurrency(operationalCosts)}</span>
         </div>
         <div className="flex justify-between items-center pl-2">
           <span className="text-muted-foreground text-xs">Costos de transporte</span>
-          <span className="font-mono text-xs">{formatCurrency(transportTotal)}</span>
+          <span className="font-mono text-xs">{formatCurrency(transportCosts)}</span>
         </div>
         <div className="flex justify-between items-center pl-2">
           <span className="text-muted-foreground text-xs">Vehículos</span>
-          <span className="font-mono text-xs">{formatCurrency(vehicleTotal)}</span>
+          <span className="font-mono text-xs">{formatCurrency(vehicleCosts)}</span>
         </div>
         <div className="flex justify-between items-center pl-2">
           <span className="text-muted-foreground text-xs">Infraestructura</span>
-          <span className="font-mono text-xs">{formatCurrency(infraTotal)}</span>
+          <span className="font-mono text-xs">{formatCurrency(infraCosts)}</span>
         </div>
         <div className="flex justify-between items-center pl-2">
           <span className="text-muted-foreground text-xs">Sistemas</span>
-          <span className="font-mono text-xs">{formatCurrency(systemTotal)}</span>
+          <span className="font-mono text-xs">{formatCurrency(systemCosts)}</span>
         </div>
         
         <div className="flex justify-between items-center border-t border-border/50 pt-2 mt-1">
