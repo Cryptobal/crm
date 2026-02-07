@@ -135,7 +135,7 @@ export function Section23PropuestaEconomica({
                       
                       {/* Notas adicionales */}
                       {item.notes && !showTokens && (
-                        <div className="text-xs mt-1 text-white/50">{item.notes}</div>
+                        <div className="text-xs sm:text-sm mt-1 text-white/50">{item.notes}</div>
                       )}
                       {showTokens && (
                         <div className="mt-2">
@@ -180,7 +180,7 @@ export function Section23PropuestaEconomica({
                         formatPrice(pricing.subtotal)
                       )}
                     </div>
-                    <div className="text-xs text-white/50 mt-2">
+                    <div className="text-xs sm:text-sm text-white/50 mt-2">
                       Valores netos. IVA se factura según ley.
                     </div>
                   </td>
@@ -263,7 +263,7 @@ export function Section23PropuestaEconomica({
                   )}
                 </span>
               </div>
-              <p className="text-xs text-white/50">Valores netos. IVA se factura según ley.</p>
+              <p className="text-xs sm:text-sm text-white/50">Valores netos. IVA se factura según ley.</p>
             </div>
           </div>
         </div>

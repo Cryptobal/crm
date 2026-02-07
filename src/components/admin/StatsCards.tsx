@@ -106,15 +106,15 @@ export function StatsCards({
   return (
     <div className="space-y-2">
       {/* Tooltip de ayuda */}
-      <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20">
-        <Info className="w-3 h-3 text-blue-400 flex-shrink-0" />
-        <p className="text-[10px] text-blue-300">
+      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-blue-500/10 border border-blue-500/20">
+        <Info className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+        <p className="text-xs sm:text-sm text-blue-300">
           <strong>Vistas:</strong> Cliente hizo click en "Ver Propuesta" y abrió la presentación | <strong>Sin Leer:</strong> Enviadas pero no vistas aún
         </p>
       </div>
 
       {/* Cards */}
-      <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-2">
         {cards.map((card, index) => {
           const Icon = card.icon;
           const isActive = activeFilter === card.filter;
@@ -135,7 +135,7 @@ export function StatsCards({
             >
               {/* Icon - minimalista */}
               <div className={`inline-flex p-1 rounded-md bg-gradient-to-br ${card.color} mb-1`}>
-                <Icon className="w-3 h-3 text-white" />
+                <Icon className="w-3.5 h-3.5 text-white" />
               </div>
 
               {/* Value - compacto */}
@@ -144,13 +144,13 @@ export function StatsCards({
               </div>
 
               {/* Label - minimalista */}
-              <div className="text-[9px] sm:text-[10px] text-white/70 font-medium leading-tight">
+              <div className="text-xs sm:text-[10px] text-white/70 font-medium leading-tight">
                 {card.label}
               </div>
 
               {/* Subtitle - muy pequeño */}
               {card.subtitle && (
-                <div className="text-[8px] text-white/50 hidden sm:block mt-0.5">
+                <div className="text-[10px] sm:text-[10px] text-white/50 hidden sm:block mt-0.5">
                   {card.subtitle}
                 </div>
               )}

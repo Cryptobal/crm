@@ -55,14 +55,14 @@ export function Section18KPIs({ data }: Section18KPIsProps) {
                 
                 <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/10">
                   <div>
-                    <p className="text-xs text-white/50 mb-1">Target</p>
+                    <p className="text-xs sm:text-sm text-white/50 mb-1">Target</p>
                     <p className="text-xl font-black text-teal-400">
                       {indicator.target}
                     </p>
                   </div>
                   
                   <div>
-                    <p className="text-xs text-white/50 mb-1">Medición</p>
+                    <p className="text-xs sm:text-sm text-white/50 mb-1">Medición</p>
                     <p className="text-sm font-semibold text-white">
                       {indicator.measurement_frequency}
                     </p>

@@ -39,7 +39,7 @@ export function Section21Sectores({ data }: Section21SectoresProps) {
             viewport={{ once: true }}
             className="inline-block px-5 py-2 rounded-full glass-card border border-teal-400/30 glow-teal mb-6"
           >
-            <span className="text-xs font-bold text-white uppercase tracking-wider">
+            <span className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
               Experiencia Vertical
             </span>
           </motion.div>

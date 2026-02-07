@@ -60,7 +60,7 @@ export function Section14Tecnologia({ data }: Section14TecnologiaProps) {
                   {/* Info grid */}
                   <div className="space-y-3">
                     <div>
-                      <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-1">
+                      <p className="text-xs sm:text-sm font-bold text-white/40 uppercase tracking-wider mb-1">
                         ¿Qué es?
                       </p>
                       <p className="text-sm text-white/80">
@@ -69,7 +69,7 @@ export function Section14Tecnologia({ data }: Section14TecnologiaProps) {
                     </div>
                     
                     <div>
-                      <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-1">
+                      <p className="text-xs sm:text-sm font-bold text-white/40 uppercase tracking-wider mb-1">
                         ¿Para qué?
                       </p>
                       <p className="text-sm text-white/80">
@@ -78,7 +78,7 @@ export function Section14Tecnologia({ data }: Section14TecnologiaProps) {
                     </div>
                     
                     <div className="pt-3 border-t border-white/10">
-                      <p className="text-[10px] font-bold text-teal-400 uppercase tracking-wider mb-1">
+                      <p className="text-xs sm:text-sm font-bold text-teal-400 uppercase tracking-wider mb-1">
                         Beneficio real
                       </p>
                       <p className="text-sm font-bold text-white">

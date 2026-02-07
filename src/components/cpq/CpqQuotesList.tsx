@@ -17,11 +17,11 @@ interface CpqQuotesListProps {
 
 export function CpqQuotesList({ quotes, loading }: CpqQuotesListProps) {
   if (loading) {
-    return <div className="text-xs text-muted-foreground">Cargando...</div>;
+    return <div className="text-sm text-muted-foreground">Cargando...</div>;
   }
 
   if (!quotes.length) {
-    return <div className="text-xs text-muted-foreground">No hay cotizaciones aún.</div>;
+    return <div className="text-sm text-muted-foreground">No hay cotizaciones aún.</div>;
   }
 
   return (
@@ -32,17 +32,17 @@ export function CpqQuotesList({ quotes, loading }: CpqQuotesListProps) {
             <div>
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold">{quote.code}</p>
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-xs">
                   {quote.status}
                 </Badge>
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 {quote.clientName || "Cliente sin nombre"} · {quote.totalPositions} puestos · {quote.totalGuards} guardias
               </p>
             </div>
             <div className="text-right">
-              <p className="text-[10px] uppercase text-muted-foreground">Costo mensual</p>
-              <p className="font-mono text-sm">{formatCurrency(Number(quote.monthlyCost))}</p>
+              <p className="text-xs sm:text-sm uppercase text-muted-foreground">Costo mensual</p>
+              <p className="font-mono text-base sm:text-sm">{formatCurrency(Number(quote.monthlyCost))}</p>
             </div>
           </Card>
         </Link>

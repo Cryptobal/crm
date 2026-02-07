@@ -210,7 +210,7 @@ export function EditPositionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Editar Puesto de Trabajo</DialogTitle>
         </DialogHeader>
@@ -218,12 +218,12 @@ export function EditPositionModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-3">
-              <h3 className="text-[10px] font-semibold uppercase text-blue-400">Puesto</h3>
+              <h3 className="text-xs sm:text-sm font-semibold uppercase text-blue-400">Puesto</h3>
 
               <div className="space-y-1">
-                <Label className="text-[10px]">Tipo de Puesto *</Label>
+                <Label className="text-xs sm:text-sm">Tipo de Puesto *</Label>
                 <select
-                  className="flex h-8 w-full rounded-md border border-input bg-card px-3 text-xs"
+                  className="flex h-11 sm:h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
                   value={form.puestoTrabajoId}
                   onChange={(e) => setForm((p) => ({ ...p, puestoTrabajoId: e.target.value }))}
                 >
@@ -235,19 +235,19 @@ export function EditPositionModal({
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[10px]">Nombre personalizado</Label>
+                <Label className="text-xs sm:text-sm">Nombre personalizado</Label>
                 <Input
                   value={form.customName}
                   onChange={(e) => setForm((p) => ({ ...p, customName: e.target.value }))}
-                  className="h-8 bg-background text-xs"
+                  className="h-11 sm:h-9 bg-background text-sm"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <Label className="text-[10px]">Hora inicio</Label>
+                  <Label className="text-xs sm:text-sm">Hora inicio</Label>
                   <select
-                    className="flex h-8 w-full rounded-md border border-input bg-card px-3 text-xs"
+                    className="flex h-11 sm:h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
                     value={form.startTime}
                     onChange={(e) => setForm((p) => ({ ...p, startTime: e.target.value }))}
                   >
@@ -257,9 +257,9 @@ export function EditPositionModal({
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px]">Hora término</Label>
+                  <Label className="text-xs sm:text-sm">Hora término</Label>
                   <select
-                    className="flex h-8 w-full rounded-md border border-input bg-card px-3 text-xs"
+                    className="flex h-11 sm:h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
                     value={form.endTime}
                     onChange={(e) => setForm((p) => ({ ...p, endTime: e.target.value }))}
                   >
@@ -269,7 +269,7 @@ export function EditPositionModal({
                   </select>
                 </div>
               </div>
-              <div className="text-[10px] text-slate-400">
+              <div className="text-xs sm:text-sm text-slate-400">
                 Jornada:{" "}
                 <span className="font-medium text-slate-200">
                   {shiftHours === null
@@ -279,10 +279,10 @@ export function EditPositionModal({
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[10px]">Días de servicio</Label>
-                <div className="grid grid-cols-4 gap-2">
+                <Label className="text-xs sm:text-sm">Días de servicio</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {WEEKDAY_ORDER.map((day) => (
-                    <label key={day} className="flex items-center gap-1 text-[10px]">
+                    <label key={day} className="flex items-center gap-1.5 text-xs">
                       <input
                         type="checkbox"
                         checked={form.weekdays.includes(day)}
@@ -295,9 +295,9 @@ export function EditPositionModal({
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[10px]">Cantidad de guardias</Label>
+                <Label className="text-xs sm:text-sm">Cantidad de guardias</Label>
                 <select
-                  className="flex h-8 w-20 rounded-md border border-input bg-card px-2 text-xs"
+                  className="flex h-11 sm:h-9 w-24 rounded-md border border-input bg-card px-2 text-sm"
                   value={form.numGuards}
                   onChange={(e) => setForm((p) => ({ ...p, numGuards: Number(e.target.value) }))}
                 >
@@ -309,12 +309,12 @@ export function EditPositionModal({
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-[10px] font-semibold uppercase text-purple-400">Estructura</h3>
+              <h3 className="text-xs sm:text-sm font-semibold uppercase text-purple-400">Estructura</h3>
 
               <div className="space-y-1">
-                <Label className="text-[10px]">Cargo *</Label>
+                <Label className="text-xs sm:text-sm">Cargo *</Label>
                 <select
-                  className="flex h-8 w-full rounded-md border border-input bg-card px-3 text-xs"
+                  className="flex h-11 sm:h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
                   value={form.cargoId}
                   onChange={(e) => setForm((p) => ({ ...p, cargoId: e.target.value }))}
                 >
@@ -326,9 +326,9 @@ export function EditPositionModal({
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[10px]">Rol *</Label>
+                <Label className="text-xs sm:text-sm">Rol *</Label>
                 <select
-                  className="flex h-8 w-full rounded-md border border-input bg-card px-3 text-xs"
+                  className="flex h-11 sm:h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
                   value={form.rolId}
                   onChange={(e) => setForm((p) => ({ ...p, rolId: e.target.value }))}
                 >
@@ -340,20 +340,20 @@ export function EditPositionModal({
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[10px]">Sueldo base</Label>
+                <Label className="text-xs sm:text-sm">Sueldo base</Label>
                 <Input
                   type="number"
                   value={form.baseSalary}
                   onChange={(e) => setForm((p) => ({ ...p, baseSalary: Number(e.target.value) }))}
-                  className="h-8 bg-background text-xs"
+                  className="h-11 sm:h-9 bg-background text-sm"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <Label className="text-[10px]">AFP</Label>
+                  <Label className="text-xs sm:text-sm">AFP</Label>
                   <select
-                    className="flex h-8 w-full rounded-md border border-input bg-card px-3 text-xs"
+                    className="flex h-11 sm:h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
                     value={form.afpName}
                     onChange={(e) => setForm((p) => ({ ...p, afpName: e.target.value }))}
                   >
@@ -367,9 +367,9 @@ export function EditPositionModal({
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px]">Salud</Label>
+                  <Label className="text-xs sm:text-sm">Salud</Label>
                   <select
-                    className="flex h-8 w-full rounded-md border border-input bg-card px-3 text-xs"
+                    className="flex h-11 sm:h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
                     value={form.healthSystem}
                     onChange={(e) => setForm((p) => ({ ...p, healthSystem: e.target.value }))}
                   >
@@ -381,13 +381,13 @@ export function EditPositionModal({
 
               {form.healthSystem === "isapre" && (
                 <div className="space-y-1">
-                  <Label className="text-[10px]">Plan Isapre (%)</Label>
+                  <Label className="text-xs sm:text-sm">Plan Isapre (%)</Label>
                   <Input
                     type="number"
                     value={form.healthPlanPct}
                     onChange={(e) => setForm((p) => ({ ...p, healthPlanPct: Number(e.target.value) }))}
                     step="0.01"
-                    className="h-8 bg-background text-xs"
+                    className="h-11 sm:h-9 bg-background text-sm"
                   />
                 </div>
               )}
@@ -398,7 +398,7 @@ export function EditPositionModal({
               </Button>
 
               {preview && (
-                <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-2 text-[10px]">
+                <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-emerald-400">Costo empresa por guardia</span>
                     <span className="font-mono text-emerald-400">
@@ -423,7 +423,7 @@ export function EditPositionModal({
           </div>
 
           <div className="flex items-center justify-between">
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               AFP Modelo + Fonasa por defecto
             </Badge>
             <Button type="submit" size="sm" disabled={loading}>

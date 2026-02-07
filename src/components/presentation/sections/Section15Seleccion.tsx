@@ -102,7 +102,7 @@ export function Section15Seleccion({ data }: Section15SeleccionProps) {
                     
                     {/* Porcentaje a la derecha */}
                     <div className={cn(
-                      'absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold',
+                      'absolute right-4 top-1/2 -translate-y-1/2 text-xs sm:text-sm font-bold',
                       colors.text
                     )}>
                       {Math.round(widthPercent)}%
@@ -120,7 +120,7 @@ export function Section15Seleccion({ data }: Section15SeleccionProps) {
             Criterios de evaluación
           </h3>
           
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 max-w-6xl mx-auto">
             {data.criteria_table.map((criterion, index) => {
               const Icon = criteriaIcons[index % criteriaIcons.length];
               
@@ -140,7 +140,7 @@ export function Section15Seleccion({ data }: Section15SeleccionProps) {
                   <h4 className="text-sm font-bold text-white mb-2">
                     {criterion.criterion}
                   </h4>
-                  <p className="text-xs text-white/60 leading-snug">
+                  <p className="text-xs sm:text-sm text-white/60 leading-snug">
                     {criterion.description}
                   </p>
                 </motion.div>

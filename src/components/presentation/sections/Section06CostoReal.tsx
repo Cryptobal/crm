@@ -80,7 +80,7 @@ export function Section06CostoReal({ data }: Section06CostoRealProps) {
                       variant="ghost"
                       size="sm"
                       onClick={() => openModal('traditional')}
-                      className="h-6 px-2 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                      className="h-8 px-2 text-red-400 hover:text-red-300 hover:bg-red-500/20"
                     >
                       <Info className="w-4 h-4 mr-1" />
                       Ver desglose
@@ -98,7 +98,7 @@ export function Section06CostoReal({ data }: Section06CostoRealProps) {
                   <span className="text-lg font-semibold">TOTAL REAL 12 meses</span>
                   <span className="text-3xl font-bold text-red-500">1.380 UF</span>
                 </div>
-                <p className="text-xs text-red-400/80 mt-3">
+                <p className="text-xs sm:text-sm text-red-400/80 mt-3">
                   Incluye: incidentes, rotación, multas, tiempo gerencial, riesgo reputacional
                 </p>
               </div>
@@ -113,7 +113,7 @@ export function Section06CostoReal({ data }: Section06CostoRealProps) {
               'relative overflow-hidden'
             )}>
               {/* Badge */}
-              <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
+              <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-xs sm:text-sm font-semibold">
                 Recomendado
               </div>
               
@@ -147,7 +147,7 @@ export function Section06CostoReal({ data }: Section06CostoRealProps) {
                       variant="ghost"
                       size="sm"
                       onClick={() => openModal('gard')}
-                      className="h-6 px-2 text-green-400 hover:text-green-300 hover:bg-green-500/20"
+                      className="h-8 px-2 text-green-400 hover:text-green-300 hover:bg-green-500/20"
                     >
                       <Info className="w-4 h-4 mr-1" />
                       Ver desglose
@@ -165,7 +165,7 @@ export function Section06CostoReal({ data }: Section06CostoRealProps) {
                   <span className="text-lg font-semibold">TOTAL REAL 12 meses</span>
                   <span className="text-3xl font-bold text-green-500">1.272 UF</span>
                 </div>
-                <p className="text-xs text-green-400/80 mt-3">
+                <p className="text-xs sm:text-sm text-green-400/80 mt-3">
                   ✓ Todo incluido: supervisión, reportes, cumplimiento, tecnología, contingencias
                 </p>
               </div>

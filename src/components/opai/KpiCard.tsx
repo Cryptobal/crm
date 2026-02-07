@@ -73,11 +73,11 @@ export function KpiCard({
       </CardHeader>
       <CardContent className="flex-1 pb-3">
         <div className="flex h-full flex-col justify-between">
-          <div className="text-2xl font-bold tracking-tight">
+          <div className="text-xl sm:text-2xl font-bold tracking-tight">
             {value}
           </div>
           {(description || (trend && trendValue)) && (
-            <div className="mt-1 flex items-center gap-2 text-xs">
+            <div className="mt-1.5 sm:mt-1 flex items-center gap-2 text-xs">
               {trend && TrendIcon && trendValue && (
                 <div className={cn("flex items-center gap-1", trendColors[trend])}>
                   <TrendIcon className="h-3 w-3" />

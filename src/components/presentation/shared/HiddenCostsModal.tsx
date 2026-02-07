@@ -50,9 +50,9 @@ export function HiddenCostsModal({
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] lg:max-w-6xl max-h-[90vh] bg-slate-900 border-2 border-slate-700 overflow-hidden flex flex-col">
-        <DialogHeader className="pb-3 border-b border-slate-700 flex-shrink-0">
-          <DialogTitle className="text-xl lg:text-2xl font-bold flex items-center gap-2">
+      <DialogContent className="max-w-[95vw] md:max-w-2xl lg:max-w-4xl xl:max-w-6xl max-h-[90vh] bg-slate-900 border-2 border-slate-700 overflow-hidden flex flex-col p-4 sm:p-6">
+        <DialogHeader className="pb-3 border-b border-slate-700 flex-shrink-0 px-1 sm:px-0">
+          <DialogTitle className="text-lg sm:text-xl lg:text-2xl font-bold flex items-center gap-2">
             {isTraditional ? (
               <>
                 <div className="p-1.5 rounded-lg bg-red-500/20 border border-red-500/50">
@@ -82,7 +82,7 @@ export function HiddenCostsModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto lg:overflow-visible py-4">
+        <div className="flex-1 overflow-y-auto lg:overflow-visible py-4 px-1 sm:px-0">
           {/* Grid de 2 columnas en desktop, 1 en mobile */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
             {costs.map((cost, index) => {
@@ -91,7 +91,7 @@ export function HiddenCostsModal({
                 <div 
                   key={index}
                   className={cn(
-                    'p-3 rounded-lg border-2 transition-all',
+                    'p-4 sm:p-3 rounded-lg border-2 transition-all',
                     isTraditional 
                       ? 'border-red-500/50 bg-red-950/40 hover:bg-red-950/60' 
                       : 'border-green-500/50 bg-green-950/40 hover:bg-green-950/60'
@@ -110,12 +110,12 @@ export function HiddenCostsModal({
                       )} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-base mb-1 text-white">{cost.title}</h4>
-                      <p className="text-xs text-slate-300 mb-2 leading-snug">
+                      <h4 className="font-bold text-lg sm:text-base mb-1 text-white">{cost.title}</h4>
+                      <p className="text-sm sm:text-xs text-slate-300 mb-2 leading-snug">
                         {cost.description}
                       </p>
                       <div className={cn(
-                        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold border',
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-2.5 sm:py-1 rounded text-sm sm:text-xs font-bold border',
                         isTraditional 
                           ? 'bg-red-500/30 text-red-300 border-red-500/60' 
                           : 'bg-green-500/30 text-green-300 border-green-500/60'
@@ -147,7 +147,7 @@ export function HiddenCostsModal({
               </span>
             </div>
             
-            <div className="text-xs text-slate-300 bg-slate-800/50 p-3 rounded border border-slate-700">
+            <div className="text-sm sm:text-xs text-slate-300 bg-slate-800/50 p-3 rounded border border-slate-700">
               <p className="flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-400" />
                 <span className="leading-relaxed">

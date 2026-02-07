@@ -64,7 +64,7 @@ export function Section27Implementacion({ data }: Section27ImplementacionProps) 
                   
                   {/* Entregables */}
                   <div className="pt-4 border-t border-white/10">
-                    <h4 className="text-xs font-bold text-white/50 uppercase tracking-wider mb-3">
+                    <h4 className="text-xs sm:text-sm font-bold text-white/50 uppercase tracking-wider mb-3">
                       Entregables:
                     </h4>
                     <div className="space-y-2">
@@ -80,12 +80,12 @@ export function Section27Implementacion({ data }: Section27ImplementacionProps) 
                   {/* Requisitos del cliente */}
                   {phase.client_requirements && phase.client_requirements.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-white/10">
-                      <h4 className="text-xs font-bold text-white/50 uppercase tracking-wider mb-2">
+                      <h4 className="text-xs sm:text-sm font-bold text-white/50 uppercase tracking-wider mb-2">
                         Necesitamos de ti:
                       </h4>
                       <ul className="space-y-1">
                         {phase.client_requirements.map((req, i) => (
-                          <li key={i} className="text-xs text-white/60 flex items-start gap-2">
+                          <li key={i} className="text-xs sm:text-sm text-white/60 flex items-start gap-2">
                             <span>•</span>
                             <span>{req}</span>
                           </li>

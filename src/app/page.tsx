@@ -1,6 +1,6 @@
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-b from-slate-950 to-slate-900">
+    <main className="flex min-h-screen flex-col items-center justify-center p-6 sm:p-12 lg:p-24 bg-gradient-to-b from-slate-950 to-slate-900">
       <div className="z-10 max-w-5xl w-full items-center justify-center text-center space-y-8">
         <h1 className="text-5xl font-black bg-gradient-to-r from-teal-400 to-teal-300 bg-clip-text text-transparent">
           Gard Docs

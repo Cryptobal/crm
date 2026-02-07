@@ -60,7 +60,7 @@ export function Section17Continuidad({ data }: Section17ContinuidadProps) {
                   </p>
                   
                   <div className={cn('pt-4 border-t', theme.border)}>
-                    <p className={cn('text-xs font-semibold mb-1', theme.textMuted)}>
+                    <p className={cn('text-xs sm:text-sm font-semibold mb-1', theme.textMuted)}>
                       Tiempo de respuesta:
                     </p>
                     <p className={cn('text-base font-bold', theme.accent.replace('bg-', 'text-'))}>

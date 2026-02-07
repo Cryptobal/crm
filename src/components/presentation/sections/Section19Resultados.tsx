@@ -115,7 +115,7 @@ export function Section19Resultados({ data }: Section19ResultadosProps) {
                           <div className="text-2xl font-black bg-gradient-to-br from-teal-400 to-blue-400 bg-clip-text text-transparent">
                             {metric.value}
                           </div>
-                          <div className="text-xs text-white/70">{metric.label}</div>
+                          <div className="text-xs sm:text-sm text-white/70">{metric.label}</div>
                         </div>
                       ))}
                     </div>

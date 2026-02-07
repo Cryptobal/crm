@@ -35,7 +35,7 @@ export function Section10Supervision({ data }: Section10SupervisionProps) {
         </div>
         
         {/* Levels - Grid compacto */}
-        <StaggerContainer className="grid md:grid-cols-4 gap-6 mb-16">
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-16">
           {data.levels.map((level, index) => (
             <StaggerItem key={index}>
               <div className={cn(
@@ -56,7 +56,7 @@ export function Section10Supervision({ data }: Section10SupervisionProps) {
                 <p className="text-sm text-white/60 mb-3">
                   {level.description}
                 </p>
-                <div className="text-xs font-semibold text-teal-400">
+                <div className="text-xs sm:text-sm font-semibold text-teal-400">
                   {level.frequency}
                 </div>
               </div>
@@ -75,7 +75,7 @@ export function Section10Supervision({ data }: Section10SupervisionProps) {
             {/* Línea de tiempo */}
             <div className="absolute left-0 right-0 top-8 h-1 bg-gradient-to-r from-teal-500/0 via-teal-500/50 to-teal-500/0" />
             
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
               {data.night_shift_timeline.map((item, index) => (
                 <motion.div
                   key={index}
@@ -97,7 +97,7 @@ export function Section10Supervision({ data }: Section10SupervisionProps) {
                   
                   {/* Actividad - ALTURA FIJA para simetría */}
                   <div className="glass-card p-3 rounded-lg border border-white/10 min-h-[60px] flex items-center justify-center">
-                    <p className="text-xs text-white/80 leading-tight text-center">
+                    <p className="text-xs sm:text-sm text-white/80 leading-tight text-center">
                       {item.activity}
                     </p>
                   </div>
@@ -128,7 +128,7 @@ export function Section10Supervision({ data }: Section10SupervisionProps) {
                     <Shield className="w-6 h-6 text-teal-400" />
                   </div>
                   <div className="flex-1">
-                    <div className="text-xs text-white/50 mb-1">SLA {index + 1}</div>
+                    <div className="text-xs sm:text-sm text-white/50 mb-1">SLA {index + 1}</div>
                     <div className="text-sm font-bold text-white">{sla}</div>
                   </div>
                 </div>

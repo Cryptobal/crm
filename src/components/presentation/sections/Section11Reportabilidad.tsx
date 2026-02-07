@@ -78,7 +78,7 @@ export function Section11Reportabilidad({ data }: Section11ReportabilidadProps) 
                       <h3 className={cn('text-lg font-bold', theme.text)}>
                         {report.title}
                       </h3>
-                      <p className={cn('text-xs', theme.textMuted)}>
+                      <p className={cn('text-xs sm:text-sm', theme.textMuted)}>
                         {report.frequency}
                       </p>
                     </div>

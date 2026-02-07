@@ -84,11 +84,11 @@ export function CpqPositionCard({ quoteId, position, onUpdated }: CpqPositionCar
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               {position.numGuards} guardias
             </Badge>
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs sm:text-[11px] text-muted-foreground">
             {daysLabel || "Días por definir"} · {position.startTime} - {position.endTime}
             {" · "}
             {shiftHours === null
@@ -100,7 +100,7 @@ export function CpqPositionCard({ quoteId, position, onUpdated }: CpqPositionCar
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="ghost" className="h-8 w-8">
+            <Button size="icon" variant="ghost" className="h-9 w-9">
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -116,42 +116,42 @@ export function CpqPositionCard({ quoteId, position, onUpdated }: CpqPositionCar
         </DropdownMenu>
       </div>
 
-      <div className="grid gap-2 p-3 md:grid-cols-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 p-3">
         <div className="rounded-md bg-gradient-to-br from-blue-600/40 to-blue-800/30 p-2 text-white">
-          <p className="text-[9px] uppercase text-white/70">Cargo</p>
-          <p className="text-[11px] font-semibold">{position.cargo?.name || "—"}</p>
+          <p className="text-xs sm:text-[9px] uppercase text-white/70">Cargo</p>
+          <p className="text-sm sm:text-[11px] font-semibold">{position.cargo?.name || "—"}</p>
         </div>
         <div className="rounded-md bg-gradient-to-br from-purple-600/40 to-purple-800/30 p-2 text-white">
-          <p className="text-[9px] uppercase text-white/70">Rol</p>
-          <p className="text-[11px] font-semibold">{position.rol?.name || "—"}</p>
+          <p className="text-xs sm:text-[9px] uppercase text-white/70">Rol</p>
+          <p className="text-sm sm:text-[11px] font-semibold">{position.rol?.name || "—"}</p>
         </div>
         <div className="rounded-md bg-gradient-to-br from-indigo-600/40 to-indigo-800/30 p-2 text-white">
-          <p className="text-[9px] uppercase text-white/70">Base c/u</p>
-          <p className="text-[11px] font-semibold">{formatCurrency(Number(position.baseSalary))}</p>
+          <p className="text-xs sm:text-[9px] uppercase text-white/70">Base c/u</p>
+          <p className="text-sm sm:text-[11px] font-semibold">{formatCurrency(Number(position.baseSalary))}</p>
         </div>
         <div className="rounded-md bg-gradient-to-br from-emerald-600/40 to-emerald-800/30 p-2 text-white">
-          <p className="text-[9px] uppercase text-white/70">Líquido c/u</p>
-          <p className="text-[11px] font-semibold">
+          <p className="text-xs sm:text-[9px] uppercase text-white/70">Líquido c/u</p>
+          <p className="text-sm sm:text-[11px] font-semibold">
             {formatCurrency(Number(position.netSalary || 0))}
           </p>
         </div>
         <div className="rounded-md bg-gradient-to-br from-cyan-600/40 to-cyan-800/30 p-2 text-white">
-          <p className="text-[9px] uppercase text-white/70">Empresa c/u</p>
-          <p className="text-[11px] font-semibold">
+          <p className="text-xs sm:text-[9px] uppercase text-white/70">Empresa c/u</p>
+          <p className="text-sm sm:text-[11px] font-semibold">
             {formatCurrency(Number(position.employerCost))}
           </p>
         </div>
       </div>
 
       <div className="flex items-center justify-between border-t bg-muted/10 px-3 py-2">
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-xs sm:text-[10px] text-muted-foreground">
           Total puesto ({position.numGuards}):{" "}
           <span className="font-mono text-foreground">
             {formatCurrency(Number(position.monthlyPositionCost))}
           </span>
         </p>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" onClick={() => setOpenBreakdown(true)}>
+          <Button size="sm" variant="outline" className="h-9 sm:h-7 px-3 sm:px-2 text-xs sm:text-[10px]" onClick={() => setOpenBreakdown(true)}>
             Ver desglose
           </Button>
         </div>

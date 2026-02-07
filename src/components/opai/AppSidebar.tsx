@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import { LucideIcon } from 'lucide-react';
+import { LucideIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export interface NavItem {
   href: string;
@@ -18,6 +18,9 @@ export interface AppSidebarProps {
   navItems: NavItem[];
   logo?: ReactNode;
   footer?: ReactNode;
+  onNavigate?: () => void;
+  onToggleSidebar?: () => void;
+  isSidebarOpen?: boolean;
   className?: string;
 }
 
@@ -42,7 +45,7 @@ export interface AppSidebarProps {
  * />
  * ```
  */
-export function AppSidebar({ navItems, logo, footer, className }: AppSidebarProps) {
+export function AppSidebar({ navItems, logo, footer, onNavigate, onToggleSidebar, isSidebarOpen = true, className }: AppSidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -56,7 +59,7 @@ export function AppSidebar({ navItems, logo, footer, className }: AppSidebarProp
       {/* Logo */}
       <div className="flex h-16 items-center border-b border-border px-6">
         {logo || (
-          <Link href="/opai/inicio" className="flex items-center gap-3">
+          <Link href="/opai/inicio" className="flex items-center gap-3" onClick={onNavigate}>
             <Image 
               src="/logo escudo blanco.png" 
               alt="Gard Security" 
@@ -84,6 +87,7 @@ export function AppSidebar({ navItems, logo, footer, className }: AppSidebarProp
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 isActive
@@ -99,9 +103,22 @@ export function AppSidebar({ navItems, logo, footer, className }: AppSidebarProp
       </nav>
 
       {/* Footer */}
-      {footer && (
+      {(footer || onToggleSidebar) && (
         <div className="border-t border-border p-4">
-          {footer}
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">{footer}</div>
+            {onToggleSidebar && (
+              <button
+                type="button"
+                className="hidden lg:inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card/95 text-foreground shadow-sm"
+                onClick={onToggleSidebar}
+                aria-label={isSidebarOpen ? "Cerrar navegación" : "Abrir navegación"}
+                aria-expanded={isSidebarOpen}
+              >
+                {isSidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+              </button>
+            )}
+          </div>
         </div>
       )}
     </aside>

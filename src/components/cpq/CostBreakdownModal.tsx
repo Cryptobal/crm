@@ -65,13 +65,13 @@ export function CostBreakdownModal({ open, onOpenChange, position }: CostBreakdo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-[95vw] sm:max-w-lg p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Apertura costo por guardia</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3 text-xs">
-          <div className="rounded-md border bg-muted/20 p-2">
+        <div className="space-y-3 text-sm sm:text-xs">
+          <div className="rounded-md border bg-muted/20 p-3 sm:p-2">
             <div className="flex items-center justify-between">
               <span>Base</span>
               <span className="font-mono">{formatCurrency(Number(position.baseSalary))}</span>
@@ -87,12 +87,12 @@ export function CostBreakdownModal({ open, onOpenChange, position }: CostBreakdo
           </div>
 
           {loading && <div className="text-muted-foreground">Calculando...</div>}
-          {error && <div className="rounded-md border border-red-500/30 bg-red-500/10 p-2">{error}</div>}
+          {error && <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 sm:p-2">{error}</div>}
 
           {data && (
             <div className="space-y-2">
-              <div className="rounded-md border p-2">
-                <p className="text-[10px] font-semibold uppercase text-muted-foreground">Haberes</p>
+              <div className="rounded-md border p-3 sm:p-2">
+                <p className="text-xs sm:text-[10px] font-semibold uppercase text-muted-foreground">Haberes</p>
                 <div className="mt-1 space-y-1">
                   <div className="flex items-center justify-between">
                     <span>Sueldo base</span>
@@ -109,8 +109,8 @@ export function CostBreakdownModal({ open, onOpenChange, position }: CostBreakdo
                 </div>
               </div>
 
-              <div className="rounded-md border p-2">
-                <p className="text-[10px] font-semibold uppercase text-muted-foreground">Aportes empresa</p>
+              <div className="rounded-md border p-3 sm:p-2">
+                <p className="text-xs sm:text-[10px] font-semibold uppercase text-muted-foreground">Aportes empresa</p>
                 <div className="mt-1 space-y-1">
                   <div className="flex items-center justify-between">
                     <span>SIS</span>
@@ -127,8 +127,8 @@ export function CostBreakdownModal({ open, onOpenChange, position }: CostBreakdo
                 </div>
               </div>
 
-              <div className="rounded-md border p-2">
-                <p className="text-[10px] font-semibold uppercase text-muted-foreground">Provisiones</p>
+              <div className="rounded-md border p-3 sm:p-2">
+                <p className="text-xs sm:text-[10px] font-semibold uppercase text-muted-foreground">Provisiones</p>
                 <div className="mt-1 space-y-1">
                   <div className="flex items-center justify-between">
                     <span>Vacaciones</span>
@@ -141,7 +141,7 @@ export function CostBreakdownModal({ open, onOpenChange, position }: CostBreakdo
                 </div>
               </div>
 
-              <div className="rounded-md border bg-emerald-500/5 p-2">
+              <div className="rounded-md border bg-emerald-500/5 p-3 sm:p-2">
                 <div className="flex items-center justify-between">
                   <span className="text-emerald-500">Costo empresa</span>
                   <span className="font-mono text-emerald-500">
@@ -155,8 +155,8 @@ export function CostBreakdownModal({ open, onOpenChange, position }: CostBreakdo
               </div>
 
               {worker && (
-                <div className="rounded-md border p-2">
-                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">Descuentos trabajador</p>
+                <div className="rounded-md border p-3 sm:p-2">
+                  <p className="text-xs sm:text-[10px] font-semibold uppercase text-muted-foreground">Descuentos trabajador</p>
                   <div className="mt-1 space-y-1">
                     <div className="flex items-center justify-between">
                       <span>AFP</span>

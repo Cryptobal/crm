@@ -110,7 +110,7 @@ export function Section01Hero({ data, payload, showTokens = false }: Section01He
                 <div className="text-3xl font-black bg-gradient-to-br from-teal-400 to-blue-400 bg-clip-text text-transparent mb-1">
                   {kpi.value}
                 </div>
-                <div className="text-xs text-white/70 font-semibold">
+                <div className="text-xs sm:text-sm text-white/70 font-semibold">
                   {kpi.label}
                 </div>
               </motion.div>

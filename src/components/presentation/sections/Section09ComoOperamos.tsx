@@ -30,7 +30,7 @@ export function Section09ComoOperamos({ data }: Section09ComoOperamosProps) {
             viewport={{ once: true }}
             className="inline-block px-5 py-2 rounded-full glass-card border border-teal-400/30 glow-teal mb-6"
           >
-            <span className="text-xs font-bold text-white uppercase tracking-wider">
+            <span className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
               Nuestro Proceso
             </span>
           </motion.div>
@@ -70,7 +70,7 @@ export function Section09ComoOperamos({ data }: Section09ComoOperamosProps) {
                     <h4 className="text-sm font-bold text-white mb-2 text-center">
                       {stage.title}
                     </h4>
-                    <p className="text-xs text-white/60 text-center leading-snug">
+                    <p className="text-xs sm:text-sm text-white/60 text-center leading-snug">
                       {stage.description}
                     </p>
                   </div>

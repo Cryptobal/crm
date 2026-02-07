@@ -54,7 +54,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
   }, [positions]);
 
   if (loading && !quote) {
-    return <div className="text-xs text-muted-foreground">Cargando...</div>;
+    return <div className="text-sm text-muted-foreground">Cargando...</div>;
   }
 
   if (!quote) {
@@ -70,7 +70,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
           <Link href="/cpq">
             <Button variant="ghost" size="sm">
@@ -93,19 +93,19 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
 
       <div className="grid gap-3 md:grid-cols-3">
         <Card className="border-blue-500/20 bg-blue-500/5 p-4">
-          <p className="text-[10px] uppercase text-blue-400/80">Puestos</p>
+          <p className="text-xs sm:text-sm uppercase text-blue-400/80">Puestos</p>
           <p className="mt-1 font-mono text-2xl font-semibold text-blue-400">
             {positions.length}
           </p>
         </Card>
         <Card className="border-purple-500/20 bg-purple-500/5 p-4">
-          <p className="text-[10px] uppercase text-purple-400/80">Guardias</p>
+          <p className="text-xs sm:text-sm uppercase text-purple-400/80">Guardias</p>
           <p className="mt-1 font-mono text-2xl font-semibold text-purple-400">
             {stats.totalGuards}
           </p>
         </Card>
         <Card className="border-emerald-500/20 bg-emerald-500/5 p-4">
-          <p className="text-[10px] uppercase text-emerald-400/80">Costo mensual</p>
+          <p className="text-xs sm:text-sm uppercase text-emerald-400/80">Costo mensual</p>
           <p className="mt-1 font-mono text-2xl font-semibold text-emerald-400">
             {formatCurrency(stats.monthly)}
           </p>
@@ -116,14 +116,14 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold">Puestos de trabajo</h2>
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-xs">
               {quote.status}
             </Badge>
           </div>
         </div>
 
         {positions.length === 0 ? (
-          <div className="text-xs text-muted-foreground">
+          <div className="text-sm text-muted-foreground">
             Agrega el primer puesto para comenzar la estructura de servicio.
           </div>
         ) : (

@@ -42,7 +42,7 @@ export function PreviewSidebar({ sessionId, zohoData, onTabChange }: PreviewSide
 
       {/* Sidebar */}
       {isOpen && (
-        <div className="fixed top-0 right-0 h-screen w-[600px] bg-slate-900 border-l border-white/10 z-40 shadow-2xl overflow-hidden flex flex-col">
+        <div className="fixed top-0 right-0 h-screen w-full sm:w-[600px] bg-slate-900 border-l border-white/10 z-40 shadow-2xl overflow-hidden flex flex-col">
           {/* Header */}
           <div className="bg-gradient-to-r from-teal-500 to-blue-500 p-4 flex-shrink-0">
             <h3 className="text-white font-bold text-lg">Opciones de Vista</h3>

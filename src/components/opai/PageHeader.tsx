@@ -31,13 +31,13 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <div className={cn(
-      "flex items-center justify-between border-b border-border py-3 mb-4",
+      "flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-border py-3 mb-4 gap-2",
       className
     )}>
       <div className="flex-1 min-w-0">
-        <h1 className="text-xl font-bold tracking-tight leading-tight">{title}</h1>
+        <h1 className="text-lg sm:text-xl font-bold tracking-tight leading-tight">{title}</h1>
         {description && (
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-0.5">
             {description}
           </p>
         )}

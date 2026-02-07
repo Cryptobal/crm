@@ -72,7 +72,7 @@ export function Section16NuestraGente({ data }: Section16NuestraGenteProps) {
             Nuestros valores
           </h3>
           
-          <StaggerContainer className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {data.values.map((value, index) => {
               const Icon = valueIcons[index % valueIcons.length];
               
@@ -85,7 +85,7 @@ export function Section16NuestraGente({ data }: Section16NuestraGenteProps) {
                     <h4 className="text-sm font-bold text-white mb-2">
                       {value.title}
                     </h4>
-                    <p className="text-xs text-white/60 leading-snug">
+                    <p className="text-xs sm:text-sm text-white/60 leading-snug">
                       {value.description}
                     </p>
                   </div>

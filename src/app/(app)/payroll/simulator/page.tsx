@@ -122,7 +122,7 @@ export default function PayrollSimulator() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link href="/payroll">
             <Button variant="ghost" size="sm" className="gap-2">
@@ -136,7 +136,7 @@ export default function PayrollSimulator() {
         <div className="flex items-center gap-2">
           {/* UF/UTM Badge */}
           <div className="rounded-lg border border-border bg-card px-3 py-1.5">
-            <div className="flex items-center gap-3 text-[10px]">
+            <div className="flex items-center gap-3 text-xs sm:text-sm">
               <div>
                 <span className="text-muted-foreground">UF:</span>
                 <span className="ml-1 font-mono font-medium">${ufValue.toLocaleString("es-CL")}</span>
@@ -157,7 +157,7 @@ export default function PayrollSimulator() {
                 Parámetros
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-[95vw] sm:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
               <DialogHeader>
                 <DialogTitle>Parámetros Legales Vigentes</DialogTitle>
               </DialogHeader>
@@ -171,8 +171,8 @@ export default function PayrollSimulator() {
                   <div className="grid gap-3 md:grid-cols-3">
                     {/* AFP */}
                     <div className="rounded-lg border bg-card p-3">
-                      <h4 className="mb-2 text-xs font-semibold">AFP</h4>
-                      <div className="space-y-1 text-[10px]">
+                      <h4 className="mb-2 text-xs sm:text-sm font-semibold">AFP</h4>
+                      <div className="space-y-1 text-xs sm:text-sm">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Base:</span>
                           <span className="font-mono">10%</span>
@@ -190,8 +190,8 @@ export default function PayrollSimulator() {
 
                     {/* SIS */}
                     <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-                      <h4 className="mb-2 text-xs font-semibold">SIS (Empleador)</h4>
-                      <div className="text-[10px]">
+                      <h4 className="mb-2 text-xs sm:text-sm font-semibold">SIS (Empleador)</h4>
+                      <div className="text-xs sm:text-sm">
                         <div className="flex justify-between">
                           <span className="text-emerald-400">Tasa:</span>
                           <span className="font-mono font-semibold text-emerald-400">
@@ -203,8 +203,8 @@ export default function PayrollSimulator() {
 
                     {/* Mutual */}
                     <div className="rounded-lg border bg-card p-3">
-                      <h4 className="mb-2 text-xs font-semibold">Mutual</h4>
-                      <div className="text-[10px]">
+                      <h4 className="mb-2 text-xs sm:text-sm font-semibold">Mutual</h4>
+                      <div className="text-xs sm:text-sm">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Base legal:</span>
                           <span className="font-mono">{(parameters.data.work_injury.base_rate * 100).toFixed(2).replace(".", ",")}%</span>
@@ -215,8 +215,8 @@ export default function PayrollSimulator() {
 
                   {/* Topes */}
                   <div className="rounded-lg border bg-card p-3">
-                    <h4 className="mb-2 text-xs font-semibold">Topes Imponibles 2026</h4>
-                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                    <h4 className="mb-2 text-xs sm:text-sm font-semibold">Topes Imponibles 2026</h4>
+                    <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Pensiones:</span>
                         <span className="font-mono">{parameters.data.caps.pension_uf} UF</span>
@@ -230,11 +230,11 @@ export default function PayrollSimulator() {
 
                   {/* Referencias */}
                   <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-                    <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold text-blue-400">
+                    <h4 className="mb-2 flex items-center gap-2 text-xs sm:text-sm font-semibold text-blue-400">
                       <Info className="h-3 w-3" />
                       Referencias Vigentes
                     </h4>
-                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                    <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">UF ({ufDate}):</span>
                         <span className="font-mono">${ufValue.toLocaleString("es-CL")}</span>
@@ -244,7 +244,7 @@ export default function PayrollSimulator() {
                         <span className="font-mono">${utmValue.toLocaleString("es-CL")}</span>
                       </div>
                     </div>
-                    <p className="mt-2 text-[9px] text-muted-foreground">
+                    <p className="mt-2 text-xs text-muted-foreground">
                       💡 UF se actualiza diariamente (SBIF). UTM mensualmente (SII). 
                       Valores capturados en snapshot inmutable.
                     </p>
@@ -262,70 +262,70 @@ export default function PayrollSimulator() {
           <form onSubmit={handleSubmit} className="space-y-3">
             {/* HABERES */}
             <div className="space-y-2">
-              <h3 className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400">+ Haberes</h3>
+              <h3 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-emerald-400">+ Haberes</h3>
               
               <div className="space-y-1">
-                <Label className="text-[10px]">Sueldo Base</Label>
-                <Input type="number" value={baseSalary} onChange={(e) => setBaseSalary(e.target.value)} className="h-8 bg-background font-mono text-sm" required />
+                <Label className="text-xs sm:text-sm">Sueldo Base</Label>
+                <Input type="number" value={baseSalary} onChange={(e) => setBaseSalary(e.target.value)} className="h-11 sm:h-9 bg-background font-mono text-sm" required />
               </div>
 
-              <div className="flex items-center justify-between rounded-md border bg-muted/30 px-2 py-1.5">
-                <Label className="flex cursor-pointer items-center gap-1.5 text-[10px]">
-                  <input type="checkbox" checked={includeGrat} onChange={(e) => setIncludeGrat(e.target.checked)} className="h-3 w-3" />
+              <div className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2">
+                <Label className="flex cursor-pointer items-center gap-2 text-xs sm:text-sm">
+                  <input type="checkbox" checked={includeGrat} onChange={(e) => setIncludeGrat(e.target.checked)} className="h-4 w-4" />
                   Gratificación 25%
                 </Label>
-                {includeGrat && <span className="font-mono text-[10px] text-emerald-400">+{fmt(gratPreview)}</span>}
+                {includeGrat && <span className="font-mono text-xs sm:text-sm text-emerald-400">+{fmt(gratPreview)}</span>}
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <Label className="text-[10px]">Horas Extra 50%</Label>
-                  <Input type="number" value={overtimeHours} onChange={(e) => setOvertimeHours(e.target.value)} placeholder="0" className="h-8 bg-background font-mono text-xs" />
+                  <Label className="text-xs sm:text-sm">Horas Extra 50%</Label>
+                  <Input type="number" value={overtimeHours} onChange={(e) => setOvertimeHours(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px]">Comisiones</Label>
-                  <Input type="number" value={commissions} onChange={(e) => setCommissions(e.target.value)} placeholder="0" className="h-8 bg-background font-mono text-xs" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-[10px]">Bonos</Label>
-                  <Input type="number" value={bonuses} onChange={(e) => setBonuses(e.target.value)} placeholder="0" className="h-8 bg-background font-mono text-xs" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px]">Asig. Familiar (cargas)</Label>
-                  <Input type="number" value={numDependents} onChange={(e) => setNumDependents(e.target.value)} placeholder="0" className="h-8 bg-background font-mono text-xs" />
+                  <Label className="text-xs sm:text-sm">Comisiones</Label>
+                  <Input type="number" value={commissions} onChange={(e) => setCommissions(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <Label className="text-[10px]">Colación</Label>
-                  <Input type="number" value={meal} onChange={(e) => setMeal(e.target.value)} placeholder="0" className="h-8 bg-background font-mono text-xs" />
+                  <Label className="text-xs sm:text-sm">Bonos</Label>
+                  <Input type="number" value={bonuses} onChange={(e) => setBonuses(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px]">Movilización</Label>
-                  <Input type="number" value={transport} onChange={(e) => setTransport(e.target.value)} placeholder="0" className="h-8 bg-background font-mono text-xs" />
+                  <Label className="text-xs sm:text-sm">Asig. Familiar (cargas)</Label>
+                  <Input type="number" value={numDependents} onChange={(e) => setNumDependents(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs sm:text-sm">Colación</Label>
+                  <Input type="number" value={meal} onChange={(e) => setMeal(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs sm:text-sm">Movilización</Label>
+                  <Input type="number" value={transport} onChange={(e) => setTransport(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
                 </div>
               </div>
             </div>
 
             {/* DESCUENTOS */}
             <div className="space-y-2 border-t pt-2">
-              <h3 className="text-[10px] font-semibold uppercase tracking-wider text-red-400">− Descuentos</h3>
+              <h3 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-red-400">− Descuentos</h3>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <Label className="text-[10px]">Contrato</Label>
-                  <select value={contractType} onChange={(e) => setContractType(e.target.value as any)} className="flex h-8 w-full appearance-none rounded-md border border-input bg-card px-3 text-xs text-foreground">
+                  <Label className="text-xs sm:text-sm">Contrato</Label>
+                  <select value={contractType} onChange={(e) => setContractType(e.target.value as any)} className="flex h-11 sm:h-9 w-full appearance-none rounded-md border border-input bg-card px-3 text-sm text-foreground">
                     <option value="indefinite">Indefinido</option>
                     <option value="fixed_term">Plazo Fijo</option>
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px]">Salud</Label>
-                  <select value={healthSystem} onChange={(e) => setHealthSystem(e.target.value as any)} className="flex h-8 w-full appearance-none rounded-md border border-input bg-card px-3 text-xs text-foreground">
+                  <Label className="text-xs sm:text-sm">Salud</Label>
+                  <select value={healthSystem} onChange={(e) => setHealthSystem(e.target.value as any)} className="flex h-11 sm:h-9 w-full appearance-none rounded-md border border-input bg-card px-3 text-sm text-foreground">
                     <option value="fonasa">Fonasa 7%</option>
                     <option value="isapre">Isapre</option>
                   </select>
@@ -333,8 +333,8 @@ export default function PayrollSimulator() {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-[10px]">AFP</Label>
-                <select value={afpName} onChange={(e) => setAfpName(e.target.value)} className="flex h-8 w-full appearance-none rounded-md border border-input bg-card px-3 text-xs text-foreground">
+                <Label className="text-xs sm:text-sm">AFP</Label>
+                <select value={afpName} onChange={(e) => setAfpName(e.target.value)} className="flex h-11 sm:h-9 w-full appearance-none rounded-md border border-input bg-card px-3 text-sm text-foreground">
                   <option value="capital">Capital (11,44%)</option>
                   <option value="cuprum">Cuprum (11,44%)</option>
                   <option value="habitat">Habitat (11,27%)</option>
@@ -347,14 +347,14 @@ export default function PayrollSimulator() {
 
               {healthSystem === "isapre" && (
                 <div className="space-y-1">
-                  <Label className="text-[10px]">Isapre Adicional (%)</Label>
-                  <Input type="number" value={isapre_additional} onChange={(e) => setIsapreAdditional(e.target.value)} placeholder="0" step="0.1" className="h-8 bg-background font-mono text-xs" />
+                  <Label className="text-xs sm:text-sm">Isapre Adicional (%)</Label>
+                  <Input type="number" value={isapre_additional} onChange={(e) => setIsapreAdditional(e.target.value)} placeholder="0" step="0.1" className="h-11 sm:h-9 bg-background font-mono text-sm" />
                 </div>
               )}
 
               <div className="space-y-1">
-                <Label className="text-[10px]">APV (opcional)</Label>
-                <Input type="number" value={apv} onChange={(e) => setApv(e.target.value)} placeholder="0" className="h-8 bg-background font-mono text-xs" />
+                <Label className="text-xs sm:text-sm">APV (opcional)</Label>
+                <Input type="number" value={apv} onChange={(e) => setApv(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
               </div>
             </div>
 
@@ -363,24 +363,24 @@ export default function PayrollSimulator() {
             </Button>
           </form>
 
-          {error && <div className="mt-2 rounded-md border border-red-500/20 bg-red-500/10 p-2 text-[10px] text-red-400">{error}</div>}
+          {error && <div className="mt-2 rounded-md border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400">{error}</div>}
         </Card>
 
         {/* RESULTADOS */}
         <div className="space-y-3">
           {!result ? (
             <Card className="flex h-full min-h-[400px] items-center justify-center">
-              <p className="text-xs text-muted-foreground">Completa el formulario</p>
+              <p className="text-sm text-muted-foreground">Completa el formulario</p>
             </Card>
           ) : (
             <>
               <div className="grid grid-cols-2 gap-2">
                 <Card className="border-emerald-500/20 bg-emerald-500/5 p-3">
-                  <p className="text-[9px] uppercase text-emerald-400/70">Líquido</p>
+                  <p className="text-xs sm:text-sm uppercase text-emerald-400/70">Líquido</p>
                   <p className="mt-1 font-mono text-xl font-bold text-emerald-400">{fmt(result.net_salary)}</p>
                 </Card>
                 <Card className="border-blue-500/20 bg-blue-500/5 p-3">
-                  <p className="text-[9px] uppercase text-blue-400/70">Costo Empresa</p>
+                  <p className="text-xs sm:text-sm uppercase text-blue-400/70">Costo Empresa</p>
                   <p className="mt-1 font-mono text-xl font-bold text-blue-400">{fmt(result.total_employer_cost)}</p>
                 </Card>
               </div>
@@ -388,8 +388,8 @@ export default function PayrollSimulator() {
               <Card className="p-4">
                 <div className="space-y-3">
                   <div>
-                    <h4 className="mb-2 text-[10px] font-semibold uppercase text-emerald-400">+ Haberes</h4>
-                    <div className="space-y-0.5 text-[11px]">
+                    <h4 className="mb-2 text-xs sm:text-sm font-semibold uppercase text-emerald-400">+ Haberes</h4>
+                    <div className="space-y-0.5 text-xs sm:text-sm">
                       <div className="flex justify-between"><span className="text-muted-foreground">Base</span><span className="font-mono">{fmt(baseNum)}</span></div>
                       {overtimeHours && Number(overtimeHours) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">HE 50% ({overtimeHours}h)</span><span className="font-mono text-emerald-400">+{fmt(overtimeNum)}</span></div>}
                       {includeGrat && <div className="flex justify-between"><span className="text-muted-foreground">Gratif. 25%</span><span className="font-mono text-emerald-400">+{fmt(gratPreview)}</span></div>}
@@ -408,8 +408,8 @@ export default function PayrollSimulator() {
                   </div>
 
                   <div>
-                    <h4 className="mb-2 text-[10px] font-semibold uppercase text-red-400">− Descuentos</h4>
-                    <div className="space-y-0.5 text-[11px]">
+                    <h4 className="mb-2 text-xs sm:text-sm font-semibold uppercase text-red-400">− Descuentos</h4>
+                    <div className="space-y-0.5 text-xs sm:text-sm">
                       <div className="flex justify-between"><span className="text-muted-foreground">AFP {(result.deductions.afp.total_rate * 100).toFixed(2).replace(".", ",")}%</span><span className="font-mono text-red-400">-{fmt(result.deductions.afp.amount)}</span></div>
                       <div className="flex justify-between"><span className="text-muted-foreground">Salud {(result.deductions.health.rate * 100).toFixed(1).replace(".", ",")}%</span><span className="font-mono text-red-400">-{fmt(result.deductions.health.amount)}</span></div>
                       <div className="flex justify-between"><span className="text-muted-foreground">AFC {(result.deductions.afc.total_rate * 100).toFixed(1).replace(".", ",")}%</span><span className="font-mono text-red-400">-{fmt(result.deductions.afc.amount)}</span></div>
@@ -420,14 +420,14 @@ export default function PayrollSimulator() {
 
                   <div className="rounded-lg border-2 border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
                     <div className="flex items-baseline justify-between">
-                      <span className="text-[10px] font-semibold uppercase text-emerald-300">Líquido</span>
+                      <span className="text-xs sm:text-sm font-semibold uppercase text-emerald-300">Líquido</span>
                       <span className="font-mono text-2xl font-bold text-emerald-400">{fmt(result.net_salary)}</span>
                     </div>
                   </div>
 
                   <div className="border-t pt-2">
-                    <h4 className="mb-1.5 text-[10px] font-semibold uppercase text-blue-400">Aportes Empleador</h4>
-                    <div className="space-y-0.5 text-[11px]">
+                    <h4 className="mb-1.5 text-xs sm:text-sm font-semibold uppercase text-blue-400">Aportes Empleador</h4>
+                    <div className="space-y-0.5 text-xs sm:text-sm">
                       <div className="flex justify-between"><span className="text-muted-foreground">SIS {(result.employer_cost.sis.rate * 100).toFixed(2).replace(".", ",")}%</span><span className="font-mono text-blue-400">+{fmt(result.employer_cost.sis.amount)}</span></div>
                       <div className="flex justify-between"><span className="text-muted-foreground">AFC {(result.employer_cost.afc.total_rate * 100).toFixed(1).replace(".", ",")}%</span><span className="font-mono text-blue-400">+{fmt(result.employer_cost.afc.total_amount)}</span></div>
                       <div className="flex justify-between"><span className="text-muted-foreground">Mutual {(result.employer_cost.work_injury.rate * 100).toFixed(2).replace(".", ",")}%</span><span className="font-mono text-blue-400">+{fmt(result.employer_cost.work_injury.amount)}</span></div>
@@ -436,8 +436,8 @@ export default function PayrollSimulator() {
                   </div>
 
                   {result.simulation_id && (
-                    <div className="rounded-md bg-muted/30 px-2 py-1.5 text-[9px] text-muted-foreground">
-                      ID: {result.simulation_id.slice(0, 8)} <Badge variant="outline" className="ml-2 h-4 text-[8px]">Inmutable</Badge>
+                    <div className="rounded-md bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground">
+                      ID: {result.simulation_id.slice(0, 8)} <Badge variant="outline" className="ml-2 h-4 text-[10px]">Inmutable</Badge>
                     </div>
                   )}
                 </div>

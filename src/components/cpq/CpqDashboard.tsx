@@ -49,7 +49,7 @@ export function CpqDashboard({ initialQuotes }: CpqDashboardProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <PageHeader title="CPQ" description="Cotizador de servicios de seguridad" />
         <div className="flex items-center gap-2">
           <CreateQuoteModal onCreated={refresh} />
@@ -64,19 +64,19 @@ export function CpqDashboard({ initialQuotes }: CpqDashboardProps) {
 
       <div className="grid gap-3 md:grid-cols-3">
         <Card className="border-blue-500/20 bg-blue-500/5 p-4">
-          <p className="text-[10px] uppercase text-blue-400/80">Cotizaciones</p>
+          <p className="text-xs sm:text-sm uppercase text-blue-400/80">Cotizaciones</p>
           <p className="mt-1 font-mono text-2xl font-semibold text-blue-400">
             {totals.totalQuotes}
           </p>
         </Card>
         <Card className="border-emerald-500/20 bg-emerald-500/5 p-4">
-          <p className="text-[10px] uppercase text-emerald-400/80">Costo mensual</p>
+          <p className="text-xs sm:text-sm uppercase text-emerald-400/80">Costo mensual</p>
           <p className="mt-1 font-mono text-2xl font-semibold text-emerald-400">
             {formatCurrency(totals.totalMonthly)}
           </p>
         </Card>
         <Card className="border-muted/40 bg-card p-4">
-          <p className="text-[10px] uppercase text-muted-foreground">Estado</p>
+          <p className="text-xs sm:text-sm uppercase text-muted-foreground">Estado</p>
           <div className="mt-2 flex items-center gap-2">
             <Badge variant="outline">Borradores</Badge>
             <Badge variant="secondary">Enviadas</Badge>
