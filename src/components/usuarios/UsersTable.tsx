@@ -90,8 +90,111 @@ export default function UsersTable({ users, currentUserId, currentUserRole }: Pr
   const isOnlyUser = users.length === 1 && users[0].id === currentUserId;
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
+    <div>
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {users.map((user) => {
+          const isCurrentUser = user.id === currentUserId;
+          const canChangeRole = currentUserRole === 'owner' || currentUserRole === 'admin';
+          return (
+            <div key={user.id} className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-medium text-white">{user.name}</div>
+                  <div className="text-sm text-slate-400 truncate">{user.email}</div>
+                </div>
+                {getStatusBadge(user.status)}
+              </div>
+
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-slate-400">Rol</span>
+                  <div className="text-right">
+                    {!isCurrentUser && canChangeRole && user.status === 'active' ? (
+                      <Select
+                        value={user.role}
+                        onValueChange={(newRole) => handleRoleChange(user.id, newRole)}
+                        disabled={roleChanging === user.id}
+                      >
+                        <SelectTrigger className="w-[160px] bg-slate-800 border-slate-700 text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-800 border-slate-700">
+                          <SelectItem value={ROLES.VIEWER} className="text-white hover:bg-slate-700">Visualizador</SelectItem>
+                          <SelectItem value={ROLES.EDITOR} className="text-white hover:bg-slate-700">Editor</SelectItem>
+                          <SelectItem value={ROLES.ADMIN} className="text-white hover:bg-slate-700">Admin</SelectItem>
+                          <SelectItem value={ROLES.OWNER} className="text-white hover:bg-slate-700">Propietario</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      getRoleBadge(user.role)
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 text-sm text-slate-400">
+                  <span>Último login</span>
+                  <span>
+                    {user.lastLoginAt
+                      ? formatDistanceToNow(new Date(user.lastLoginAt), {
+                          addSuffix: true,
+                          locale: es,
+                        })
+                      : 'Nunca'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between">
+                {!isCurrentUser && canChangeRole && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={loading === user.id}
+                        className="text-slate-200 border-slate-700 bg-slate-800"
+                      >
+                        Acciones
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-slate-800 border-slate-700">
+                      <DropdownMenuItem
+                        onClick={() => handleToggleStatus(user.id)}
+                        className="text-white hover:bg-slate-700 cursor-pointer"
+                      >
+                        {user.status === 'active' ? (
+                          <>
+                            <UserX className="w-4 h-4 mr-2" />
+                            Desactivar
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            Activar
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+                {isCurrentUser && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">(Tú)</span>
+                    {isOnlyUser && (
+                      <span className="text-xs text-amber-500">Invita usuarios para ver acciones</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full">
         <thead className="bg-slate-800 border-b border-slate-700">
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
@@ -200,7 +303,8 @@ export default function UsersTable({ users, currentUserId, currentUserRole }: Pr
             );
           })}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   );
 }

@@ -1,0 +1,1693 @@
+/**
+ * Panel de costos adicionales CPQ
+ */
+
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { KpiCard } from "@/components/opai";
+import { formatCurrency } from "@/components/cpq/utils";
+import type {
+  CpqCatalogItem,
+  CpqQuoteCostItem,
+  CpqQuoteCostSummary,
+  CpqQuoteExamItem,
+  CpqQuoteInfrastructure,
+  CpqQuoteMeal,
+  CpqQuoteParameters,
+  CpqQuoteUniformItem,
+  CpqQuoteVehicle,
+} from "@/types/cpq";
+import { Plus, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+
+interface CpqQuoteCostsProps {
+  quoteId: string;
+}
+
+const DEFAULT_PARAMS: CpqQuoteParameters = {
+  monthlyHoursStandard: 180,
+  avgStayMonths: 4,
+  uniformChangesPerYear: 3,
+  financialRatePct: 0,
+  salePriceMonthly: 0,
+  policyRatePct: 0,
+  policyAdminRatePct: 0,
+  policyContractMonths: 12,
+  policyContractPct: 100,
+  contractMonths: 12,
+  contractAmount: 0,
+  marginPct: 20,
+};
+
+const OPERATIONAL_TYPES = ["phone", "radio", "flashlight"];
+const TRANSPORT_TYPES = ["transport"];
+const VEHICLE_TYPES = ["vehicle_rent", "vehicle_fuel", "vehicle_tag"];
+const INFRA_TYPES = ["infrastructure", "fuel"];
+const FINANCIAL_TYPES = ["financial", "policy"];
+
+const toNumber = (value: string) => (value === "" ? 0 : Number(value));
+
+const normalizeCostItems = (items: CpqQuoteCostItem[]) =>
+  items.map((item) => ({
+    ...item,
+    quantity: Number(item.quantity ?? 1),
+    unitPriceOverride: item.unitPriceOverride ?? null,
+  }));
+
+export function CpqQuoteCosts({ quoteId }: CpqQuoteCostsProps) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [catalog, setCatalog] = useState<CpqCatalogItem[]>([]);
+  const [summary, setSummary] = useState<CpqQuoteCostSummary | null>(null);
+  const [parameters, setParameters] = useState<CpqQuoteParameters>(DEFAULT_PARAMS);
+  const [uniforms, setUniforms] = useState<CpqQuoteUniformItem[]>([]);
+  const [exams, setExams] = useState<CpqQuoteExamItem[]>([]);
+  const [costItems, setCostItems] = useState<CpqQuoteCostItem[]>([]);
+  const [meals, setMeals] = useState<CpqQuoteMeal[]>([]);
+  const [vehicles, setVehicles] = useState<CpqQuoteVehicle[]>([]);
+  const [infrastructure, setInfrastructure] = useState<CpqQuoteInfrastructure[]>([]);
+  const defaultsApplied = useRef(false);
+  const inputClass =
+    "h-11 sm:h-9 bg-card text-foreground border-border placeholder:text-muted-foreground";
+  const sectionBoxClass = "rounded-md border border-border bg-muted/20 p-3 sm:p-2";
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [costsRes, catalogRes, settingsRes] = await Promise.all([
+        fetch(`/api/cpq/quotes/${quoteId}/costs`),
+        fetch("/api/cpq/catalog?active=true"),
+        fetch("/api/cpq/settings"),
+      ]);
+      const costsData = await costsRes.json();
+      const catalogData = await catalogRes.json();
+      const settingsData = await settingsRes.json();
+
+      if (catalogData?.success) {
+        setCatalog(catalogData.data || []);
+      }
+      if (costsData?.success) {
+        const payload = costsData.data || {};
+        setSummary(payload.summary || null);
+        const globalDefaults = settingsData?.success ? settingsData.data : {};
+        setParameters({
+          ...DEFAULT_PARAMS,
+          ...globalDefaults,
+          ...(payload.parameters || {}),
+        });
+        setUniforms(payload.uniforms || []);
+        setExams(payload.exams || []);
+        setCostItems(normalizeCostItems(payload.costItems || []));
+        setMeals(payload.meals || []);
+        setVehicles(payload.vehicles || []);
+        setInfrastructure(payload.infrastructure || []);
+      }
+    } catch (err) {
+      console.error("Error loading CPQ costs:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const findCostItem = (catalogItemId: string) =>
+    costItems.find((item) => item.catalogItemId === catalogItemId);
+
+  const upsertCostItem = (catalogItem: CpqCatalogItem, patch: Partial<CpqQuoteCostItem>) => {
+    setCostItems((prev) => {
+      const existing = prev.find((item) => item.catalogItemId === catalogItem.id);
+      if (existing) {
+        return prev.map((item) =>
+          item.catalogItemId === catalogItem.id ? { ...item, ...patch } : item
+        );
+      }
+      return [
+        ...prev,
+        {
+          catalogItemId: catalogItem.id,
+          calcMode: "per_month",
+          quantity: 1,
+          unitPriceOverride: null,
+          isEnabled: true,
+          visibility: catalogItem.defaultVisibility || "visible",
+          notes: "",
+          catalogItem,
+          ...patch,
+        },
+      ];
+    });
+  };
+
+  const updateMeal = (mealType: string, patch: Partial<CpqQuoteMeal>) => {
+    setMeals((prev) => {
+      const index = prev.findIndex(
+        (meal) => meal.mealType.toLowerCase() === mealType.toLowerCase()
+      );
+      if (index >= 0) {
+        return prev.map((meal, i) => (i === index ? { ...meal, ...patch } : meal));
+      }
+      return [
+        ...prev,
+        {
+          mealType,
+          mealsPerDay: 0,
+          daysOfService: 0,
+          priceOverride: null,
+          isEnabled: false,
+          visibility: "visible",
+          ...patch,
+        },
+      ];
+    });
+  };
+
+  const handleAddOtherItem = async (payload: { name: string; unit: string; basePrice: number }) => {
+    if (!payload.name.trim()) {
+      toast.error("Escribe el nombre del ítem");
+      return;
+    }
+    try {
+      const res = await fetch("/api/cpq/catalog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "other",
+          name: payload.name.trim(),
+          unit: payload.unit.trim() || "mes",
+          basePrice: payload.basePrice ?? 0,
+          isDefault: false,
+          active: true,
+        }),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setCatalog((prev) => [...prev, data.data]);
+        upsertCostItem(data.data, { isEnabled: true });
+        toast.success("Ítem agregado");
+        return;
+      }
+      toast.error("No se pudo agregar el ítem");
+    } catch (err) {
+      console.error("Error creating other cost item:", err);
+      toast.error("No se pudo agregar el ítem");
+    }
+  };
+
+
+  const handleSave = async (options?: { close?: boolean }) => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/cpq/quotes/${quoteId}/costs`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          parameters,
+          uniforms,
+          exams,
+          costItems,
+          meals,
+          vehicles,
+          infrastructure,
+        }),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setSummary(data.data);
+        if (options?.close !== false) setOpen(false);
+        toast.success("Costos guardados");
+        return;
+      }
+      toast.error("No se pudieron guardar los costos");
+    } catch (err) {
+      console.error("Error saving CPQ costs:", err);
+      toast.error("No se pudieron guardar los costos");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+
+  useEffect(() => {
+    loadData();
+  }, [quoteId]);
+
+  useEffect(() => {
+    if (open) {
+      defaultsApplied.current = false;
+      loadData();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    defaultsApplied.current = false;
+  }, [quoteId]);
+
+  const catalogByType = useMemo(() => {
+    const grouped: Record<string, CpqCatalogItem[]> = {};
+    for (const item of catalog) {
+      grouped[item.type] = grouped[item.type] || [];
+      grouped[item.type].push(item);
+    }
+    return grouped;
+  }, [catalog]);
+
+  const catalogById = useMemo(() => {
+    return new Map(catalog.map((item) => [item.id, item]));
+  }, [catalog]);
+
+  const applyDefaults = () => {
+    if (defaultsApplied.current) return;
+
+    const uniformDefaults = (catalogByType.uniform || []).filter((item) => item.isDefault);
+    if (uniformDefaults.length) {
+      setUniforms((prev) => {
+        const map = new Map(prev.map((u) => [u.catalogItemId, u]));
+        uniformDefaults.forEach((item) => {
+          const existing = map.get(item.id);
+          if (existing) {
+            map.set(item.id, { ...existing, active: true, catalogItem: item });
+          } else {
+            map.set(item.id, {
+              catalogItemId: item.id,
+              unitPriceOverride: null,
+              active: true,
+              catalogItem: item,
+            });
+          }
+        });
+        return Array.from(map.values());
+      });
+    }
+
+    const examDefaults = (catalogByType.exam || []).filter((item) => item.isDefault);
+    if (examDefaults.length) {
+      setExams((prev) => {
+        const map = new Map(prev.map((u) => [u.catalogItemId, u]));
+        examDefaults.forEach((item) => {
+          const existing = map.get(item.id);
+          if (existing) {
+            map.set(item.id, { ...existing, active: true, catalogItem: item });
+          } else {
+            map.set(item.id, {
+              catalogItemId: item.id,
+              unitPriceOverride: null,
+              active: true,
+              catalogItem: item,
+            });
+          }
+        });
+        return Array.from(map.values());
+      });
+    }
+
+    if (mealCatalog.length) {
+      setMeals((prev) => {
+        const existing = new Map(
+          prev.map((meal) => [meal.mealType.toLowerCase(), meal])
+        );
+        return mealCatalog.map((item) => {
+          const found = existing.get(item.name.toLowerCase());
+          if (found) {
+            return {
+              ...found,
+              isEnabled: item.isDefault ? true : found.isEnabled,
+            };
+          }
+          return {
+            mealType: item.name,
+            mealsPerDay: 0,
+            daysOfService: 0,
+            priceOverride: null,
+            isEnabled: item.isDefault ?? false,
+            visibility: "visible",
+          };
+        });
+      });
+    }
+
+    const operationalDefaults = operationalCatalog.filter((item) => item.isDefault);
+    if (operationalDefaults.length) {
+      setCostItems((prev) => {
+        const map = new Map(prev.map((item) => [item.catalogItemId, item]));
+        operationalDefaults.forEach((item) => {
+          const existing = map.get(item.id);
+          if (existing) {
+            map.set(item.id, { ...existing, isEnabled: true, catalogItem: item });
+          } else {
+            map.set(item.id, {
+              catalogItemId: item.id,
+              calcMode: "per_month",
+              quantity: 1,
+              unitPriceOverride: null,
+              isEnabled: true,
+              visibility: item.defaultVisibility || "visible",
+              notes: "",
+              catalogItem: item,
+            });
+          }
+        });
+        return Array.from(map.values());
+      });
+    }
+
+    const transportDefaults = transportCatalog.filter((item) => item.isDefault);
+    if (transportDefaults.length) {
+      setCostItems((prev) => {
+        const map = new Map(prev.map((item) => [item.catalogItemId, item]));
+        transportDefaults.forEach((item) => {
+          const existing = map.get(item.id);
+          if (existing) {
+            map.set(item.id, { ...existing, isEnabled: true, catalogItem: item });
+          } else {
+            map.set(item.id, {
+              catalogItemId: item.id,
+              calcMode: "per_month",
+              quantity: 1,
+              unitPriceOverride: null,
+              isEnabled: true,
+              visibility: item.defaultVisibility || "visible",
+              notes: "",
+              catalogItem: item,
+            });
+          }
+        });
+        return Array.from(map.values());
+      });
+    }
+
+    const vehicleDefaults = vehicleCatalog.filter((item) => item.isDefault);
+    if (vehicleDefaults.length) {
+      setCostItems((prev) => {
+        const map = new Map(prev.map((item) => [item.catalogItemId, item]));
+        vehicleDefaults.forEach((item) => {
+          const existing = map.get(item.id);
+          if (existing) {
+            map.set(item.id, { ...existing, isEnabled: true, catalogItem: item });
+          } else {
+            map.set(item.id, {
+              catalogItemId: item.id,
+              calcMode: "per_month",
+              quantity: 1,
+              unitPriceOverride: null,
+              isEnabled: true,
+              visibility: item.defaultVisibility || "visible",
+              notes: "",
+              catalogItem: item,
+            });
+          }
+        });
+        return Array.from(map.values());
+      });
+    }
+
+    const infraDefaults = infraCatalog.filter((item) => item.isDefault);
+    if (infraDefaults.length) {
+      setCostItems((prev) => {
+        const map = new Map(prev.map((item) => [item.catalogItemId, item]));
+        infraDefaults.forEach((item) => {
+          const existing = map.get(item.id);
+          if (existing) {
+            map.set(item.id, { ...existing, isEnabled: true, catalogItem: item });
+          } else {
+            map.set(item.id, {
+              catalogItemId: item.id,
+              calcMode: "per_month",
+              quantity: 1,
+              unitPriceOverride: null,
+              isEnabled: true,
+              visibility: item.defaultVisibility || "visible",
+              notes: "",
+              catalogItem: item,
+            });
+          }
+        });
+        return Array.from(map.values());
+      });
+    }
+
+    const systemDefaults = extraItemsCatalog.filter((item) => item.isDefault);
+    if (systemDefaults.length) {
+      setCostItems((prev) => {
+        const map = new Map(prev.map((item) => [item.catalogItemId, item]));
+        systemDefaults.forEach((item) => {
+          const existing = map.get(item.id);
+          if (existing) {
+            map.set(item.id, { ...existing, isEnabled: true, catalogItem: item });
+          } else {
+            map.set(item.id, {
+              catalogItemId: item.id,
+              calcMode: "per_month",
+              quantity: 1,
+              unitPriceOverride: null,
+              isEnabled: true,
+              visibility: item.defaultVisibility || "visible",
+              notes: "",
+              catalogItem: item,
+            });
+          }
+        });
+        return Array.from(map.values());
+      });
+    }
+
+    const financialDefaults = financialCatalog.filter((item) => item.isDefault);
+    if (financialDefaults.length) {
+      setCostItems((prev) => {
+        const map = new Map(prev.map((item) => [item.catalogItemId, item]));
+        financialDefaults.forEach((item) => {
+          const existing = map.get(item.id);
+          if (existing) {
+            map.set(item.id, { ...existing, isEnabled: true, catalogItem: item });
+          } else {
+            map.set(item.id, {
+              catalogItemId: item.id,
+              calcMode: "per_month",
+              quantity: 1,
+              unitPriceOverride: null,
+              isEnabled: true,
+              visibility: item.defaultVisibility || "visible",
+              notes: "",
+              catalogItem: item,
+            });
+          }
+        });
+        return Array.from(map.values());
+      });
+    }
+
+    defaultsApplied.current = true;
+  };
+
+  useEffect(() => {
+    if (!open || !catalog.length) return;
+    applyDefaults();
+  }, [open, catalog, uniforms.length, exams.length, meals.length, costItems.length]);
+
+  const extraItemsCatalog = useMemo(() => {
+    return catalog.filter((item) => item.type === "system");
+  }, [catalog]);
+
+  const operationalCatalog = useMemo(() => {
+    return catalog.filter((item) => OPERATIONAL_TYPES.includes(item.type));
+  }, [catalog]);
+
+  const transportCatalog = useMemo(() => {
+    return catalog.filter((item) => TRANSPORT_TYPES.includes(item.type));
+  }, [catalog]);
+
+  const vehicleCatalog = useMemo(() => {
+    return catalog.filter((item) => VEHICLE_TYPES.includes(item.type));
+  }, [catalog]);
+
+  const infraCatalog = useMemo(() => {
+    return catalog.filter((item) => INFRA_TYPES.includes(item.type));
+  }, [catalog]);
+
+  const mealCatalog = useMemo(() => {
+    return catalog.filter((item) => item.type === "meal");
+  }, [catalog]);
+
+  const financialCatalog = useMemo(() => {
+    return catalog.filter((item) => FINANCIAL_TYPES.includes(item.type));
+  }, [catalog]);
+
+  const otherCostItems = useMemo(() => {
+    return costItems.filter((item) => {
+      const catalogItem = catalogById.get(item.catalogItemId);
+      return catalogItem?.type === "system";
+    });
+  }, [costItems, catalogById]);
+
+  const financialCostItems = useMemo(() => {
+    return costItems.filter((item) => {
+      const catalogItem = catalogById.get(item.catalogItemId);
+      return catalogItem && FINANCIAL_TYPES.includes(catalogItem.type);
+    });
+  }, [costItems, catalogById]);
+
+  const totalGuards = summary?.totalGuards ?? 0;
+
+  const normalizeUnitPrice = (value: number, unit?: string | null) => {
+    if (!unit) return value;
+    const normalized = unit.toLowerCase();
+    if (normalized.includes("año") || normalized.includes("year")) {
+      return value / 12;
+    }
+    if (normalized.includes("semestre") || normalized.includes("semester")) {
+      return value / 6;
+    }
+    return value;
+  };
+
+  const sumCostItemsByType = (types: string[]) =>
+    costItems.reduce((sum, item) => {
+      if (!item.isEnabled) return sum;
+      const catalogItem = item.catalogItem ?? catalogById.get(item.catalogItemId);
+      if (!catalogItem || !types.includes(catalogItem.type)) return sum;
+      const base = Number(catalogItem.basePrice || 0);
+      const override =
+        item.unitPriceOverride !== null && item.unitPriceOverride !== undefined
+          ? Number(item.unitPriceOverride)
+          : null;
+      const unitPrice = normalizeUnitPrice(override ?? base, catalogItem.unit);
+      const quantity = Number(item.quantity ?? 1);
+      const calcMode = item.calcMode || "per_month";
+      if (calcMode === "per_guard") {
+        return sum + unitPrice * quantity * totalGuards;
+      }
+      return sum + unitPrice * quantity;
+    }, 0);
+
+  const uniformTotal = useMemo(() => {
+    const total = uniforms.reduce((sum, item) => {
+      if (!item.active) return sum;
+      const base = Number(item.catalogItem?.basePrice ?? 0);
+      const override =
+        item.unitPriceOverride !== null && item.unitPriceOverride !== undefined
+          ? Number(item.unitPriceOverride)
+          : null;
+      const unitPrice = normalizeUnitPrice(override ?? base, item.catalogItem?.unit);
+      return sum + unitPrice;
+    }, 0);
+    const changes = parameters.uniformChangesPerYear || 0;
+    const guards = summary?.totalGuards ?? 0;
+    return guards > 0 ? ((total * changes) / 12) * guards : 0;
+  }, [uniforms, parameters.uniformChangesPerYear, summary?.totalGuards]);
+
+  const examTotal = useMemo(() => {
+    const total = exams.reduce((sum, item) => {
+      if (!item.active) return sum;
+      const base = Number(item.catalogItem?.basePrice ?? 0);
+      const override =
+        item.unitPriceOverride !== null && item.unitPriceOverride !== undefined
+          ? Number(item.unitPriceOverride)
+          : null;
+      const unitPrice = normalizeUnitPrice(override ?? base, item.catalogItem?.unit);
+      return sum + unitPrice;
+    }, 0);
+    const avgStay = parameters.avgStayMonths || 0;
+    const entriesPerYear = avgStay > 0 ? 12 / avgStay : 0;
+    const guards = summary?.totalGuards ?? 0;
+    return guards > 0 ? ((total * entriesPerYear) / 12) * guards : 0;
+  }, [exams, parameters.avgStayMonths, summary?.totalGuards]);
+
+  const mealTotal = useMemo(() => {
+    return meals.reduce((sum, meal) => {
+      if (!meal.isEnabled) return sum;
+      const base = Number(
+        mealCatalog.find((item) => item.name.toLowerCase() === meal.mealType.toLowerCase())
+          ?.basePrice ?? 0
+      );
+      const unit = mealCatalog.find(
+        (item) => item.name.toLowerCase() === meal.mealType.toLowerCase()
+      )?.unit;
+      const override =
+        meal.priceOverride !== null && meal.priceOverride !== undefined
+          ? Number(meal.priceOverride)
+          : null;
+      const price = normalizeUnitPrice(override ?? base, unit);
+      return sum + price * meal.mealsPerDay * meal.daysOfService;
+    }, 0);
+  }, [meals, mealCatalog]);
+
+  return (
+    <Card className="p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold">Costos adicionales</h2>
+          <p className="text-xs text-muted-foreground">
+            Uniformes, exámenes, alimentación y servicios adicionales.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="gap-2" onClick={loadData}>
+            <RefreshCw className="h-3 w-3" />
+            <span className="hidden sm:inline">Actualizar</span>
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Agregar costos</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-background text-foreground p-4 sm:p-6">
+              <DialogHeader>
+                <DialogTitle>Configurar costos adicionales</DialogTitle>
+              </DialogHeader>
+
+              {loading ? (
+                <div className="text-sm text-muted-foreground">Cargando...</div>
+              ) : (
+                <div className="space-y-4 text-sm">
+                  <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="text-xs sm:text-sm font-semibold uppercase text-foreground">
+                        Uniformes
+                      </h3>
+                      <span className="text-xs text-muted-foreground">
+                        Total: {formatCurrency(uniformTotal)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flex h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground sm:w-64"
+                          value=""
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (!value) return;
+                            setUniforms((prev) => {
+                              const existing = prev.find((u) => u.catalogItemId === value);
+                              if (existing) {
+                                return prev.map((u) =>
+                                  u.catalogItemId === value ? { ...u, active: true } : u
+                                );
+                              }
+                              const catalogItem = catalogById.get(value);
+                              if (!catalogItem) return prev;
+                              return [
+                                ...prev,
+                                {
+                                  catalogItemId: value,
+                                  unitPriceOverride: null,
+                                  active: true,
+                                  catalogItem,
+                                },
+                              ];
+                            });
+                          }}
+                        >
+                          <option value="">Agregar ítem</option>
+                          {(catalogByType.uniform || [])
+                            .filter((item) => !uniforms.find((u) => u.catalogItemId === item.id && u.active))
+                            .map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {(catalogByType.uniform || [])
+                        .filter((item) =>
+                          uniforms.find((u) => u.catalogItemId === item.id && u.active)
+                        )
+                        .map((item) => {
+                          const selected = uniforms.find((u) => u.catalogItemId === item.id);
+                          return (
+                            <div key={item.id} className={`${sectionBoxClass} space-y-2`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs sm:text-sm">{item.name}</span>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>Base: {formatCurrency(Number(item.basePrice))}</span>
+                                  <button
+                                    type="button"
+                                    className="rounded-md border border-border px-2 py-1 text-[11px]"
+                                    onClick={() =>
+                                      setUniforms((prev) =>
+                                        prev.map((u) =>
+                                          u.catalogItemId === item.id ? { ...u, active: false } : u
+                                        )
+                                      )
+                                    }
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                              <Input
+                                type="number"
+                                placeholder="Precio mensual (override)"
+                                value={selected?.unitPriceOverride ?? ""}
+                                onChange={(e) =>
+                                  setUniforms((prev) =>
+                                    prev.map((u) =>
+                                      u.catalogItemId === item.id
+                                        ? { ...u, unitPriceOverride: toNumber(e.target.value) }
+                                        : u
+                                    )
+                                  )
+                                }
+                                className={inputClass}
+                              />
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="text-xs sm:text-sm font-semibold uppercase text-foreground">
+                        Exámenes
+                      </h3>
+                      <span className="text-xs text-muted-foreground">
+                        Total: {formatCurrency(examTotal)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flex h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground sm:w-64"
+                          value=""
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (!value) return;
+                            setExams((prev) => {
+                              const existing = prev.find((u) => u.catalogItemId === value);
+                              if (existing) {
+                                return prev.map((u) =>
+                                  u.catalogItemId === value ? { ...u, active: true } : u
+                                );
+                              }
+                              const catalogItem = catalogById.get(value);
+                              if (!catalogItem) return prev;
+                              return [
+                                ...prev,
+                                {
+                                  catalogItemId: value,
+                                  unitPriceOverride: null,
+                                  active: true,
+                                  catalogItem,
+                                },
+                              ];
+                            });
+                          }}
+                        >
+                          <option value="">Agregar ítem</option>
+                          {(catalogByType.exam || [])
+                            .filter((item) => !exams.find((u) => u.catalogItemId === item.id && u.active))
+                            .map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {(catalogByType.exam || [])
+                        .filter((item) =>
+                          exams.find((u) => u.catalogItemId === item.id && u.active)
+                        )
+                        .map((item) => {
+                          const selected = exams.find((u) => u.catalogItemId === item.id);
+                          return (
+                            <div key={item.id} className={`${sectionBoxClass} space-y-2`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs sm:text-sm">{item.name}</span>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>Base: {formatCurrency(Number(item.basePrice))}</span>
+                                  <button
+                                    type="button"
+                                    className="rounded-md border border-border px-2 py-1 text-[11px]"
+                                    onClick={() =>
+                                      setExams((prev) =>
+                                        prev.map((u) =>
+                                          u.catalogItemId === item.id ? { ...u, active: false } : u
+                                        )
+                                      )
+                                    }
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                              <Input
+                                type="number"
+                                placeholder="Precio mensual (override)"
+                                value={selected?.unitPriceOverride ?? ""}
+                                onChange={(e) =>
+                                  setExams((prev) =>
+                                    prev.map((u) =>
+                                      u.catalogItemId === item.id
+                                        ? { ...u, unitPriceOverride: toNumber(e.target.value) }
+                                        : u
+                                    )
+                                  )
+                                }
+                                className={inputClass}
+                              />
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="text-xs sm:text-sm font-semibold uppercase text-foreground">
+                        Alimentación
+                      </h3>
+                      <span className="text-xs text-muted-foreground">
+                        Total: {formatCurrency(mealTotal)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flex h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground sm:w-64"
+                          value=""
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (!value) return;
+                            updateMeal(value, { isEnabled: true });
+                          }}
+                        >
+                          <option value="">Agregar ítem</option>
+                          {mealCatalog
+                            .filter(
+                              (item) =>
+                                !meals.find(
+                                  (m) =>
+                                    m.mealType.toLowerCase() === item.name.toLowerCase() &&
+                                    m.isEnabled
+                                )
+                            )
+                            .map((item) => (
+                              <option key={item.id} value={item.name}>
+                                {item.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {mealCatalog
+                        .filter((item) =>
+                          meals.find(
+                            (m) =>
+                              m.mealType.toLowerCase() === item.name.toLowerCase() && m.isEnabled
+                          )
+                        )
+                        .map((item) => {
+                          const meal = meals.find(
+                            (m) => m.mealType.toLowerCase() === item.name.toLowerCase()
+                          );
+                          return (
+                            <div key={item.id} className={`${sectionBoxClass} space-y-2`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs sm:text-sm">{item.name}</span>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>Base: {formatCurrency(Number(item.basePrice))}</span>
+                                  <button
+                                    type="button"
+                                    className="rounded-md border border-border px-2 py-1 text-[11px]"
+                                    onClick={() => updateMeal(item.name, { isEnabled: false })}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <Input
+                                  type="number"
+                                  placeholder="Comidas/día"
+                                  value={meal?.mealsPerDay ?? 0}
+                                  onChange={(e) =>
+                                    updateMeal(item.name, { mealsPerDay: toNumber(e.target.value) })
+                                  }
+                                  className={inputClass}
+                                />
+                                <Input
+                                  type="number"
+                                  placeholder="Días/mes"
+                                  value={meal?.daysOfService ?? 0}
+                                  onChange={(e) =>
+                                    updateMeal(item.name, { daysOfService: toNumber(e.target.value) })
+                                  }
+                                  className={inputClass}
+                                />
+                                <Input
+                                  type="number"
+                                  placeholder="Precio mensual (override)"
+                                  value={meal?.priceOverride ?? ""}
+                                  onChange={(e) =>
+                                    updateMeal(item.name, { priceOverride: toNumber(e.target.value) })
+                                  }
+                                  className={`${inputClass} col-span-2`}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="text-xs sm:text-sm font-semibold uppercase text-foreground">
+                        Equipos operativos
+                      </h3>
+                      <span className="text-xs text-muted-foreground">
+                        Total: {formatCurrency(sumCostItemsByType(["phone", "radio", "flashlight"]))}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flex h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground sm:w-64"
+                          value=""
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (!value) return;
+                            upsertCostItem(catalogById.get(value)!, { isEnabled: true });
+                          }}
+                        >
+                          <option value="">Agregar ítem</option>
+                          {operationalCatalog
+                            .filter((item) => !findCostItem(item.id)?.isEnabled)
+                            .map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {operationalCatalog
+                        .filter((item) => findCostItem(item.id)?.isEnabled)
+                        .map((item) => {
+                          const costItem = findCostItem(item.id);
+                          return (
+                            <div key={item.id} className={`${sectionBoxClass} space-y-2`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs sm:text-sm">{item.name}</span>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>Base: {formatCurrency(Number(item.basePrice))}</span>
+                                  <button
+                                    type="button"
+                                    className="rounded-md border border-border px-2 py-1 text-[11px]"
+                                    onClick={() => upsertCostItem(item, { isEnabled: false })}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                              <Input
+                                type="number"
+                                placeholder="Precio mensual (override)"
+                                value={costItem?.unitPriceOverride ?? ""}
+                                onChange={(e) =>
+                                  upsertCostItem(item, { unitPriceOverride: toNumber(e.target.value) })
+                                }
+                                className={inputClass}
+                              />
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="text-xs sm:text-sm font-semibold uppercase text-foreground">
+                        Costos de transporte
+                      </h3>
+                      <span className="text-xs text-muted-foreground">
+                        Total: {formatCurrency(sumCostItemsByType(TRANSPORT_TYPES))}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flex h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground sm:w-64"
+                          value=""
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (!value) return;
+                            upsertCostItem(catalogById.get(value)!, { isEnabled: true });
+                          }}
+                        >
+                          <option value="">Agregar ítem</option>
+                          {transportCatalog
+                            .filter((item) => !findCostItem(item.id)?.isEnabled)
+                            .map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {transportCatalog
+                        .filter((item) => findCostItem(item.id)?.isEnabled)
+                        .map((item) => {
+                          const costItem = findCostItem(item.id);
+                          return (
+                            <div key={item.id} className={`${sectionBoxClass} space-y-2`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs sm:text-sm">{item.name}</span>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>Base: {formatCurrency(Number(item.basePrice))}</span>
+                                  <button
+                                    type="button"
+                                    className="rounded-md border border-border px-2 py-1 text-[11px]"
+                                    onClick={() => upsertCostItem(item, { isEnabled: false })}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                              <Input
+                                type="number"
+                                placeholder="Precio mensual (override)"
+                                value={costItem?.unitPriceOverride ?? ""}
+                                onChange={(e) =>
+                                  upsertCostItem(item, { unitPriceOverride: toNumber(e.target.value) })
+                                }
+                                className={inputClass}
+                              />
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="text-xs sm:text-sm font-semibold uppercase text-foreground">
+                        Vehículos
+                      </h3>
+                      <span className="text-xs text-muted-foreground">
+                        Total: {formatCurrency(sumCostItemsByType(VEHICLE_TYPES))}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flex h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground sm:w-64"
+                          value=""
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (!value) return;
+                            upsertCostItem(catalogById.get(value)!, { isEnabled: true });
+                          }}
+                        >
+                          <option value="">Agregar ítem</option>
+                          {vehicleCatalog
+                            .filter((item) => !findCostItem(item.id)?.isEnabled)
+                            .map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {vehicleCatalog
+                        .filter((item) => findCostItem(item.id)?.isEnabled)
+                        .map((item) => {
+                          const costItem = findCostItem(item.id);
+                          return (
+                            <div key={item.id} className={`${sectionBoxClass} space-y-2`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs sm:text-sm">{item.name}</span>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>Base: {formatCurrency(Number(item.basePrice))}</span>
+                                  <button
+                                    type="button"
+                                    className="rounded-md border border-border px-2 py-1 text-[11px]"
+                                    onClick={() => upsertCostItem(item, { isEnabled: false })}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                              <Input
+                                type="number"
+                                placeholder="Precio mensual (override)"
+                                value={costItem?.unitPriceOverride ?? ""}
+                                onChange={(e) =>
+                                  upsertCostItem(item, { unitPriceOverride: toNumber(e.target.value) })
+                                }
+                                className={inputClass}
+                              />
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="text-xs sm:text-sm font-semibold uppercase text-foreground">
+                        Infraestructura
+                      </h3>
+                      <span className="text-xs text-muted-foreground">
+                        Total: {formatCurrency(sumCostItemsByType(INFRA_TYPES))}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flex h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground sm:w-64"
+                          value=""
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (!value) return;
+                            upsertCostItem(catalogById.get(value)!, { isEnabled: true });
+                          }}
+                        >
+                          <option value="">Agregar ítem</option>
+                          {infraCatalog
+                            .filter((item) => !findCostItem(item.id)?.isEnabled)
+                            .map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {infraCatalog
+                        .filter((item) => findCostItem(item.id)?.isEnabled)
+                        .map((item) => {
+                          const costItem = findCostItem(item.id);
+                          return (
+                            <div key={item.id} className={`${sectionBoxClass} space-y-2`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs sm:text-sm">{item.name}</span>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>Base: {formatCurrency(Number(item.basePrice))}</span>
+                                  <button
+                                    type="button"
+                                    className="rounded-md border border-border px-2 py-1 text-[11px]"
+                                    onClick={() => upsertCostItem(item, { isEnabled: false })}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                              <Input
+                                type="number"
+                                placeholder="Precio mensual (override)"
+                                value={costItem?.unitPriceOverride ?? ""}
+                                onChange={(e) =>
+                                  upsertCostItem(item, { unitPriceOverride: toNumber(e.target.value) })
+                                }
+                                className={inputClass}
+                              />
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="text-xs sm:text-sm font-semibold uppercase text-foreground">
+                        Sistemas
+                      </h3>
+                      <span className="text-xs text-muted-foreground">
+                        Total: {formatCurrency(sumCostItemsByType(["system"]))}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flex h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground sm:w-64"
+                          value=""
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (!value) return;
+                            const item = catalogById.get(value);
+                            if (!item) return;
+                            upsertCostItem(item, { isEnabled: true });
+                          }}
+                        >
+                          <option value="">Agregar ítem</option>
+                          {extraItemsCatalog
+                            .filter((item) => !findCostItem(item.id)?.isEnabled)
+                            .map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {otherCostItems
+                        .filter((item) => item.isEnabled)
+                        .map((item) => {
+                          const catalogItem = catalogById.get(item.catalogItemId);
+                          if (!catalogItem) return null;
+                          return (
+                            <div key={item.catalogItemId} className={`${sectionBoxClass} space-y-2`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs sm:text-sm">{catalogItem.name}</span>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>Base: {formatCurrency(Number(catalogItem.basePrice))}</span>
+                                  <button
+                                    type="button"
+                                    className="rounded-md border border-border px-2 py-1 text-[11px]"
+                                    onClick={() => upsertCostItem(catalogItem, { isEnabled: false })}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                              <Input
+                                type="number"
+                                placeholder="Precio mensual (override)"
+                                value={item.unitPriceOverride ?? ""}
+                                onChange={(e) =>
+                                  setCostItems((prev) =>
+                                    prev.map((c) =>
+                                      c.catalogItemId === item.catalogItemId
+                                        ? { ...c, unitPriceOverride: toNumber(e.target.value) }
+                                        : c
+                                    )
+                                  )
+                                }
+                                className={inputClass}
+                              />
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <h3 className="text-xs sm:text-sm font-semibold uppercase text-foreground">
+                        Costos financieros
+                      </h3>
+                      <span className="text-xs text-muted-foreground">
+                        Total: {formatCurrency(sumCostItemsByType(["financial", "policy"]))}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="flex h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground sm:w-64"
+                          value=""
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (!value) return;
+                            const item = catalogById.get(value);
+                            if (!item) return;
+                            upsertCostItem(item, { isEnabled: true });
+                          }}
+                        >
+                          <option value="">Agregar ítem</option>
+                          {financialCatalog
+                            .filter((item) => !findCostItem(item.id)?.isEnabled)
+                            .map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {financialCostItems
+                        .filter((item) => item.isEnabled)
+                        .map((item) => {
+                          const catalogItem = catalogById.get(item.catalogItemId);
+                          if (!catalogItem) return null;
+                          const isPolicy = catalogItem.type === "policy";
+                          return (
+                            <div key={item.catalogItemId} className={`${sectionBoxClass} space-y-2 ${isPolicy ? "sm:col-span-2 lg:col-span-3" : ""}`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs sm:text-sm">{catalogItem.name}</span>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>Tasa base: {Number(catalogItem.basePrice)}%</span>
+                                  <button
+                                    type="button"
+                                    className="rounded-md border border-border px-2 py-1 text-[11px]"
+                                    onClick={() => upsertCostItem(catalogItem, { isEnabled: false })}
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="grid gap-2 grid-cols-2 sm:grid-cols-3">
+                                <div className="space-y-1">
+                                  <Label className="text-[11px]">Tasa (%)</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="Override tasa"
+                                    value={item.unitPriceOverride ?? ""}
+                                    onChange={(e) =>
+                                      setCostItems((prev) =>
+                                        prev.map((c) =>
+                                          c.catalogItemId === item.catalogItemId
+                                            ? { ...c, unitPriceOverride: toNumber(e.target.value) }
+                                            : c
+                                        )
+                                      )
+                                    }
+                                    className={inputClass}
+                                  />
+                                </div>
+                                {isPolicy && (
+                                  <>
+                                    <div className="space-y-1">
+                                      <Label className="text-[11px]">Meses a considerar</Label>
+                                      <Input
+                                        type="number"
+                                        value={parameters.policyContractMonths}
+                                        onChange={(e) =>
+                                          setParameters((prev) => ({
+                                            ...prev,
+                                            policyContractMonths: toNumber(e.target.value),
+                                          }))
+                                        }
+                                        className={inputClass}
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-[11px]">Porcentaje contrato (%)</Label>
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={parameters.policyContractPct}
+                                        onChange={(e) =>
+                                          setParameters((prev) => ({
+                                            ...prev,
+                                            policyContractPct: toNumber(e.target.value),
+                                          }))
+                                        }
+                                        className={inputClass}
+                                      />
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-2">
+                    <h3 className="text-[11px] font-semibold uppercase text-foreground">
+                      Margen y parámetros
+                    </h3>
+                    <div className="grid gap-2 grid-cols-2 sm:grid-cols-3">
+                      <div className="space-y-1">
+                        <Label className="text-[11px]">Margen (%)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={parameters.marginPct}
+                          onChange={(e) =>
+                            setParameters((prev) => ({
+                              ...prev,
+                              marginPct: toNumber(e.target.value),
+                            }))
+                          }
+                          className={inputClass}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px]">Meses contrato</Label>
+                        <Input
+                          type="number"
+                          value={parameters.contractMonths}
+                          onChange={(e) =>
+                            setParameters((prev) => ({
+                              ...prev,
+                              contractMonths: toNumber(e.target.value),
+                            }))
+                          }
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <Badge variant="outline" className="text-xs">
+                  Mobile-first · Los cambios se guardan al presionar "Guardar cambios"
+                </Badge>
+                <Button size="sm" onClick={handleSave} disabled={saving} className="bg-teal-600 hover:bg-teal-700">
+                  {saving ? "Guardando..." : "Guardar cambios"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {summary ? (
+        <div className="space-y-2">
+          <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9">
+            <KpiCard
+              title="Uniformes"
+              value={formatCurrency(summary.monthlyUniforms)}
+              variant="blue"
+              size="sm"
+            tooltip={
+              <div className="space-y-1">
+                <div className="font-semibold">Ítems activos:</div>
+                {uniforms
+                  .filter((item) => item.active)
+                  .map((item) => {
+                    const price = item.unitPriceOverride
+                      ? Number(item.unitPriceOverride)
+                      : Number(item.catalogItem?.basePrice ?? 0);
+                    return (
+                      <div key={item.catalogItemId} className="text-[11px]">
+                        • {item.catalogItem?.name}: {formatCurrency(price)}
+                        {item.unitPriceOverride && <span className="text-emerald-300"> (override)</span>}
+                      </div>
+                    );
+                  })}
+                <div className="mt-2 border-t border-border/60 pt-2 text-[11px]">
+                  <div>Guardias: {summary.totalGuards}</div>
+                  <div>Cambios/año: {parameters.uniformChangesPerYear}</div>
+                </div>
+              </div>
+            }
+            />
+            <KpiCard
+              title="Exámenes"
+              value={formatCurrency(summary.monthlyExams)}
+              variant="indigo"
+              size="sm"
+            tooltip={
+              <div className="space-y-1">
+                <div className="font-semibold">Ítems activos:</div>
+                {exams
+                  .filter((item) => item.active)
+                  .map((item) => {
+                    const price = item.unitPriceOverride
+                      ? Number(item.unitPriceOverride)
+                      : Number(item.catalogItem?.basePrice ?? 0);
+                    return (
+                      <div key={item.catalogItemId} className="text-[11px]">
+                        • {item.catalogItem?.name}: {formatCurrency(price)}
+                        {item.unitPriceOverride && <span className="text-emerald-300"> (override)</span>}
+                      </div>
+                    );
+                  })}
+                <div className="mt-2 border-t border-border/60 pt-2 text-[11px]">
+                  <div>Guardias: {summary.totalGuards}</div>
+                  <div>Meses estadía: {parameters.avgStayMonths}</div>
+                </div>
+              </div>
+            }
+            />
+            <KpiCard
+              title="Alimentación"
+              value={formatCurrency(summary.monthlyMeals)}
+              variant="sky"
+              size="sm"
+            tooltip={
+              <div className="space-y-1">
+                <div className="font-semibold">Ítems activos:</div>
+                {meals
+                  .filter((meal) => meal.isEnabled)
+                  .map((meal) => {
+                    const catalogItem = mealCatalog.find(
+                      (item) => item.name.toLowerCase() === meal.mealType.toLowerCase()
+                    );
+                    const price = meal.priceOverride
+                      ? Number(meal.priceOverride)
+                      : Number(catalogItem?.basePrice ?? 0);
+                    return (
+                      <div key={meal.mealType} className="text-[11px]">
+                        • {meal.mealType}: {formatCurrency(price)} × {meal.mealsPerDay}/día × {meal.daysOfService} días
+                        {meal.priceOverride && <span className="text-emerald-300"> (override)</span>}
+                      </div>
+                    );
+                  })}
+              </div>
+            }
+            />
+            <KpiCard
+              title="Equipo operativo"
+              value={formatCurrency(sumCostItemsByType(["phone", "radio", "flashlight"]))}
+              variant="emerald"
+              size="sm"
+            tooltip={
+              <div className="space-y-1">
+                <div className="font-semibold">Ítems activos:</div>
+                {costItems
+                  .filter((item) => {
+                    const catalogItem = catalogById.get(item.catalogItemId);
+                    return catalogItem && ["phone", "radio", "flashlight"].includes(catalogItem.type) && item.isEnabled;
+                  })
+                  .map((item) => {
+                    const catalogItem = catalogById.get(item.catalogItemId);
+                    const price = item.unitPriceOverride
+                      ? Number(item.unitPriceOverride)
+                      : Number(catalogItem?.basePrice ?? 0);
+                    return (
+                      <div key={item.catalogItemId} className="text-[11px]">
+                        • {catalogItem?.name}: {formatCurrency(price)}
+                        {item.unitPriceOverride && <span className="text-emerald-300"> (override)</span>}
+                      </div>
+                    );
+                  })}
+                <div className="mt-2 border-t border-border/60 pt-2 text-[11px]">
+                  <div>Guardias: {summary.totalGuards}</div>
+                </div>
+              </div>
+            }
+            />
+            <KpiCard
+              title="Transporte"
+              value={formatCurrency(sumCostItemsByType(TRANSPORT_TYPES))}
+              variant="sky"
+              size="sm"
+              tooltip={
+                <div className="space-y-1">
+                  <div className="font-semibold">Ítems activos:</div>
+                  {costItems
+                    .filter((item) => {
+                      const catalogItem = catalogById.get(item.catalogItemId);
+                      return catalogItem && TRANSPORT_TYPES.includes(catalogItem.type) && item.isEnabled;
+                    })
+                    .map((item) => {
+                      const catalogItem = catalogById.get(item.catalogItemId);
+                      const price = item.unitPriceOverride
+                        ? Number(item.unitPriceOverride)
+                        : Number(catalogItem?.basePrice ?? 0);
+                      return (
+                        <div key={item.catalogItemId} className="text-[11px]">
+                          • {catalogItem?.name}: {formatCurrency(price)}
+                          {item.unitPriceOverride && <span className="text-emerald-300"> (override)</span>}
+                        </div>
+                      );
+                    })}
+                </div>
+              }
+            />
+            <KpiCard
+              title="Vehículos"
+              value={formatCurrency(sumCostItemsByType(VEHICLE_TYPES))}
+              variant="indigo"
+              size="sm"
+              tooltip={
+                <div className="space-y-1">
+                  <div className="font-semibold">Ítems activos:</div>
+                  {costItems
+                    .filter((item) => {
+                      const catalogItem = catalogById.get(item.catalogItemId);
+                      return catalogItem && VEHICLE_TYPES.includes(catalogItem.type) && item.isEnabled;
+                    })
+                    .map((item) => {
+                      const catalogItem = catalogById.get(item.catalogItemId);
+                      const price = item.unitPriceOverride
+                        ? Number(item.unitPriceOverride)
+                        : Number(catalogItem?.basePrice ?? 0);
+                      return (
+                        <div key={item.catalogItemId} className="text-[11px]">
+                          • {catalogItem?.name}: {formatCurrency(price)}
+                          {item.unitPriceOverride && <span className="text-emerald-300"> (override)</span>}
+                        </div>
+                      );
+                    })}
+                </div>
+              }
+            />
+            <KpiCard
+              title="Infraestructura"
+              value={formatCurrency(sumCostItemsByType(INFRA_TYPES))}
+              variant="teal"
+              size="sm"
+              tooltip={
+                <div className="space-y-1">
+                  <div className="font-semibold">Ítems activos:</div>
+                  {costItems
+                    .filter((item) => {
+                      const catalogItem = catalogById.get(item.catalogItemId);
+                      return catalogItem && INFRA_TYPES.includes(catalogItem.type) && item.isEnabled;
+                    })
+                    .map((item) => {
+                      const catalogItem = catalogById.get(item.catalogItemId);
+                      const price = item.unitPriceOverride
+                        ? Number(item.unitPriceOverride)
+                        : Number(catalogItem?.basePrice ?? 0);
+                      return (
+                        <div key={item.catalogItemId} className="text-[11px]">
+                          • {catalogItem?.name}: {formatCurrency(price)}
+                          {item.unitPriceOverride && <span className="text-emerald-300"> (override)</span>}
+                        </div>
+                      );
+                    })}
+                </div>
+              }
+            />
+            <KpiCard
+              title="Sistemas"
+              value={formatCurrency(sumCostItemsByType(["system"]))}
+              variant="purple"
+              size="sm"
+            tooltip={
+              <div className="space-y-1">
+                <div className="font-semibold">Ítems activos:</div>
+                {costItems
+                  .filter((item) => {
+                    const catalogItem = catalogById.get(item.catalogItemId);
+                    return catalogItem?.type === "system" && item.isEnabled;
+                  })
+                  .map((item) => {
+                    const catalogItem = catalogById.get(item.catalogItemId);
+                    const price = item.unitPriceOverride
+                      ? Number(item.unitPriceOverride)
+                      : Number(catalogItem?.basePrice ?? 0);
+                    return (
+                      <div key={item.catalogItemId} className="text-[11px]">
+                        • {catalogItem?.name}: {formatCurrency(price)}
+                        {item.unitPriceOverride && <span className="text-emerald-300"> (override)</span>}
+                      </div>
+                    );
+                  })}
+              </div>
+            }
+            />
+            <KpiCard
+              title="Gastos financieros"
+              value={formatCurrency(summary.monthlyFinancial + summary.monthlyPolicy)}
+              variant="amber"
+              size="sm"
+              tooltip={
+                <div className="space-y-1">
+                  <div className="font-semibold">Desglose:</div>
+                  <div className="text-[11px]">Costo financiero: {formatCurrency(summary.monthlyFinancial)}</div>
+                  <div className="text-[11px]">Póliza: {formatCurrency(summary.monthlyPolicy)}</div>
+                </div>
+              }
+            />
+          </div>
+          <div className="flex justify-end">
+            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5">
+              <div className="text-[10px] text-emerald-300/70 uppercase">Total adicionales</div>
+              <div className="font-mono text-sm font-semibold text-emerald-400">
+                {formatCurrency(summary.monthlyExtras)}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="text-sm text-muted-foreground">
+          Agrega costos adicionales para ver el detalle.
+        </div>
+      )}
+    </Card>
+  );
+}

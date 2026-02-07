@@ -75,6 +75,123 @@ export interface CpqQuote {
   positions?: CpqPosition[];
 }
 
+export interface CpqCatalogItem {
+  id: string;
+  tenantId?: string | null;
+  type: string;
+  name: string;
+  unit: string;
+  basePrice: number;
+  isDefault?: boolean;
+  defaultVisibility: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CpqQuoteParameters {
+  id?: string;
+  quoteId?: string;
+  monthlyHoursStandard: number;
+  avgStayMonths: number;
+  uniformChangesPerYear: number;
+  financialRatePct: number;
+  salePriceMonthly: number;
+  policyRatePct: number;
+  policyAdminRatePct: number;
+  policyContractMonths: number;
+  policyContractPct: number;
+  contractMonths: number;
+  contractAmount: number;
+  marginPct: number;
+}
+
+export interface CpqQuoteUniformItem {
+  id?: string;
+  quoteId?: string;
+  catalogItemId: string;
+  unitPriceOverride?: number | null;
+  active: boolean;
+  catalogItem?: CpqCatalogItem;
+}
+
+export interface CpqQuoteExamItem {
+  id?: string;
+  quoteId?: string;
+  catalogItemId: string;
+  unitPriceOverride?: number | null;
+  active: boolean;
+  catalogItem?: CpqCatalogItem;
+}
+
+export interface CpqQuoteCostItem {
+  id?: string;
+  quoteId?: string;
+  catalogItemId: string;
+  calcMode: string;
+  quantity: number;
+  unitPriceOverride?: number | null;
+  isEnabled: boolean;
+  visibility: string;
+  notes?: string | null;
+  catalogItem?: CpqCatalogItem;
+}
+
+export interface CpqQuoteMeal {
+  id?: string;
+  quoteId?: string;
+  mealType: string;
+  mealsPerDay: number;
+  daysOfService: number;
+  priceOverride?: number | null;
+  isEnabled: boolean;
+  visibility: string;
+}
+
+export interface CpqQuoteVehicle {
+  id?: string;
+  quoteId?: string;
+  vehiclesCount: number;
+  rentMonthly: number;
+  kmPerDay: number;
+  daysPerMonth: number;
+  kmPerLiter: number;
+  fuelPrice: number;
+  maintenanceMonthly: number;
+  isEnabled: boolean;
+  visibility: string;
+}
+
+export interface CpqQuoteInfrastructure {
+  id?: string;
+  quoteId?: string;
+  itemType: string;
+  quantity: number;
+  rentMonthly: number;
+  hasFuel: boolean;
+  fuelLitersPerHour: number;
+  fuelHoursPerDay: number;
+  fuelDaysPerMonth: number;
+  fuelPrice: number;
+  isEnabled: boolean;
+  visibility: string;
+}
+
+export interface CpqQuoteCostSummary {
+  totalGuards: number;
+  monthlyPositions: number;
+  monthlyUniforms: number;
+  monthlyExams: number;
+  monthlyMeals: number;
+  monthlyVehicles: number;
+  monthlyInfrastructure: number;
+  monthlyCostItems: number;
+  monthlyFinancial: number;
+  monthlyPolicy: number;
+  monthlyExtras: number;
+  monthlyTotal: number;
+}
+
 export interface CreateQuoteInput {
   clientName?: string;
   validUntil?: string;

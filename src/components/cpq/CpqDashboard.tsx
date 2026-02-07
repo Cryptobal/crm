@@ -6,15 +6,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { PageHeader } from "@/components/opai";
+import { PageHeader, KpiCard } from "@/components/opai";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { CreateQuoteModal } from "@/components/cpq/CreateQuoteModal";
 import { CpqQuotesList } from "@/components/cpq/CpqQuotesList";
 import { formatCurrency } from "@/components/cpq/utils";
 import type { CpqQuote } from "@/types/cpq";
-import { FileText, Plus } from "lucide-react";
+import { FileText, Plus, Settings } from "lucide-react";
 
 interface CpqDashboardProps {
   initialQuotes?: CpqQuote[];
@@ -23,6 +24,8 @@ interface CpqDashboardProps {
 export function CpqDashboard({ initialQuotes }: CpqDashboardProps) {
   const [quotes, setQuotes] = useState<CpqQuote[]>(initialQuotes || []);
   const [loading, setLoading] = useState(!initialQuotes);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "draft" | "sent">("all");
 
   const refresh = async () => {
     setLoading(true);
@@ -47,35 +50,53 @@ export function CpqDashboard({ initialQuotes }: CpqDashboardProps) {
     return { totalQuotes, totalMonthly };
   }, [quotes]);
 
+  const filteredQuotes = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return quotes.filter((quote) => {
+      const statusMatch =
+        statusFilter === "all" ? true : quote.status === statusFilter;
+      const searchMatch = query
+        ? `${quote.code} ${quote.clientName ?? ""}`.toLowerCase().includes(query)
+        : true;
+      return statusMatch && searchMatch;
+    });
+  }, [quotes, search, statusFilter]);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <PageHeader title="CPQ" description="Cotizador de servicios de seguridad" />
         <div className="flex items-center gap-2">
           <CreateQuoteModal onCreated={refresh} />
+          <Link href="/cpq/config">
+            <Button variant="outline" size="sm" className="gap-2 bg-slate-800/50 border-slate-600 text-slate-200 hover:bg-slate-700/50 hover:text-white">
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Configurar</span>
+            </Button>
+          </Link>
           <Link href="/payroll/simulator">
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button variant="outline" size="sm" className="gap-2 bg-slate-800/50 border-slate-600 text-slate-200 hover:bg-slate-700/50 hover:text-white">
               <FileText className="h-4 w-4" />
-              Payroll
+              <span className="hidden sm:inline">Payroll</span>
             </Button>
           </Link>
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <Card className="border-blue-500/20 bg-blue-500/5 p-4">
-          <p className="text-xs sm:text-sm uppercase text-blue-400/80">Cotizaciones</p>
-          <p className="mt-1 font-mono text-2xl font-semibold text-blue-400">
-            {totals.totalQuotes}
-          </p>
-        </Card>
-        <Card className="border-emerald-500/20 bg-emerald-500/5 p-4">
-          <p className="text-xs sm:text-sm uppercase text-emerald-400/80">Costo mensual</p>
-          <p className="mt-1 font-mono text-2xl font-semibold text-emerald-400">
-            {formatCurrency(totals.totalMonthly)}
-          </p>
-        </Card>
-        <Card className="border-muted/40 bg-card p-4">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
+        <KpiCard
+          title="Cotizaciones"
+          value={totals.totalQuotes}
+          variant="blue"
+          size="lg"
+        />
+        <KpiCard
+          title="Costo mensual"
+          value={formatCurrency(totals.totalMonthly)}
+          variant="emerald"
+          size="lg"
+        />
+        <Card className="border-muted/40 bg-card p-4 col-span-2 md:col-span-1">
           <p className="text-xs sm:text-sm uppercase text-muted-foreground">Estado</p>
           <div className="mt-2 flex items-center gap-2">
             <Badge variant="outline">Borradores</Badge>
@@ -89,10 +110,49 @@ export function CpqDashboard({ initialQuotes }: CpqDashboardProps) {
           <h2 className="text-sm font-semibold">Cotizaciones recientes</h2>
           <Button size="sm" variant="outline" className="gap-2" onClick={refresh}>
             <Plus className="h-3 w-3" />
-            Actualizar
+            <span className="hidden sm:inline">Actualizar</span>
           </Button>
         </div>
-        <CpqQuotesList quotes={quotes} loading={loading} />
+        <div className="mb-3 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por código o cliente"
+            className="h-10 sm:h-9 bg-slate-900/80 text-white border-blue-600/40 placeholder:text-slate-400"
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setStatusFilter("all")}
+              className={statusFilter === "all" ? "bg-blue-600/20 border-blue-500/50 text-blue-300" : "bg-slate-900/60 border-slate-700 text-slate-300 hover:bg-slate-800/60"}
+            >
+              Todas
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setStatusFilter("draft")}
+              className={statusFilter === "draft" ? "bg-blue-600/20 border-blue-500/50 text-blue-300" : "bg-slate-900/60 border-slate-700 text-slate-300 hover:bg-slate-800/60"}
+            >
+              Borradores
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setStatusFilter("sent")}
+              className={statusFilter === "sent" ? "bg-blue-600/20 border-blue-500/50 text-blue-300" : "bg-slate-900/60 border-slate-700 text-slate-300 hover:bg-slate-800/60"}
+            >
+              Enviadas
+            </Button>
+          </div>
+        </div>
+        <CpqQuotesList quotes={filteredQuotes} loading={loading} />
+        {!loading && !filteredQuotes.length && (
+          <div className="text-sm text-muted-foreground">
+            No hay cotizaciones para los filtros seleccionados.
+          </div>
+        )}
       </Card>
     </div>
   );

@@ -17,7 +17,7 @@ import {
   BarChart3,
   Info
 } from 'lucide-react';
-import { useState } from 'react';
+import { KpiCard } from '@/components/opai';
 
 interface StatsCardsProps {
   stats: {
@@ -46,63 +46,6 @@ export function StatsCards({
   activeFilter = 'all',
   onFilterClick
 }: StatsCardsProps) {
-  const [showTooltip, setShowTooltip] = useState<string | null>(null);
-  const cards = [
-    {
-      label: 'Total',
-      value: stats.total,
-      icon: FileText,
-      color: 'from-blue-500 to-blue-600',
-      bgColor: 'bg-blue-500/10',
-      borderColor: 'border-blue-500/20',
-      filter: 'all',
-      tooltip: 'Todas las presentaciones creadas',
-    },
-    {
-      label: 'Enviadas',
-      value: stats.sent,
-      icon: Send,
-      color: 'from-purple-500 to-purple-600',
-      bgColor: 'bg-purple-500/10',
-      borderColor: 'border-purple-500/20',
-      filter: 'sent',
-      tooltip: 'Presentaciones enviadas por email',
-    },
-    {
-      label: 'Vistas',
-      value: stats.viewed,
-      subtitle: `${stats.totalViews} totales`,
-      icon: Eye,
-      color: 'from-green-500 to-green-600',
-      bgColor: 'bg-green-500/10',
-      borderColor: 'border-green-500/20',
-      filter: 'viewed',
-      tooltip: 'Clientes que hicieron click en "Ver Propuesta" y abrieron la presentación',
-    },
-    {
-      label: 'Sin Leer',
-      value: stats.pending,
-      subtitle: `${stats.sent > 0 ? ((stats.pending / stats.sent) * 100).toFixed(0) : 0}% pend`,
-      icon: Mail,
-      color: 'from-yellow-500 to-yellow-600',
-      bgColor: 'bg-yellow-500/10',
-      borderColor: 'border-yellow-500/20',
-      filter: 'pending',
-      tooltip: 'Presentaciones enviadas que aún no han sido vistas',
-    },
-    {
-      label: 'Conversión',
-      value: `${conversionRate.toFixed(1)}%`,
-      subtitle: 'Vista/Env',
-      icon: TrendingUp,
-      color: 'from-pink-500 to-pink-600',
-      bgColor: 'bg-pink-500/10',
-      borderColor: 'border-pink-500/20',
-      filter: null,
-      tooltip: 'Porcentaje de presentaciones enviadas que fueron vistas',
-    },
-  ];
-
   return (
     <div className="space-y-2">
       {/* Tooltip de ayuda */}
@@ -115,48 +58,59 @@ export function StatsCards({
 
       {/* Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-2">
-        {cards.map((card, index) => {
-          const Icon = card.icon;
-          const isActive = activeFilter === card.filter;
-          const isClickable = card.filter !== null && onFilterClick;
-          
-          const CardWrapper = isClickable ? 'button' : 'div';
-          
-          return (
-            <CardWrapper
-              key={index}
-              onClick={isClickable ? () => onFilterClick!(card.filter!) : undefined}
-              onMouseEnter={() => setShowTooltip(card.label)}
-              onMouseLeave={() => setShowTooltip(null)}
-              className={`relative overflow-hidden rounded-lg border ${card.borderColor} ${card.bgColor} backdrop-blur-sm p-2 transition-all ${
-                isClickable ? 'cursor-pointer hover:scale-105 hover:shadow-lg' : ''
-              } ${isActive ? 'ring-2 ring-white/30 shadow-lg' : ''}`}
-              title={card.tooltip}
-            >
-              {/* Icon - minimalista */}
-              <div className={`inline-flex p-1 rounded-md bg-gradient-to-br ${card.color} mb-1`}>
-                <Icon className="w-3.5 h-3.5 text-white" />
-              </div>
-
-              {/* Value - compacto */}
-              <div className="text-base sm:text-lg font-bold text-white mb-0.5">
-                {typeof card.value === 'number' ? card.value : card.value}
-              </div>
-
-              {/* Label - minimalista */}
-              <div className="text-xs sm:text-[10px] text-white/70 font-medium leading-tight">
-                {card.label}
-              </div>
-
-              {/* Subtitle - muy pequeño */}
-              {card.subtitle && (
-                <div className="text-[10px] sm:text-[10px] text-white/50 hidden sm:block mt-0.5">
-                  {card.subtitle}
-                </div>
-              )}
-            </CardWrapper>
-          );
-        })}
+        <button onClick={() => onFilterClick?.('all')} className="text-left">
+          <KpiCard
+            title="Total"
+            value={stats.total}
+            icon={<FileText className="h-4 w-4" />}
+            description="Todas"
+            variant="blue"
+            size="sm"
+            className={activeFilter === 'all' ? 'ring-2 ring-primary' : 'hover:ring-2 hover:ring-muted cursor-pointer'}
+          />
+        </button>
+        <button onClick={() => onFilterClick?.('sent')} className="text-left">
+          <KpiCard
+            title="Enviadas"
+            value={stats.sent}
+            icon={<Send className="h-4 w-4" />}
+            variant="purple"
+            size="sm"
+            className={activeFilter === 'sent' ? 'ring-2 ring-primary' : 'hover:ring-2 hover:ring-muted cursor-pointer'}
+          />
+        </button>
+        <button onClick={() => onFilterClick?.('viewed')} className="text-left">
+          <KpiCard
+            title="Vistas"
+            value={stats.viewed}
+            description={`${stats.totalViews} totales`}
+            icon={<Eye className="h-4 w-4" />}
+            variant="emerald"
+            size="sm"
+            className={activeFilter === 'viewed' ? 'ring-2 ring-primary' : 'hover:ring-2 hover:ring-muted cursor-pointer'}
+          />
+        </button>
+        <button onClick={() => onFilterClick?.('pending')} className="text-left">
+          <KpiCard
+            title="Sin Leer"
+            value={stats.pending}
+            description={`${stats.sent > 0 ? ((stats.pending / stats.sent) * 100).toFixed(0) : 0}% pend`}
+            icon={<Mail className="h-4 w-4" />}
+            variant="amber"
+            size="sm"
+            className={activeFilter === 'pending' ? 'ring-2 ring-primary' : 'hover:ring-2 hover:ring-muted cursor-pointer'}
+          />
+        </button>
+        <div className="text-left hidden sm:block">
+          <KpiCard
+            title="Conversión"
+            value={`${conversionRate.toFixed(1)}%`}
+            description="Vista/Env"
+            icon={<TrendingUp className="h-4 w-4" />}
+            variant="sky"
+            size="sm"
+          />
+        </div>
       </div>
     </div>
   );

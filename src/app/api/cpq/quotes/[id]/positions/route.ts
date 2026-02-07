@@ -6,23 +6,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { computeEmployerCost } from "@/modules/payroll/engine/compute-employer-cost";
+import { computeCpqQuoteCosts } from "@/modules/cpq/costing/compute-quote-costs";
 
 async function refreshQuoteTotals(quoteId: string) {
   const positions = await prisma.cpqPosition.findMany({
     where: { quoteId },
-    select: { numGuards: true, monthlyPositionCost: true },
+    select: { id: true },
   });
-
   const totalPositions = positions.length;
-  const totalGuards = positions.reduce((sum, p) => sum + p.numGuards, 0);
-  const monthlyCost = positions.reduce(
-    (sum, p) => sum + Number(p.monthlyPositionCost),
-    0
-  );
+  const costSummary = await computeCpqQuoteCosts(quoteId);
 
   return prisma.cpqQuote.update({
     where: { id: quoteId },
-    data: { totalPositions, totalGuards, monthlyCost },
+    data: {
+      totalPositions,
+      totalGuards: costSummary.totalGuards,
+      monthlyCost: costSummary.monthlyTotal,
+    },
   });
 }
 

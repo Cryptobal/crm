@@ -71,7 +71,7 @@ export function AppShell({ sidebar, topbar, children, className }: AppShellProps
       {sidebar && (
         <button
           type="button"
-          className="fixed left-4 top-4 z-40 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card/95 text-foreground shadow-lg backdrop-blur lg:hidden"
+          className="fixed right-4 top-4 z-40 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card/95 text-foreground shadow-lg backdrop-blur lg:hidden"
           onClick={() => setIsMobileOpen(true)}
           aria-label="Abrir navegación"
           aria-controls="app-sidebar-mobile"

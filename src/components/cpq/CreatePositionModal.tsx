@@ -186,7 +186,7 @@ export function CreatePositionModal({ quoteId, onCreated }: CreatePositionModalP
       <DialogTrigger asChild>
         <Button size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
-          Agregar Puesto
+          <span className="hidden sm:inline">Agregar Puesto</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-[95vw] sm:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">

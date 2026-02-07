@@ -381,7 +381,14 @@ model CpqQuote {
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  positions CpqPosition[]
+  positions       CpqPosition[]
+  parameters      CpqQuoteParameters?
+  uniformItems    CpqQuoteUniformItem[]
+  examItems       CpqQuoteExamItem[]
+  costItems       CpqQuoteCostItem[]
+  meals           CpqQuoteMeal[]
+  vehicles        CpqQuoteVehicle[]
+  infrastructure  CpqQuoteInfrastructure[]
 
   @@index([tenantId], map: "idx_cpq_quotes_tenant")
   @@index([status], map: "idx_cpq_quotes_status")
@@ -469,5 +476,177 @@ model CpqRol {
 
   @@index([active], map: "idx_cpq_roles_active")
   @@map("roles")
+  @@schema("cpq")
+}
+
+model CpqCatalogItem {
+  id                String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId          String?  @map("tenant_id")
+  type              String
+  name              String
+  unit              String
+  basePrice         Decimal  @default(0) @map("base_price") @db.Decimal(12, 2)
+  isDefault         Boolean  @default(false) @map("is_default")
+  defaultVisibility String   @default("visible") @map("default_visibility")
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  uniformSelections CpqQuoteUniformItem[]
+  examSelections    CpqQuoteExamItem[]
+  costItems         CpqQuoteCostItem[]
+
+  @@index([type], map: "idx_cpq_catalog_type")
+  @@index([active], map: "idx_cpq_catalog_active")
+  @@index([tenantId], map: "idx_cpq_catalog_tenant")
+  @@index([tenantId, type], map: "idx_cpq_catalog_tenant_type")
+  @@map("catalog_items")
+  @@schema("cpq")
+}
+
+model CpqQuoteParameters {
+  id                     String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  quoteId                String   @unique @map("quote_id") @db.Uuid
+  monthlyHoursStandard   Int      @default(180) @map("monthly_hours_standard")
+  avgStayMonths          Int      @default(4) @map("avg_stay_months")
+  uniformChangesPerYear  Int      @default(3) @map("uniform_changes_per_year")
+  financialRatePct       Decimal  @default(0) @map("financial_rate_pct") @db.Decimal(6, 4)
+  salePriceMonthly       Decimal  @default(0) @map("sale_price_monthly") @db.Decimal(12, 2)
+  policyRatePct          Decimal  @default(0) @map("policy_rate_pct") @db.Decimal(6, 4)
+  policyAdminRatePct     Decimal  @default(0) @map("policy_admin_rate_pct") @db.Decimal(6, 4)
+  policyContractMonths   Int      @default(12) @map("policy_contract_months")
+  policyContractPct      Decimal  @default(100) @map("policy_contract_pct") @db.Decimal(6, 2)
+  contractMonths         Int      @default(12) @map("contract_months")
+  contractAmount         Decimal  @default(0) @map("contract_amount") @db.Decimal(14, 2)
+  marginPct              Decimal  @default(20) @map("margin_pct") @db.Decimal(6, 2)
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  quote CpqQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@map("quote_parameters")
+  @@schema("cpq")
+}
+
+model CpqQuoteUniformItem {
+  id               String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  quoteId          String   @map("quote_id") @db.Uuid
+  catalogItemId    String   @map("catalog_item_id") @db.Uuid
+  unitPriceOverride Decimal? @map("unit_price_override") @db.Decimal(12, 2)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  quote       CpqQuote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  catalogItem CpqCatalogItem @relation(fields: [catalogItemId], references: [id])
+
+  @@index([quoteId], map: "idx_cpq_uniform_quote")
+  @@index([catalogItemId], map: "idx_cpq_uniform_catalog")
+  @@map("quote_uniform_items")
+  @@schema("cpq")
+}
+
+model CpqQuoteExamItem {
+  id               String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  quoteId          String   @map("quote_id") @db.Uuid
+  catalogItemId    String   @map("catalog_item_id") @db.Uuid
+  unitPriceOverride Decimal? @map("unit_price_override") @db.Decimal(12, 2)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  quote       CpqQuote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  catalogItem CpqCatalogItem @relation(fields: [catalogItemId], references: [id])
+
+  @@index([quoteId], map: "idx_cpq_exam_quote")
+  @@index([catalogItemId], map: "idx_cpq_exam_catalog")
+  @@map("quote_exam_items")
+  @@schema("cpq")
+}
+
+model CpqQuoteCostItem {
+  id                String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  quoteId           String   @map("quote_id") @db.Uuid
+  catalogItemId     String   @map("catalog_item_id") @db.Uuid
+  calcMode          String   @default("per_month") @map("calc_mode")
+  quantity          Decimal  @default(1) @db.Decimal(12, 2)
+  unitPriceOverride Decimal? @map("unit_price_override") @db.Decimal(12, 2)
+  isEnabled         Boolean  @default(true) @map("is_enabled")
+  visibility        String   @default("visible")
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  quote       CpqQuote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  catalogItem CpqCatalogItem @relation(fields: [catalogItemId], references: [id])
+
+  @@index([quoteId], map: "idx_cpq_cost_quote")
+  @@index([catalogItemId], map: "idx_cpq_cost_catalog")
+  @@index([isEnabled], map: "idx_cpq_cost_enabled")
+  @@map("quote_cost_items")
+  @@schema("cpq")
+}
+
+model CpqQuoteMeal {
+  id            String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  quoteId       String   @map("quote_id") @db.Uuid
+  mealType      String   @map("meal_type")
+  mealsPerDay   Int      @default(0) @map("meals_per_day")
+  daysOfService Int      @default(0) @map("days_of_service")
+  priceOverride Decimal? @map("price_override") @db.Decimal(12, 2)
+  isEnabled     Boolean  @default(true) @map("is_enabled")
+  visibility    String   @default("visible")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  quote CpqQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId], map: "idx_cpq_meals_quote")
+  @@map("quote_meals")
+  @@schema("cpq")
+}
+
+model CpqQuoteVehicle {
+  id                String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  quoteId           String   @map("quote_id") @db.Uuid
+  vehiclesCount     Int      @default(1) @map("vehicles_count")
+  rentMonthly       Decimal  @default(0) @map("rent_monthly") @db.Decimal(12, 2)
+  kmPerDay          Decimal  @default(0) @map("km_per_day") @db.Decimal(10, 2)
+  daysPerMonth      Int      @default(0) @map("days_per_month")
+  kmPerLiter        Decimal  @default(0) @map("km_per_liter") @db.Decimal(10, 2)
+  fuelPrice         Decimal  @default(0) @map("fuel_price") @db.Decimal(12, 2)
+  maintenanceMonthly Decimal @default(0) @map("maintenance_monthly") @db.Decimal(12, 2)
+  isEnabled         Boolean  @default(true) @map("is_enabled")
+  visibility        String   @default("visible")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  quote CpqQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId], map: "idx_cpq_vehicles_quote")
+  @@map("quote_vehicles")
+  @@schema("cpq")
+}
+
+model CpqQuoteInfrastructure {
+  id                 String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  quoteId            String   @map("quote_id") @db.Uuid
+  itemType           String   @map("item_type")
+  quantity           Int      @default(1)
+  rentMonthly        Decimal  @default(0) @map("rent_monthly") @db.Decimal(12, 2)
+  hasFuel            Boolean  @default(false) @map("has_fuel")
+  fuelLitersPerHour  Decimal  @default(0) @map("fuel_liters_per_hour") @db.Decimal(10, 2)
+  fuelHoursPerDay    Decimal  @default(0) @map("fuel_hours_per_day") @db.Decimal(10, 2)
+  fuelDaysPerMonth   Int      @default(0) @map("fuel_days_per_month")
+  fuelPrice          Decimal  @default(0) @map("fuel_price") @db.Decimal(12, 2)
+  isEnabled          Boolean  @default(true) @map("is_enabled")
+  visibility         String   @default("visible")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  quote CpqQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId], map: "idx_cpq_infra_quote")
+  @@map("quote_infrastructure")
   @@schema("cpq")
 }

@@ -18,18 +18,43 @@ import { EditPositionModal } from "@/components/cpq/EditPositionModal";
 import { CostBreakdownModal } from "@/components/cpq/CostBreakdownModal";
 import { formatCurrency, sortWeekdays } from "@/components/cpq/utils";
 import type { CpqPosition } from "@/types/cpq";
-import { MoreVertical } from "lucide-react";
+import { ChevronDown, MoreVertical } from "lucide-react";
 
 interface CpqPositionCardProps {
   quoteId: string;
   position: CpqPosition;
   onUpdated?: () => void;
+  totalGuards?: number;
+  additionalCostsTotal?: number;
+  marginPct?: number;
+  financialRatePct?: number;
+  policyRatePct?: number;
+  monthlyHours?: number;
 }
 
-export function CpqPositionCard({ quoteId, position, onUpdated }: CpqPositionCardProps) {
+export function CpqPositionCard({
+  quoteId,
+  position,
+  onUpdated,
+  totalGuards = 1,
+  additionalCostsTotal = 0,
+  marginPct = 20,
+  financialRatePct = 0,
+  policyRatePct = 0,
+  monthlyHours = 180,
+}: CpqPositionCardProps) {
   const [openEdit, setOpenEdit] = useState(false);
   const [openBreakdown, setOpenBreakdown] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  const positionGuards = position.numGuards;
+  const proportion = totalGuards > 0 ? positionGuards / totalGuards : 0;
+  const additionalCostsForPosition = additionalCostsTotal * proportion;
+  const totalCostPosition = Number(position.monthlyPositionCost) + additionalCostsForPosition;
+  const totalRatePct = (marginPct + financialRatePct + policyRatePct) / 100;
+  const salePricePosition = totalRatePct < 1 ? totalCostPosition / (1 - totalRatePct) : totalCostPosition;
+  const hourlyRate = monthlyHours > 0 ? salePricePosition / monthlyHours : 0;
 
   const handleRecalculate = async () => {
     setLoading(true);
@@ -116,7 +141,7 @@ export function CpqPositionCard({ quoteId, position, onUpdated }: CpqPositionCar
         </DropdownMenu>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 p-3">
+      <div className={`${detailsOpen ? 'grid' : 'hidden'} sm:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 p-3`}>
         <div className="rounded-md bg-gradient-to-br from-blue-600/40 to-blue-800/30 p-2 text-white">
           <p className="text-xs sm:text-[9px] uppercase text-white/70">Cargo</p>
           <p className="text-sm sm:text-[11px] font-semibold">{position.cargo?.name || "—"}</p>
@@ -144,13 +169,31 @@ export function CpqPositionCard({ quoteId, position, onUpdated }: CpqPositionCar
       </div>
 
       <div className="flex items-center justify-between border-t bg-muted/10 px-3 py-2">
-        <p className="text-xs sm:text-[10px] text-muted-foreground">
-          Total puesto ({position.numGuards}):{" "}
-          <span className="font-mono text-foreground">
-            {formatCurrency(Number(position.monthlyPositionCost))}
-          </span>
-        </p>
+        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3">
+          <p className="text-xs sm:text-[10px] text-muted-foreground">
+            Total puesto ({position.numGuards}):{" "}
+            <span className="font-mono text-foreground">
+              {formatCurrency(Number(position.monthlyPositionCost))}
+            </span>
+          </p>
+          <p className="text-xs sm:text-[10px] text-emerald-400">
+            Valor hora:{" "}
+            <span className="font-mono font-semibold">
+              {formatCurrency(hourlyRate)}
+            </span>
+          </p>
+        </div>
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 w-9 p-0 sm:hidden"
+            onClick={() => setDetailsOpen((open) => !open)}
+            aria-label={detailsOpen ? "Ocultar detalles" : "Ver detalles"}
+            title={detailsOpen ? "Ocultar detalles" : "Ver detalles"}
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform ${detailsOpen ? "rotate-180" : ""}`} />
+          </Button>
           <Button size="sm" variant="outline" className="h-9 sm:h-7 px-3 sm:px-2 text-xs sm:text-[10px]" onClick={() => setOpenBreakdown(true)}>
             Ver desglose
           </Button>

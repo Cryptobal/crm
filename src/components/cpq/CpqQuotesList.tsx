@@ -24,6 +24,22 @@ export function CpqQuotesList({ quotes, loading }: CpqQuotesListProps) {
     return <div className="text-sm text-muted-foreground">No hay cotizaciones aún.</div>;
   }
 
+  const statusLabel = (status: string) => {
+    if (status === "sent") return "Enviada";
+    if (status === "draft") return "Borrador";
+    return status;
+  };
+
+  const statusStyle = (status: string) => {
+    if (status === "sent") {
+      return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+    }
+    if (status === "draft") {
+      return "bg-slate-500/15 text-slate-200 border-slate-500/30";
+    }
+    return "bg-muted/20 text-muted-foreground border-border/40";
+  };
+
   return (
     <div className="space-y-2">
       {quotes.map((quote) => (
@@ -32,8 +48,9 @@ export function CpqQuotesList({ quotes, loading }: CpqQuotesListProps) {
             <div>
               <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold">{quote.code}</p>
-                <Badge variant="outline" className="text-xs">
-                  {quote.status}
+                <Badge className={`text-xs border ${statusStyle(quote.status)}`}>
+                  <span className="inline-flex h-2 w-2 rounded-full bg-current opacity-70" />
+                  <span className="ml-2">{statusLabel(quote.status)}</span>
                 </Badge>
               </div>
               <p className="text-xs sm:text-sm text-muted-foreground">

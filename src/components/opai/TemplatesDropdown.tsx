@@ -38,7 +38,7 @@ export function TemplatesDropdown() {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <LayoutDashboard className="h-4 w-4" />
-          Templates
+          <span className="hidden sm:inline">Templates</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">

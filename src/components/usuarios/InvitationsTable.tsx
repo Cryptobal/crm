@@ -41,8 +41,52 @@ export default function InvitationsTable({ invitations }: Props) {
   };
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
+    <div>
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {invitations.map((inv) => (
+          <div key={inv.id} className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
+            <div className="font-medium text-white">{inv.email}</div>
+            <div className="mt-1 text-sm text-slate-400">
+              {getRoleLabel(inv.role)}
+            </div>
+            <div className="mt-2 flex items-center justify-between text-sm text-slate-400">
+              <span>Enviada</span>
+              <span>
+                {formatDistanceToNow(new Date(inv.createdAt), {
+                  addSuffix: true,
+                  locale: es,
+                })}
+              </span>
+            </div>
+            <div className="mt-1 flex items-center justify-between text-sm text-slate-400">
+              <span>Expira</span>
+              <span>
+                {formatDistanceToNow(new Date(inv.expiresAt), {
+                  addSuffix: true,
+                  locale: es,
+                })}
+              </span>
+            </div>
+            <div className="mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleRevoke(inv.id)}
+                disabled={loading === inv.id}
+                className="border-slate-700 bg-slate-800 text-slate-200"
+              >
+                <X className="w-4 h-4 mr-1" />
+                Revocar
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full">
         <thead className="bg-slate-800 border-b border-slate-700">
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
@@ -100,7 +144,8 @@ export default function InvitationsTable({ invitations }: Props) {
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   );
 }

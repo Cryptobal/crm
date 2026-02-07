@@ -81,11 +81,11 @@ export function EmailStatusBadge({ presentation }: EmailStatusBadgeProps) {
 
   return (
     <div
-      className={`inline-flex items-center gap-1.5 sm:gap-1 px-3 py-1.5 sm:px-2 sm:py-1 rounded-md border ${status.color} transition-all min-w-[90px] sm:min-w-[80px] justify-center`}
+      className={`inline-flex h-9 items-center gap-2 rounded-md border ${status.color} px-3 text-xs font-medium transition-all min-w-[96px] justify-center`}
       title={status.tooltip}
     >
-      <Icon className="w-3.5 h-3.5 sm:w-3 sm:h-3 flex-shrink-0" />
-      <span className="text-xs sm:text-[10px] font-medium whitespace-nowrap">{status.label}</span>
+      <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+      <span className="whitespace-nowrap">{status.label}</span>
     </div>
   );
 }

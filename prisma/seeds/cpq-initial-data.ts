@@ -62,6 +62,50 @@ export async function seedCpqData() {
     });
   }
 
+  const catalogItems = [
+    { type: "uniform", name: "Camisa", unit: "unidad", basePrice: 15000, isDefault: true },
+    { type: "uniform", name: "Pantalon", unit: "unidad", basePrice: 18000, isDefault: true },
+    { type: "uniform", name: "Zapato", unit: "unidad", basePrice: 32000, isDefault: true },
+    { type: "uniform", name: "Casco", unit: "unidad", basePrice: 12000, isDefault: true },
+    { type: "uniform", name: "EPP", unit: "unidad", basePrice: 20000, isDefault: true },
+    { type: "uniform", name: "Chaleco Antikorper", unit: "unidad", basePrice: 28000, isDefault: true },
+
+    { type: "exam", name: "Preocupacional", unit: "examen", basePrice: 25000, isDefault: true },
+    { type: "exam", name: "Fisico", unit: "examen", basePrice: 12000, isDefault: true },
+    { type: "exam", name: "Psicotecnico", unit: "examen", basePrice: 18000, isDefault: true },
+    { type: "exam", name: "Altura", unit: "examen", basePrice: 22000, isDefault: true },
+    { type: "exam", name: "Drogas", unit: "examen", basePrice: 20000, isDefault: true },
+
+    { type: "system", name: "Sistema", unit: "mes", basePrice: 3500, isDefault: false },
+    { type: "phone", name: "Telefono", unit: "mes", basePrice: 12000, isDefault: false },
+    { type: "radio", name: "Radio", unit: "mes", basePrice: 8000, isDefault: false },
+    { type: "flashlight", name: "Linterna", unit: "mes", basePrice: 3000, isDefault: false },
+    { type: "transport", name: "Transporte", unit: "mes", basePrice: 0, isDefault: false },
+
+    { type: "meal", name: "Desayuno", unit: "comida", basePrice: 3500, isDefault: false },
+    { type: "meal", name: "Almuerzo", unit: "comida", basePrice: 6500, isDefault: false },
+    { type: "meal", name: "Comida", unit: "comida", basePrice: 6500, isDefault: false },
+    { type: "meal", name: "Merienda", unit: "comida", basePrice: 2500, isDefault: false },
+  ];
+
+  for (const item of catalogItems) {
+    const existing = await prisma.cpqCatalogItem.findFirst({
+      where: { name: item.name, type: item.type },
+    });
+    if (existing) {
+      await prisma.cpqCatalogItem.update({
+        where: { id: existing.id },
+        data: {
+          unit: item.unit,
+          basePrice: item.basePrice,
+          isDefault: item.isDefault ?? false,
+        },
+      });
+    } else {
+      await prisma.cpqCatalogItem.create({ data: item });
+    }
+  }
+
   console.log("✅ CPQ data seeded successfully!");
 }
 

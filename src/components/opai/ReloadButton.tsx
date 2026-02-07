@@ -30,7 +30,9 @@ export function ReloadButton() {
       className="gap-2"
     >
       <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-      {isRefreshing ? 'Actualizando...' : 'Recargar'}
+      <span className="hidden sm:inline">
+        {isRefreshing ? 'Actualizando...' : 'Recargar'}
+      </span>
     </Button>
   );
 }

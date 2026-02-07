@@ -148,6 +148,12 @@ export function CostBreakdownModal({ open, onOpenChange, position }: CostBreakdo
                     {formatCurrency(data.monthly_employer_cost_clp)}
                   </span>
                 </div>
+                <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Costo hora (180h)</span>
+                  <span className="font-mono">
+                    {formatCurrency(Number(data.monthly_employer_cost_clp) / 180)}
+                  </span>
+                </div>
                 <div className="mt-1 flex items-center justify-between text-blue-500">
                   <span>Líquido estimado</span>
                   <span className="font-mono">{formatCurrency(data.worker_net_salary_estimate)}</span>

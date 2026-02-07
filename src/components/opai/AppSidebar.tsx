@@ -75,7 +75,7 @@ export function AppSidebar({ navItems, logo, footer, onNavigate, onToggleSidebar
       </div>
 
       {/* Navigation Items */}
-      <nav className="flex-1 space-y-1 overflow-y-auto p-4">
+      <nav className="flex-1 space-y-1 overflow-y-hidden lg:overflow-y-auto p-3 lg:p-4">
         {navItems.map((item) => {
           // Solo mostrar si show !== false
           if (item.show === false) return null;

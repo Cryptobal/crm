@@ -207,7 +207,7 @@ export function PresentationsList({ presentations, initialFilter = 'all' }: Pres
       </div>
 
       {/* Lista */}
-      <div className="p-3 space-y-2">
+      <div className="p-3 space-y-3 overflow-x-hidden">
         {filteredPresentations.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <FileText className="w-10 h-10 mx-auto mb-2 opacity-50" />
@@ -234,32 +234,30 @@ export function PresentationsList({ presentations, initialFilter = 'all' }: Pres
             return (
               <div
                 key={presentation.id}
-                className="group rounded-md border border-white/10 bg-white/5 hover:bg-white/10 p-3 sm:p-2 transition-all hover:shadow-lg"
+                className="group rounded-md border border-white/10 bg-white/5 hover:bg-white/10 p-4 sm:p-3 transition-all hover:shadow-lg"
               >
-                {/* Layout horizontal compacto */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-2">
-                  {/* Info principal - Izquierda */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm sm:text-xs font-semibold text-white truncate mb-1 sm:mb-0.5">
+                <div className="grid grid-cols-[1fr_auto] items-start gap-3">
+                  {/* Info principal */}
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-sm font-semibold text-white truncate mb-1">
                       {companyName}
                     </h3>
-                    <p className="text-xs sm:text-[11px] text-cyan-400 truncate mb-1 sm:mb-0.5">{subject}</p>
-                    
-                    {/* Info adicional */}
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-x-2 sm:gap-y-0.5 text-xs sm:text-[10px] text-white/50">
-                      <span className="flex items-center gap-0.5">
-                        <User className="w-3 h-3 sm:w-2.5 sm:h-2.5 flex-shrink-0" />
+                    <p className="text-sm sm:text-xs text-cyan-400 truncate mb-1">{subject}</p>
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm sm:text-xs text-white/60">
+                      <span className="flex items-center gap-1 min-w-0">
+                        <User className="w-3 h-3 flex-shrink-0" />
                         <span className="truncate">{contactName}</span>
                       </span>
                       {recipientEmail && (
-                        <span className="flex items-center gap-0.5">
-                          <Mail className="w-3 h-3 sm:w-2.5 sm:h-2.5 flex-shrink-0" />
+                        <span className="flex items-center gap-1 min-w-0">
+                          <Mail className="w-3 h-3 flex-shrink-0" />
                           <span className="truncate">{recipientEmail}</span>
                         </span>
                       )}
                       {presentation.emailSentAt && (
-                        <span className="flex items-center gap-0.5">
-                          <Calendar className="w-3 h-3 sm:w-2.5 sm:h-2.5 flex-shrink-0" />
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3 flex-shrink-0" />
                           {new Date(presentation.emailSentAt).toLocaleDateString('es-CL', {
                             day: '2-digit',
                             month: '2-digit',
@@ -270,68 +268,55 @@ export function PresentationsList({ presentations, initialFilter = 'all' }: Pres
                         </span>
                       )}
                     </div>
-                  </div>
 
-                  {/* Analytics - Centro */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {/* Vistas */}
-                    <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-green-500/10 border border-green-500/20">
-                      <Eye className="w-3 h-3 text-green-400" />
-                      <div className="flex flex-col">
-                        <div className="text-xs sm:text-[11px] font-bold text-green-400 leading-none">{presentation.viewCount}</div>
-                        <div className="text-[10px] sm:text-[8px] text-white/50 leading-none mt-0.5">vistas</div>
+                    <div className="mt-3 flex flex-nowrap items-center gap-2">
+                      <div className="inline-flex h-9 items-center gap-2 rounded-md bg-green-500/10 border border-green-500/20 px-3 text-xs text-green-300">
+                        <Eye className="w-3.5 h-3.5" />
+                        <span className="font-semibold">{presentation.viewCount}</span>
+                        <span className="text-white/50">vistas</span>
                       </div>
+                      <EmailStatusBadge presentation={presentation} />
                     </div>
-
-                    {/* Estado del Email */}
-                    <EmailStatusBadge presentation={presentation} />
                   </div>
 
-                  {/* Acciones - Derecha */}
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {/* Ver - con preview=true para no trackear */}
+                  {/* Acciones a la derecha */}
+                  <div className="grid grid-cols-2 gap-2">
                     <a
                       href={`/p/${presentation.uniqueId}?preview=true`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-1.5 rounded-md bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 transition-colors"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 transition-colors"
                       title="Ver (modo preview, no se contabiliza)"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ExternalLink className="w-4 h-4" />
                     </a>
-
-                    {/* Copiar */}
                     <button
                       onClick={() => copyToClipboard(presentation.uniqueId)}
-                      className="p-1.5 rounded-md bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 transition-colors"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 transition-colors"
                       title="Copiar"
                     >
                       {copiedId === presentation.uniqueId ? (
-                        <Check className="w-3.5 h-3.5" />
+                        <Check className="w-4 h-4" />
                       ) : (
-                        <Copy className="w-3.5 h-3.5" />
+                        <Copy className="w-4 h-4" />
                       )}
                     </button>
-
-                    {/* WhatsApp */}
                     <button
                       onClick={() => shareWhatsApp(presentation.uniqueId, clientData)}
-                      className="p-1.5 rounded-md bg-green-500/20 hover:bg-green-500/30 text-green-300 transition-colors"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-green-500/20 hover:bg-green-500/30 text-green-300 transition-colors"
                       title="WhatsApp"
                     >
-                      <MessageCircle className="w-3.5 h-3.5" />
+                      <MessageCircle className="w-4 h-4" />
                     </button>
-
-                    {/* Ver en Zoho */}
                     {zohoQuoteUrl && (
                       <a
                         href={zohoQuoteUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1.5 rounded-md bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 transition-colors"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 transition-colors"
                         title="Ver en Zoho CRM"
                       >
-                        <Building2 className="w-3.5 h-3.5" />
+                        <Building2 className="w-4 h-4" />
                       </a>
                     )}
                   </div>

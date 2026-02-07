@@ -48,9 +48,9 @@ export function CreateQuoteModal({ onCreated }: CreateQuoteModalProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="gap-2">
+        <Button size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white">
           <Plus className="h-4 w-4" />
-          Nueva Cotización
+          <span className="hidden sm:inline">Nueva Cotización</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-[95vw] sm:max-w-md p-4 sm:p-6">

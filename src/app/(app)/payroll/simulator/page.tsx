@@ -41,6 +41,7 @@ export default function PayrollSimulator() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [parameters, setParameters] = useState<any>(null);
+  const [mobileSection, setMobileSection] = useState<'haberes' | 'descuentos' | 'resultado'>('haberes');
 
   // Cargar parámetros al iniciar (para UF/UTM y modal)
   useEffect(() => {
@@ -259,9 +260,46 @@ export default function PayrollSimulator() {
       <div className="grid gap-3 lg:grid-cols-2">
         {/* FORMULARIO */}
         <Card className="p-4">
+          {/* Mobile tabs */}
+          <div className="mb-3 flex gap-2 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setMobileSection('haberes')}
+              className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold ${
+                mobileSection === 'haberes'
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                  : 'bg-card border-border text-muted-foreground'
+              }`}
+            >
+              Haberes
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileSection('descuentos')}
+              className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold ${
+                mobileSection === 'descuentos'
+                  ? 'bg-red-500/15 border-red-500/40 text-red-300'
+                  : 'bg-card border-border text-muted-foreground'
+              }`}
+            >
+              Descuentos
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileSection('resultado')}
+              className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold ${
+                mobileSection === 'resultado'
+                  ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
+                  : 'bg-card border-border text-muted-foreground'
+              }`}
+            >
+              Resultado
+            </button>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-3">
             {/* HABERES */}
-            <div className="space-y-2">
+            <div className={`${mobileSection !== 'haberes' ? 'hidden lg:block' : ''} space-y-2`}>
               <h3 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-emerald-400">+ Haberes</h3>
               
               <div className="space-y-1">
@@ -312,7 +350,7 @@ export default function PayrollSimulator() {
             </div>
 
             {/* DESCUENTOS */}
-            <div className="space-y-2 border-t pt-2">
+            <div className={`${mobileSection !== 'descuentos' ? 'hidden lg:block' : ''} space-y-2 border-t pt-2`}>
               <h3 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-red-400">− Descuentos</h3>
 
               <div className="grid grid-cols-2 gap-2">
@@ -358,7 +396,12 @@ export default function PayrollSimulator() {
               </div>
             </div>
 
-            <Button type="submit" disabled={loading} className="w-full gap-2" size="sm">
+            <Button
+              type="submit"
+              disabled={loading}
+              className={`${mobileSection === 'resultado' ? 'hidden lg:flex' : 'w-full'} gap-2`}
+              size="sm"
+            >
               {loading ? "..." : <><Calculator className="h-3 w-3" />Calcular</>}
             </Button>
           </form>
@@ -367,7 +410,7 @@ export default function PayrollSimulator() {
         </Card>
 
         {/* RESULTADOS */}
-        <div className="space-y-3">
+        <div className={`${mobileSection !== 'resultado' ? 'hidden lg:block' : ''} space-y-3`}>
           {!result ? (
             <Card className="flex h-full min-h-[400px] items-center justify-center">
               <p className="text-sm text-muted-foreground">Completa el formulario</p>
