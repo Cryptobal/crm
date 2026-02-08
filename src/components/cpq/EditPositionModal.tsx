@@ -278,19 +278,30 @@ export function EditPositionModal({
                 </span>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs sm:text-sm">Días de servicio</Label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {WEEKDAY_ORDER.map((day) => (
-                    <label key={day} className="flex items-center gap-1.5 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={form.weekdays.includes(day)}
-                        onChange={() => toggleWeekday(day)}
-                      />
-                      {day}
-                    </label>
-                  ))}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs sm:text-sm">Días de servicio</Label>
+                  <span className="text-[10px] text-muted-foreground">Toca para activar</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {WEEKDAY_ORDER.map((day) => {
+                    const active = form.weekdays.includes(day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleWeekday(day)}
+                        aria-pressed={active}
+                        className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                          active
+                            ? "border-blue-400/70 bg-blue-600/20 text-blue-100"
+                            : "border-border/60 bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -339,105 +350,86 @@ export function EditPositionModal({
                 </select>
               </div>
 
-              <details className="rounded-md border border-border/60 bg-muted/20 p-3">
-                <summary className="cursor-pointer text-xs font-semibold uppercase text-purple-300">
-                  Compensación y previsión
-                </summary>
-                <div className="mt-3 space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs sm:text-sm">Sueldo base</Label>
-                    <Input
-                      type="number"
-                      value={form.baseSalary}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, baseSalary: Number(e.target.value) }))
-                      }
-                      className="h-11 sm:h-9 bg-background text-sm"
-                    />
-                  </div>
+              <div className="space-y-1">
+                <Label className="text-xs sm:text-sm">Sueldo base</Label>
+                <Input
+                  type="number"
+                  value={form.baseSalary}
+                  onChange={(e) => setForm((p) => ({ ...p, baseSalary: Number(e.target.value) }))}
+                  className="h-11 sm:h-9 bg-background text-sm"
+                />
+              </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs sm:text-sm">AFP</Label>
-                      <select
-                        className="flex h-11 sm:h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
-                        value={form.afpName}
-                        onChange={(e) => setForm((p) => ({ ...p, afpName: e.target.value }))}
-                      >
-                        <option value="modelo">Modelo</option>
-                        <option value="habitat">Habitat</option>
-                        <option value="capital">Capital</option>
-                        <option value="cuprum">Cuprum</option>
-                        <option value="planvital">PlanVital</option>
-                        <option value="provida">Provida</option>
-                        <option value="uno">Uno</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs sm:text-sm">Salud</Label>
-                      <select
-                        className="flex h-11 sm:h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
-                        value={form.healthSystem}
-                        onChange={(e) =>
-                          setForm((p) => ({ ...p, healthSystem: e.target.value }))
-                        }
-                      >
-                        <option value="fonasa">Fonasa</option>
-                        <option value="isapre">Isapre</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {form.healthSystem === "isapre" && (
-                    <div className="space-y-1">
-                      <Label className="text-xs sm:text-sm">Plan Isapre (%)</Label>
-                      <Input
-                        type="number"
-                        value={form.healthPlanPct}
-                        onChange={(e) =>
-                          setForm((p) => ({ ...p, healthPlanPct: Number(e.target.value) }))
-                        }
-                        step="0.01"
-                        className="h-11 sm:h-9 bg-background text-sm"
-                      />
-                    </div>
-                  )}
-
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="w-full gap-2"
-                    onClick={handleCalculate}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs sm:text-sm">AFP</Label>
+                  <select
+                    className="flex h-11 sm:h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
+                    value={form.afpName}
+                    onChange={(e) => setForm((p) => ({ ...p, afpName: e.target.value }))}
                   >
-                    <Calculator className="h-3 w-3" />
-                    {calculating ? "Calculando..." : "Calcular costo"}
-                  </Button>
-
-                  {preview && (
-                    <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-emerald-400">Costo empresa por guardia</span>
-                        <span className="font-mono text-emerald-400">
-                          {formatCurrency(preview.monthly_employer_cost_clp)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-blue-400">Líquido por guardia</span>
-                        <span className="font-mono text-blue-400">
-                          {formatCurrency(preview.worker_net_salary_estimate)}
-                        </span>
-                      </div>
-                      <div className="mt-1 flex items-center justify-between border-t pt-1">
-                        <span>Total puesto</span>
-                        <span className="font-mono">
-                          {formatCurrency(preview.monthly_employer_cost_clp * form.numGuards)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                    <option value="modelo">Modelo</option>
+                    <option value="habitat">Habitat</option>
+                    <option value="capital">Capital</option>
+                    <option value="cuprum">Cuprum</option>
+                    <option value="planvital">PlanVital</option>
+                    <option value="provida">Provida</option>
+                    <option value="uno">Uno</option>
+                  </select>
                 </div>
-              </details>
+                <div className="space-y-1">
+                  <Label className="text-xs sm:text-sm">Salud</Label>
+                  <select
+                    className="flex h-11 sm:h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
+                    value={form.healthSystem}
+                    onChange={(e) => setForm((p) => ({ ...p, healthSystem: e.target.value }))}
+                  >
+                    <option value="fonasa">Fonasa</option>
+                    <option value="isapre">Isapre</option>
+                  </select>
+                </div>
+              </div>
+
+              {form.healthSystem === "isapre" && (
+                <div className="space-y-1">
+                  <Label className="text-xs sm:text-sm">Plan Isapre (%)</Label>
+                  <Input
+                    type="number"
+                    value={form.healthPlanPct}
+                    onChange={(e) => setForm((p) => ({ ...p, healthPlanPct: Number(e.target.value) }))}
+                    step="0.01"
+                    className="h-11 sm:h-9 bg-background text-sm"
+                  />
+                </div>
+              )}
+
+              <Button type="button" size="sm" variant="outline" className="w-full gap-2" onClick={handleCalculate}>
+                <Calculator className="h-3 w-3" />
+                {calculating ? "Calculando..." : "Calcular costo"}
+              </Button>
+
+              {preview && (
+                <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-emerald-400">Costo empresa por guardia</span>
+                    <span className="font-mono text-emerald-400">
+                      {formatCurrency(preview.monthly_employer_cost_clp)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-400">Líquido por guardia</span>
+                    <span className="font-mono text-blue-400">
+                      {formatCurrency(preview.worker_net_salary_estimate)}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between border-t pt-1">
+                    <span>Total puesto</span>
+                    <span className="font-mono">
+                      {formatCurrency(preview.monthly_employer_cost_clp * form.numGuards)}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

@@ -19,7 +19,7 @@ import { CpqQuoteCosts } from "@/components/cpq/CpqQuoteCosts";
 import { CpqPricingCalc } from "@/components/cpq/CpqPricingCalc";
 import { formatCurrency } from "@/components/cpq/utils";
 import type { CpqQuote, CpqPosition, CpqQuoteCostSummary, CpqQuoteParameters } from "@/types/cpq";
-import { ArrowLeft, Copy, RefreshCw } from "lucide-react";
+import { ArrowLeft, Copy, RefreshCw, FileText, Users, Layers, Calculator, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface CpqQuoteDetailProps {
   quoteId: string;
@@ -46,6 +46,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
   const [quoteError, setQuoteError] = useState<string | null>(null);
 
   const steps = ["Datos", "Puestos", "Costos", "Resumen"];
+  const stepIcons = [FileText, Users, Layers, Calculator];
   const formatDateInput = (value?: string | null) => (value ? value.split("T")[0] : "");
 
   const refresh = async () => {
@@ -164,7 +165,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
   }
 
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-3 pb-16">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
           <Link href="/cpq">
@@ -200,15 +201,17 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {steps.map((step, index) => {
           const active = index === activeStep;
+          const Icon = stepIcons[index];
           return (
             <Button
               key={step}
               size="sm"
               variant={active ? "default" : "outline"}
-              className={active ? "bg-primary/90" : "bg-transparent"}
+              className={`${active ? "bg-primary/90" : "bg-transparent"} gap-1`}
               onClick={() => setActiveStep(index)}
             >
               <span className="text-[10px]">{index + 1}</span>
+              <Icon className="h-3 w-3" />
               <span className="ml-1 text-xs">{step}</span>
             </Button>
           );
@@ -237,7 +240,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       </div>
 
       {activeStep === 0 && (
-        <Card className="p-4 space-y-3">
+        <Card className="p-3 sm:p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold">Datos básicos</h2>
@@ -333,7 +336,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       )}
 
       {activeStep === 1 && (
-        <Card className="p-4">
+        <Card className="p-3 sm:p-4">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold">Puestos de trabajo</h2>
@@ -370,12 +373,12 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       )}
 
       {activeStep === 2 && (
-        <CpqQuoteCosts quoteId={quoteId} />
+        <CpqQuoteCosts quoteId={quoteId} variant="inline" />
       )}
 
       {activeStep === 3 && (
         <div className="space-y-3">
-          <Card className="p-4 space-y-3">
+          <Card className="p-3 sm:p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold">Resumen y precio</h2>
@@ -436,27 +439,31 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
         </div>
       )}
 
-      <div className="sticky bottom-0 z-20 -mx-4 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur">
+      <div className="sticky bottom-0 z-20 -mx-4 border-t border-border/60 bg-background/95 px-4 py-2 backdrop-blur">
         <div className="flex items-center justify-between gap-2">
           <Button
             size="sm"
             variant="outline"
+            className="gap-1"
             onClick={() => setActiveStep((prev) => Math.max(0, prev - 1))}
             disabled={activeStep === 0}
           >
+            <ChevronLeft className="h-4 w-4" />
             Atrás
           </Button>
-          <span className="text-xs text-muted-foreground">
-            Paso {activeStep + 1} de {steps.length}
+          <span className="text-[11px] text-muted-foreground">
+            Paso {activeStep + 1} de {steps.length} · {steps[activeStep]}
           </span>
           <Button
             size="sm"
+            className="gap-1"
             onClick={() =>
               setActiveStep((prev) => Math.min(steps.length - 1, prev + 1))
             }
             disabled={activeStep === steps.length - 1}
           >
             {activeStep === steps.length - 1 ? "Listo" : "Siguiente"}
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
