@@ -19,7 +19,8 @@ import { CpqQuoteCosts } from "@/components/cpq/CpqQuoteCosts";
 import { CpqPricingCalc } from "@/components/cpq/CpqPricingCalc";
 import { formatCurrency } from "@/components/cpq/utils";
 import type { CpqQuote, CpqPosition, CpqQuoteCostSummary, CpqQuoteParameters } from "@/types/cpq";
-import { ArrowLeft, Copy, RefreshCw, FileText, Users, Layers, Calculator, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { toast } from "sonner";
+import { ArrowLeft, Copy, RefreshCw, FileText, Users, Layers, Calculator, ChevronLeft, ChevronRight, Check, Trash2 } from "lucide-react";
 
 interface CpqQuoteDetailProps {
   quoteId: string;
@@ -34,6 +35,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
   const [costParams, setCostParams] = useState<CpqQuoteParameters | null>(null);
   const [marginPct, setMarginPct] = useState(20);
   const [cloning, setCloning] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [quoteForm, setQuoteForm] = useState({
@@ -147,6 +149,28 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
     }
   };
 
+  const handleDelete = async () => {
+    if (!confirm("¿Eliminar esta cotización? Esta acción no se puede deshacer.")) return;
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/cpq/quotes/${quoteId}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || "Error");
+      }
+      toast.success("Cotización eliminada");
+      router.push("/cpq");
+      router.refresh();
+    } catch (error) {
+      console.error("Error deleting quote:", error);
+      toast.error("No se pudo eliminar la cotización");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const stats = useMemo(() => {
     const totalGuards = quote?.totalGuards ?? positions.reduce((sum, p) => sum + p.numGuards, 0);
     const monthly = quote?.monthlyCost ?? positions.reduce((sum, p) => sum + Number(p.monthlyPositionCost), 0);
@@ -222,6 +246,18 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
             <Copy className="h-3 w-3" />
             <span className="hidden sm:inline">
               {cloning ? "Clonando..." : "Clonar"}
+            </span>
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            className="gap-2"
+            onClick={handleDelete}
+            disabled={deleting}
+          >
+            <Trash2 className="h-3 w-3" />
+            <span className="hidden sm:inline">
+              {deleting ? "Eliminando..." : "Eliminar"}
             </span>
           </Button>
         </div>
