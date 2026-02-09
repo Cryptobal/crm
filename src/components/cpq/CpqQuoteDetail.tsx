@@ -209,13 +209,18 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
   }, [positions, quote]);
 
   const additionalCostsTotal = costSummary?.monthlyExtras ?? 0;
-  const financialRatePct = costSummary
-    ? (costSummary.monthlyFinancial / (costSummary.monthlyTotal || 1)) * 100
+  const baseAdditionalCostsTotal = costSummary
+    ? Math.max(
+        0,
+        additionalCostsTotal - costSummary.monthlyFinancial - costSummary.monthlyPolicy
+      )
     : 0;
-  const policyRatePct = costSummary
-    ? (costSummary.monthlyPolicy / (costSummary.monthlyTotal || 1)) * 100
-    : 0;
+  const financialRatePct = costSummary?.financialRatePct ?? 0;
+  const policyRatePct = costSummary?.policyRatePct ?? 0;
   const monthlyHours = costParams?.monthlyHoursStandard ?? 180;
+  const policyContractMonths = costParams?.policyContractMonths ?? 12;
+  const policyContractPct = costParams?.policyContractPct ?? 100;
+  const contractMonths = costParams?.contractMonths ?? 12;
   const monthlyTotal = costSummary?.monthlyTotal ?? stats.monthly + additionalCostsTotal;
   const saveLabel = savingQuote
     ? "Guardando..."
@@ -333,7 +338,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
 
       <Stepper steps={steps} currentStep={activeStep} onStepClick={goToStep} className="mb-6" />
 
-      <div className="grid gap-3 grid-cols-3 md:grid-cols-3">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
         <KpiCard
           title="Puestos"
           value={positions.length}
@@ -348,7 +353,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
         />
         <KpiCard
           title="Costo mensual"
-          value={formatCurrency(stats.monthly)}
+          value={formatCurrency(monthlyTotal)}
           variant="emerald"
           size="lg"
         />
@@ -480,11 +485,14 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                   quoteId={quoteId}
                   onUpdated={refresh}
                   totalGuards={stats.totalGuards}
-                  additionalCostsTotal={additionalCostsTotal}
+                    baseAdditionalCostsTotal={baseAdditionalCostsTotal}
                   marginPct={marginPct}
                   financialRatePct={financialRatePct}
                   policyRatePct={policyRatePct}
                   monthlyHours={monthlyHours}
+                    policyContractMonths={policyContractMonths}
+                    policyContractPct={policyContractPct}
+                    contractMonths={contractMonths}
                 />
               ))}
             </div>
@@ -555,6 +563,11 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
             vehicleTotal={0}
             infraTotal={0}
             systemTotal={0}
+            financialRatePct={financialRatePct}
+            policyRatePct={policyRatePct}
+            policyContractMonths={policyContractMonths}
+            policyContractPct={policyContractPct}
+            contractMonths={contractMonths}
           />
         </div>
       )}

@@ -1326,7 +1326,7 @@ export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps
             </span>
             {summary?.monthlyTotal === 0 && (
               <span className="text-xs text-muted-foreground">
-                Se calcula sobre el precio de venta.
+                Se calcula sobre costo + margen.
               </span>
             )}
             <div className="flex items-center gap-2">
@@ -2230,7 +2230,7 @@ export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps
                       </span>
                       {summary?.monthlyTotal === 0 && (
                         <span className="text-xs text-muted-foreground">
-                          Se calcula sobre el precio de venta.
+                          Se calcula sobre costo + margen.
                         </span>
                       )}
                       <div className="flex items-center gap-2">
