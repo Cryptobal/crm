@@ -33,7 +33,7 @@ import type {
   CpqQuoteInfrastructure,
 } from "@/types/cpq";
 import { toast } from "sonner";
-import { ArrowLeft, Copy, RefreshCw, FileText, Users, Layers, Calculator, ChevronLeft, ChevronRight, Check, Trash2, Download, Send } from "lucide-react";
+import { ArrowLeft, Copy, RefreshCw, FileText, Users, Layers, Calculator, ChevronLeft, ChevronRight, ChevronDown, Check, Trash2, Download, Send } from "lucide-react";
 
 interface CpqQuoteDetailProps {
   quoteId: string;
@@ -76,6 +76,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
   const [savingFinancials, setSavingFinancials] = useState(false);
   const [financialError, setFinancialError] = useState<string | null>(null);
   const [decimalDrafts, setDecimalDrafts] = useState<Record<string, string>>({});
+  const [financialsCollapsed, setFinancialsCollapsed] = useState(true);
   const [quoteForm, setQuoteForm] = useState({
     clientName: "",
     validUntil: "",
@@ -454,24 +455,27 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
 
       <Stepper steps={steps} currentStep={activeStep} onStepClick={goToStep} className="mb-6" />
 
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
         <KpiCard
           title="Puestos"
           value={positions.length}
           variant="blue"
           size="lg"
+          className="col-span-1"
         />
         <KpiCard
           title="Guardias"
           value={stats.totalGuards}
           variant="purple"
           size="lg"
+          className="col-span-1"
         />
         <KpiCard
           title="Costo mensual"
           value={formatCurrency(monthlyTotal)}
           variant="emerald"
           size="lg"
+          className="col-span-2 sm:col-span-1"
         />
       </div>
 
@@ -635,22 +639,10 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
               </Badge>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-md border border-border/50 p-2">
-                <p className="text-xs text-muted-foreground uppercase">Puestos</p>
-                <p className="text-sm font-semibold">{positions.length}</p>
-              </div>
-              <div className="rounded-md border border-border/50 p-2">
-                <p className="text-xs text-muted-foreground uppercase">Guardias</p>
-                <p className="text-sm font-semibold">{stats.totalGuards}</p>
-              </div>
+            <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-md border border-border/50 p-2">
                 <p className="text-xs text-muted-foreground uppercase">Adicionales</p>
                 <p className="text-sm font-semibold">{formatCurrency(additionalCostsTotal)}</p>
-              </div>
-              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-2">
-                <p className="text-xs text-emerald-400 uppercase">Total mensual</p>
-                <p className="text-sm font-semibold text-emerald-300">{formatCurrency(monthlyTotal)}</p>
               </div>
             </div>
           </Card>
@@ -663,239 +655,262 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                   Activa y configura costo financiero y póliza.
                 </p>
               </div>
-              <Badge variant="outline" className="text-xs">
-                Resumen
-              </Badge>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground"
+                onClick={() => setFinancialsCollapsed((prev) => !prev)}
+                aria-expanded={!financialsCollapsed}
+              >
+                {financialsCollapsed ? "Mostrar" : "Ocultar"}
+                <ChevronDown
+                  className={`h-3.5 w-3.5 transition-transform ${
+                    financialsCollapsed ? "" : "rotate-180"
+                  }`}
+                />
+              </button>
             </div>
 
-            <div className="grid gap-3">
-              <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">Costo financiero</p>
-                    <p className="text-xs text-muted-foreground">
-                      Se calcula sobre costo + margen.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className={cn(
-                      "inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors",
-                      financialItem?.isEnabled
-                        ? "border-emerald-400/50 bg-emerald-500/10 text-emerald-200"
-                        : "border-border bg-muted/30 text-muted-foreground",
-                      !financialItem && "cursor-not-allowed opacity-60"
-                    )}
-                    onClick={() => {
-                      if (!financialItem) return;
-                      updateCostItem(financialItem.catalogItemId, {
-                        isEnabled: !financialItem.isEnabled,
-                      });
-                    }}
-                    aria-pressed={financialItem?.isEnabled ?? false}
-                    disabled={!financialItem}
-                  >
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full",
-                        financialItem?.isEnabled ? "bg-emerald-400" : "bg-muted-foreground"
-                      )}
-                    />
-                    {financialItem?.isEnabled ? "Activo" : "Inactivo"}
-                  </button>
-                </div>
-
-                {financialItem ? (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Tasa (%)</Label>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={getDecimalValue(
-                          `financialRate:${financialItem.catalogItemId}`,
-                          financialItem.unitPriceOverride ?? null,
-                          2,
-                          true
-                        )}
-                        onChange={(e) =>
-                          setDecimalValue(
-                            `financialRate:${financialItem.catalogItemId}`,
-                            e.target.value
-                          )
-                        }
-                        onBlur={() => {
-                          const key = `financialRate:${financialItem.catalogItemId}`;
-                          const raw = decimalDrafts[key];
-                          if (raw === undefined) return;
-                          const parsed = raw.trim() ? parseLocalizedNumber(raw) : null;
-                          updateCostItem(financialItem.catalogItemId, {
-                            unitPriceOverride: parsed,
-                          });
-                          clearDecimalValue(key);
-                        }}
-                        className="h-9 bg-card text-foreground border-border placeholder:text-muted-foreground"
-                      />
-                    </div>
-                    <div className="flex items-end text-xs text-muted-foreground">
-                      Tasa base:{" "}
-                      {formatNumber(Number(financialItem.catalogItem?.basePrice ?? 0), {
-                        minDecimals: 2,
-                        maxDecimals: 2,
-                      })}
-                      %
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-xs text-muted-foreground">
-                    No hay ítem financiero en el catálogo.
-                  </div>
+            {financialsCollapsed && (
+              <div className="text-xs text-muted-foreground">
+                Total actual:{" "}
+                {formatCurrency(
+                  costSummary ? costSummary.monthlyFinancial + costSummary.monthlyPolicy : 0
                 )}
               </div>
-
-              <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">Póliza de garantía</p>
-                    <p className="text-xs text-muted-foreground">
-                      Se calcula sobre costo + margen.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className={cn(
-                      "inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors",
-                      policyItem?.isEnabled
-                        ? "border-emerald-400/50 bg-emerald-500/10 text-emerald-200"
-                        : "border-border bg-muted/30 text-muted-foreground",
-                      !policyItem && "cursor-not-allowed opacity-60"
-                    )}
-                    onClick={() => {
-                      if (!policyItem) return;
-                      updateCostItem(policyItem.catalogItemId, {
-                        isEnabled: !policyItem.isEnabled,
-                      });
-                    }}
-                    aria-pressed={policyItem?.isEnabled ?? false}
-                    disabled={!policyItem}
-                  >
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full",
-                        policyItem?.isEnabled ? "bg-emerald-400" : "bg-muted-foreground"
-                      )}
-                    />
-                    {policyItem?.isEnabled ? "Activo" : "Inactivo"}
-                  </button>
-                </div>
-
-                {policyItem ? (
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Tasa (%)</Label>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={getDecimalValue(
-                          `policyRate:${policyItem.catalogItemId}`,
-                          policyItem.unitPriceOverride ?? null,
-                          2,
-                          true
-                        )}
-                        onChange={(e) =>
-                          setDecimalValue(
-                            `policyRate:${policyItem.catalogItemId}`,
-                            e.target.value
-                          )
-                        }
-                        onBlur={() => {
-                          const key = `policyRate:${policyItem.catalogItemId}`;
-                          const raw = decimalDrafts[key];
-                          if (raw === undefined) return;
-                          const parsed = raw.trim() ? parseLocalizedNumber(raw) : null;
-                          updateCostItem(policyItem.catalogItemId, {
-                            unitPriceOverride: parsed,
-                          });
-                          clearDecimalValue(key);
-                        }}
-                        className="h-9 bg-card text-foreground border-border placeholder:text-muted-foreground"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Meses a considerar</Label>
-                      <Input
-                        type="number"
-                        value={policyContractMonths}
-                        onChange={(e) =>
-                          updateParams({
-                            policyContractMonths: parseLocalizedNumber(e.target.value),
-                          })
-                        }
-                        className="h-9 bg-card text-foreground border-border placeholder:text-muted-foreground"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Porcentaje contrato (%)</Label>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={getDecimalValue(
-                          "policyContractPct",
-                          policyContractPct,
-                          2
-                        )}
-                        onChange={(e) => setDecimalValue("policyContractPct", e.target.value)}
-                        onBlur={() => {
-                          const raw = decimalDrafts.policyContractPct;
-                          if (raw === undefined) return;
-                          const parsed = raw.trim() ? parseLocalizedNumber(raw) : 0;
-                          updateParams({ policyContractPct: parsed });
-                          clearDecimalValue("policyContractPct");
-                        }}
-                        className="h-9 bg-card text-foreground border-border placeholder:text-muted-foreground"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Meses contrato</Label>
-                      <Input
-                        type="number"
-                        value={contractMonths}
-                        onChange={(e) =>
-                          updateParams({ contractMonths: parseLocalizedNumber(e.target.value) })
-                        }
-                        className="h-9 bg-card text-foreground border-border placeholder:text-muted-foreground"
-                      />
-                    </div>
-                    <div className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-4">
-                      Tasa base:{" "}
-                      {formatNumber(Number(policyItem.catalogItem?.basePrice ?? 0), {
-                        minDecimals: 2,
-                        maxDecimals: 2,
-                      })}
-                      %
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-xs text-muted-foreground">
-                    No hay ítem de póliza en el catálogo.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {financialError && (
-              <div className="text-xs text-red-400">{financialError}</div>
             )}
 
-            <div className="flex justify-end">
-              <Button
-                size="sm"
-                onClick={handleSaveFinancials}
-                disabled={savingFinancials || !costParams}
-              >
-                {savingFinancials ? "Guardando..." : "Guardar financieros"}
-              </Button>
-            </div>
+            {!financialsCollapsed && (
+              <>
+                <div className="grid gap-3">
+                  <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold">Costo financiero</p>
+                        <p className="text-xs text-muted-foreground">
+                          Se calcula sobre costo + margen.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className={cn(
+                          "inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors",
+                          financialItem?.isEnabled
+                            ? "border-emerald-400/50 bg-emerald-500/10 text-emerald-200"
+                            : "border-border bg-muted/30 text-muted-foreground",
+                          !financialItem && "cursor-not-allowed opacity-60"
+                        )}
+                        onClick={() => {
+                          if (!financialItem) return;
+                          updateCostItem(financialItem.catalogItemId, {
+                            isEnabled: !financialItem.isEnabled,
+                          });
+                        }}
+                        aria-pressed={financialItem?.isEnabled ?? false}
+                        disabled={!financialItem}
+                      >
+                        <span
+                          className={cn(
+                            "h-2 w-2 rounded-full",
+                            financialItem?.isEnabled ? "bg-emerald-400" : "bg-muted-foreground"
+                          )}
+                        />
+                        {financialItem?.isEnabled ? "Activo" : "Inactivo"}
+                      </button>
+                    </div>
+
+                    {financialItem ? (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Tasa (%)</Label>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={getDecimalValue(
+                              `financialRate:${financialItem.catalogItemId}`,
+                              financialItem.unitPriceOverride ?? null,
+                              2,
+                              true
+                            )}
+                            onChange={(e) =>
+                              setDecimalValue(
+                                `financialRate:${financialItem.catalogItemId}`,
+                                e.target.value
+                              )
+                            }
+                            onBlur={() => {
+                              const key = `financialRate:${financialItem.catalogItemId}`;
+                              const raw = decimalDrafts[key];
+                              if (raw === undefined) return;
+                              const parsed = raw.trim() ? parseLocalizedNumber(raw) : null;
+                              updateCostItem(financialItem.catalogItemId, {
+                                unitPriceOverride: parsed,
+                              });
+                              clearDecimalValue(key);
+                            }}
+                            className="h-9 bg-card text-foreground border-border placeholder:text-muted-foreground"
+                          />
+                        </div>
+                        <div className="flex items-end text-xs text-muted-foreground">
+                          Tasa base:{" "}
+                          {formatNumber(Number(financialItem.catalogItem?.basePrice ?? 0), {
+                            minDecimals: 2,
+                            maxDecimals: 2,
+                          })}
+                          %
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">
+                        No hay ítem financiero en el catálogo.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold">Póliza de garantía</p>
+                        <p className="text-xs text-muted-foreground">
+                          Se calcula sobre costo + margen.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className={cn(
+                          "inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors",
+                          policyItem?.isEnabled
+                            ? "border-emerald-400/50 bg-emerald-500/10 text-emerald-200"
+                            : "border-border bg-muted/30 text-muted-foreground",
+                          !policyItem && "cursor-not-allowed opacity-60"
+                        )}
+                        onClick={() => {
+                          if (!policyItem) return;
+                          updateCostItem(policyItem.catalogItemId, {
+                            isEnabled: !policyItem.isEnabled,
+                          });
+                        }}
+                        aria-pressed={policyItem?.isEnabled ?? false}
+                        disabled={!policyItem}
+                      >
+                        <span
+                          className={cn(
+                            "h-2 w-2 rounded-full",
+                            policyItem?.isEnabled ? "bg-emerald-400" : "bg-muted-foreground"
+                          )}
+                        />
+                        {policyItem?.isEnabled ? "Activo" : "Inactivo"}
+                      </button>
+                    </div>
+
+                    {policyItem ? (
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Tasa (%)</Label>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={getDecimalValue(
+                              `policyRate:${policyItem.catalogItemId}`,
+                              policyItem.unitPriceOverride ?? null,
+                              2,
+                              true
+                            )}
+                            onChange={(e) =>
+                              setDecimalValue(
+                                `policyRate:${policyItem.catalogItemId}`,
+                                e.target.value
+                              )
+                            }
+                            onBlur={() => {
+                              const key = `policyRate:${policyItem.catalogItemId}`;
+                              const raw = decimalDrafts[key];
+                              if (raw === undefined) return;
+                              const parsed = raw.trim() ? parseLocalizedNumber(raw) : null;
+                              updateCostItem(policyItem.catalogItemId, {
+                                unitPriceOverride: parsed,
+                              });
+                              clearDecimalValue(key);
+                            }}
+                            className="h-9 bg-card text-foreground border-border placeholder:text-muted-foreground"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Meses a considerar</Label>
+                          <Input
+                            type="number"
+                            value={policyContractMonths}
+                            onChange={(e) =>
+                              updateParams({
+                                policyContractMonths: parseLocalizedNumber(e.target.value),
+                              })
+                            }
+                            className="h-9 bg-card text-foreground border-border placeholder:text-muted-foreground"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Porcentaje contrato (%)</Label>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={getDecimalValue(
+                              "policyContractPct",
+                              policyContractPct,
+                              2
+                            )}
+                            onChange={(e) => setDecimalValue("policyContractPct", e.target.value)}
+                            onBlur={() => {
+                              const raw = decimalDrafts.policyContractPct;
+                              if (raw === undefined) return;
+                              const parsed = raw.trim() ? parseLocalizedNumber(raw) : 0;
+                              updateParams({ policyContractPct: parsed });
+                              clearDecimalValue("policyContractPct");
+                            }}
+                            className="h-9 bg-card text-foreground border-border placeholder:text-muted-foreground"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Meses contrato</Label>
+                          <Input
+                            type="number"
+                            value={contractMonths}
+                            onChange={(e) =>
+                              updateParams({ contractMonths: parseLocalizedNumber(e.target.value) })
+                            }
+                            className="h-9 bg-card text-foreground border-border placeholder:text-muted-foreground"
+                          />
+                        </div>
+                        <div className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-4">
+                          Tasa base:{" "}
+                          {formatNumber(Number(policyItem.catalogItem?.basePrice ?? 0), {
+                            minDecimals: 2,
+                            maxDecimals: 2,
+                          })}
+                          %
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">
+                        No hay ítem de póliza en el catálogo.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {financialError && (
+                  <div className="text-xs text-red-400">{financialError}</div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={handleSaveFinancials}
+                    disabled={savingFinancials || !costParams}
+                  >
+                    {savingFinancials ? "Guardando..." : "Guardar financieros"}
+                  </Button>
+                </div>
+              </>
+            )}
           </Card>
 
           <CpqPricingCalc

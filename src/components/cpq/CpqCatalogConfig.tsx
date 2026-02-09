@@ -75,6 +75,12 @@ export function CpqCatalogConfig({ showHeader = true }: { showHeader?: boolean }
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [collapsedItems, setCollapsedItems] = useState<Record<string, boolean>>({});
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() =>
+    GROUPS.reduce((acc, group) => {
+      acc[group.id] = true;
+      return acc;
+    }, {} as Record<string, boolean>)
+  );
   const [globalParams, setGlobalParams] = useState({
     monthlyHoursStandard: 180,
     avgStayMonths: 4,
@@ -362,209 +368,231 @@ export function CpqCatalogConfig({ showHeader = true }: { showHeader?: boolean }
 
       {GROUPS.map((group) => {
         const sectionItems = grouped[group.id] || [];
+        const isGroupCollapsed = collapsedGroups[group.id] ?? true;
         return (
           <Card key={group.id} className="p-3 sm:p-4 space-y-2 border-border/40 bg-card/50">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-sm font-semibold">{group.label}</h2>
-                <p className="text-xs text-muted-foreground">
-                  Precio por defecto, editable por cotización.
-                </p>
-              </div>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 text-left"
+                onClick={() =>
+                  setCollapsedGroups((prev) => ({
+                    ...prev,
+                    [group.id]: !isGroupCollapsed,
+                  }))
+                }
+                aria-expanded={!isGroupCollapsed}
+              >
+                <div>
+                  <h2 className="text-sm font-semibold">{group.label}</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {sectionItems.length} ítems · Precio por defecto, editable por cotización.
+                  </p>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 text-muted-foreground transition-transform ${
+                    isGroupCollapsed ? "" : "rotate-180"
+                  }`}
+                />
+              </button>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {sectionItems.length === 0 && (
-                <div className="rounded-md border border-dashed border-border/60 p-2 text-xs text-muted-foreground sm:col-span-2 lg:col-span-3">
-                  Sin items aún. Agrega el primero abajo.
-                </div>
-              )}
-              {sectionItems.map((item) => {
-                const isCollapsed = collapsedItems[item.id] ?? true;
-                return (
-                  <div
-                    key={item.id}
-                    className="rounded-md border border-border/60 p-2 space-y-3"
-                  >
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-between gap-3 text-left"
-                      onClick={() =>
-                        setCollapsedItems((prev) => ({
-                          ...prev,
-                          [item.id]: !isCollapsed,
-                        }))
-                      }
-                      aria-expanded={!isCollapsed}
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold truncate">
-                          {item.name || "Sin nombre"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatNumberLocal(item.basePrice ?? 0)} / {item.unit || "mes"}
-                        </p>
-                      </div>
-                      <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${
-                          isCollapsed ? "" : "rotate-180"
-                        }`}
-                      />
-                    </button>
+            {!isGroupCollapsed && (
+              <>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {sectionItems.length === 0 && (
+                    <div className="rounded-md border border-dashed border-border/60 p-2 text-xs text-muted-foreground sm:col-span-2 lg:col-span-3">
+                      Sin items aún. Agrega el primero abajo.
+                    </div>
+                  )}
+                  {sectionItems.map((item) => {
+                    const isCollapsed = collapsedItems[item.id] ?? true;
+                    return (
+                      <div
+                        key={item.id}
+                        className="rounded-md border border-border/60 p-2 space-y-3"
+                      >
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between gap-3 text-left"
+                          onClick={() =>
+                            setCollapsedItems((prev) => ({
+                              ...prev,
+                              [item.id]: !isCollapsed,
+                            }))
+                          }
+                          aria-expanded={!isCollapsed}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold truncate">
+                              {item.name || "Sin nombre"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatNumberLocal(item.basePrice ?? 0)} / {item.unit || "mes"}
+                            </p>
+                          </div>
+                          <ChevronDown
+                            className={`h-4 w-4 text-muted-foreground transition-transform ${
+                              isCollapsed ? "" : "rotate-180"
+                            }`}
+                          />
+                        </button>
 
-                    {!isCollapsed && (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <Input
-                            value={item.name}
-                            onChange={(e) => updateItemLocal(item.id, { name: e.target.value })}
-                            placeholder="Nombre"
-                            className={`${inputClass} flex-1`}
-                          />
-                          <Input
-                            inputMode="numeric"
-                            value={formatNumberLocal(item.basePrice ?? 0)}
-                            onChange={(e) =>
-                              updateItemLocal(item.id, { basePrice: parseNumber(e.target.value) })
-                            }
-                            onFocus={(e) => e.currentTarget.select()}
-                            placeholder="Precio"
-                            className={`${inputClass} w-28`}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-xs">
-                            <select
-                              className="flex h-9 rounded-md border border-border bg-card px-2 text-xs text-foreground"
-                              value={item.unit === "año" ? "año" : item.unit === "semestre" ? "semestre" : "mes"}
-                              onChange={(e) => updateItemLocal(item.id, { unit: e.target.value })}
-                            >
-                              <option value="mes">Mes</option>
-                              <option value="semestre">Semestre</option>
-                              <option value="año">Año</option>
-                            </select>
-                            <label className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={item.isDefault}
-                                onChange={(e) =>
-                                  updateItemLocal(item.id, { isDefault: e.target.checked })
-                                }
+                        {!isCollapsed && (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={item.name}
+                                onChange={(e) => updateItemLocal(item.id, { name: e.target.value })}
+                                placeholder="Nombre"
+                                className={`${inputClass} flex-1`}
                               />
-                              Default
-                            </label>
+                              <Input
+                                inputMode="numeric"
+                                value={formatNumberLocal(item.basePrice ?? 0)}
+                                onChange={(e) =>
+                                  updateItemLocal(item.id, { basePrice: parseNumber(e.target.value) })
+                                }
+                                onFocus={(e) => e.currentTarget.select()}
+                                placeholder="Precio"
+                                className={`${inputClass} w-28`}
+                              />
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-xs">
+                                <select
+                                  className="flex h-9 rounded-md border border-border bg-card px-2 text-xs text-foreground"
+                                  value={item.unit === "año" ? "año" : item.unit === "semestre" ? "semestre" : "mes"}
+                                  onChange={(e) => updateItemLocal(item.id, { unit: e.target.value })}
+                                >
+                                  <option value="mes">Mes</option>
+                                  <option value="semestre">Semestre</option>
+                                  <option value="año">Año</option>
+                                </select>
+                                <label className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={item.isDefault}
+                                    onChange={(e) =>
+                                      updateItemLocal(item.id, { isDefault: e.target.checked })
+                                    }
+                                  />
+                                  Default
+                                </label>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  className="h-9 w-9 p-0"
+                                  onClick={() => saveItem(item)}
+                                  disabled={savingId === item.id}
+                                  aria-label="Guardar item"
+                                  title="Guardar"
+                                >
+                                  <Save className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => deactivateItem(item)}
+                                  disabled={savingId === item.id || !item.active}
+                                  className="h-9 w-9 p-0"
+                                  aria-label="Eliminar item"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            {group.types.length > 1 && (
+                              <span className="text-xs text-muted-foreground">
+                                {TYPE_NAMES[item.type] || item.type}
+                              </span>
+                            )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              className="h-9 w-9 p-0"
-                              onClick={() => saveItem(item)}
-                              disabled={savingId === item.id}
-                              aria-label="Guardar item"
-                              title="Guardar"
-                            >
-                              <Save className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => deactivateItem(item)}
-                              disabled={savingId === item.id || !item.active}
-                              className="h-9 w-9 p-0"
-                              aria-label="Eliminar item"
-                              title="Eliminar"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        {group.types.length > 1 && (
-                          <span className="text-xs text-muted-foreground">
-                            {TYPE_NAMES[item.type] || item.type}
-                          </span>
                         )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
 
-            <div className="rounded-md border border-border/60 p-2 space-y-3">
-              <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_120px_90px_120px] sm:items-center">
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-2 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={newItems[group.id]?.isDefault || false}
-                      onChange={(e) =>
-                        setNewItems((prev) => ({
-                          ...prev,
-                          [group.id]: { ...prev[group.id], isDefault: e.target.checked },
-                        }))
-                      }
-                    />
-                    Default
-                  </label>
-                  <Input
-                    value={newItems[group.id]?.name || ""}
-                    onChange={(e) =>
-                      setNewItems((prev) => ({
-                        ...prev,
-                        [group.id]: { ...prev[group.id], name: e.target.value },
-                      }))
-                    }
-                    placeholder="Nuevo ítem"
-                    className={`${inputClass} flex-1`}
-                  />
-                  <Input
-                    inputMode="numeric"
-                    value={newItems[group.id]?.basePrice || ""}
-                    onChange={(e) =>
-                      setNewItems((prev) => ({
-                        ...prev,
-                        [group.id]: { ...prev[group.id], basePrice: e.target.value },
-                      }))
-                    }
-                    onFocus={(e) => e.currentTarget.select()}
-                    placeholder="Precio"
-                    className={`${inputClass} w-28`}
-                  />
+                <div className="rounded-md border border-border/60 p-2 space-y-3">
+                  <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_120px_90px_120px] sm:items-center">
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={newItems[group.id]?.isDefault || false}
+                          onChange={(e) =>
+                            setNewItems((prev) => ({
+                              ...prev,
+                              [group.id]: { ...prev[group.id], isDefault: e.target.checked },
+                            }))
+                          }
+                        />
+                        Default
+                      </label>
+                      <Input
+                        value={newItems[group.id]?.name || ""}
+                        onChange={(e) =>
+                          setNewItems((prev) => ({
+                            ...prev,
+                            [group.id]: { ...prev[group.id], name: e.target.value },
+                          }))
+                        }
+                        placeholder="Nuevo ítem"
+                        className={`${inputClass} flex-1`}
+                      />
+                      <Input
+                        inputMode="numeric"
+                        value={newItems[group.id]?.basePrice || ""}
+                        onChange={(e) =>
+                          setNewItems((prev) => ({
+                            ...prev,
+                            [group.id]: { ...prev[group.id], basePrice: e.target.value },
+                          }))
+                        }
+                        onFocus={(e) => e.currentTarget.select()}
+                        placeholder="Precio"
+                        className={`${inputClass} w-28`}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 sm:justify-end">
+                      <select
+                        className="flex h-9 rounded-md border border-border bg-card px-2 text-xs text-foreground"
+                        value={
+                          newItems[group.id]?.unit === "año"
+                            ? "año"
+                            : newItems[group.id]?.unit === "semestre"
+                            ? "semestre"
+                            : "mes"
+                        }
+                        onChange={(e) =>
+                          setNewItems((prev) => ({
+                            ...prev,
+                            [group.id]: { ...prev[group.id], unit: e.target.value },
+                          }))
+                        }
+                      >
+                        <option value="mes">Mes</option>
+                        <option value="semestre">Semestre</option>
+                        <option value="año">Año</option>
+                      </select>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-9 w-9 p-0"
+                        onClick={() => addItem(group.id)}
+                        aria-label="Agregar item"
+                        title="Agregar"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 sm:justify-end">
-                  <select
-                    className="flex h-9 rounded-md border border-border bg-card px-2 text-xs text-foreground"
-                    value={
-                      newItems[group.id]?.unit === "año"
-                        ? "año"
-                        : newItems[group.id]?.unit === "semestre"
-                        ? "semestre"
-                        : "mes"
-                    }
-                    onChange={(e) =>
-                      setNewItems((prev) => ({
-                        ...prev,
-                        [group.id]: { ...prev[group.id], unit: e.target.value },
-                      }))
-                    }
-                  >
-                    <option value="mes">Mes</option>
-                    <option value="semestre">Semestre</option>
-                    <option value="año">Año</option>
-                  </select>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-9 w-9 p-0"
-                    onClick={() => addItem(group.id)}
-                    aria-label="Agregar item"
-                    title="Agregar"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
+              </>
+            )}
           </Card>
         );
       })}
