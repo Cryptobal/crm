@@ -31,6 +31,7 @@ import { toast } from "sonner";
 interface CpqQuoteCostsProps {
   quoteId: string;
   variant?: "modal" | "inline";
+  showFinancial?: boolean;
 }
 
 const DEFAULT_PARAMS: CpqQuoteParameters = {
@@ -63,7 +64,11 @@ const normalizeCostItems = (items: CpqQuoteCostItem[]) =>
     unitPriceOverride: item.unitPriceOverride ?? null,
   }));
 
-export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps) {
+export function CpqQuoteCosts({
+  quoteId,
+  variant = "modal",
+  showFinancial = true,
+}: CpqQuoteCostsProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -278,6 +283,12 @@ export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps
   useEffect(() => {
     defaultsApplied.current = false;
   }, [quoteId]);
+
+  useEffect(() => {
+    if (!showFinancial && activeSection === "financieros") {
+      setActiveSection("directos");
+    }
+  }, [showFinancial, activeSection]);
 
   const catalogByType = useMemo(() => {
     const grouped: Record<string, CpqCatalogItem[]> = {};
@@ -670,14 +681,16 @@ export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps
           >
             Indirectos
           </Button>
-          <Button
-            size="sm"
-            variant={activeSection === "financieros" ? "default" : "outline"}
-            className={activeSection === "financieros" ? "bg-primary/90" : "bg-transparent"}
-            onClick={() => setActiveSection("financieros")}
-          >
-            Financieros
-          </Button>
+          {showFinancial && (
+            <Button
+              size="sm"
+              variant={activeSection === "financieros" ? "default" : "outline"}
+              className={activeSection === "financieros" ? "bg-primary/90" : "bg-transparent"}
+              onClick={() => setActiveSection("financieros")}
+            >
+              Financieros
+            </Button>
+          )}
         </div>
 
         {activeSection === "directos" && (
@@ -1315,7 +1328,7 @@ export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps
         </div>
         )}
 
-        {activeSection === "financieros" && (
+        {showFinancial && activeSection === "financieros" && (
         <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-sm font-semibold uppercase text-foreground">
@@ -1455,7 +1468,7 @@ export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps
         </div>
         )}
 
-        {activeSection === "financieros" && (
+        {showFinancial && activeSection === "financieros" && (
         <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-2">
           <h3 className="text-xs font-semibold uppercase text-foreground">
             Margen y parámetros
@@ -1528,7 +1541,9 @@ export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps
         <div>
           <h2 className="text-sm font-semibold">Costos adicionales</h2>
           <p className="text-xs text-muted-foreground">
-            Agrupa por pestañas: directos, indirectos y financieros.
+            {showFinancial
+              ? "Agrupa por pestañas: directos, indirectos y financieros."
+              : "Agrupa por pestañas: directos e indirectos."}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -2219,7 +2234,7 @@ export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps
                   </div>
                   )}
 
-                  {activeSection === "financieros" && (
+                  {showFinancial && activeSection === "financieros" && (
                   <div className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <h3 className="text-sm font-semibold uppercase text-foreground">
@@ -2351,7 +2366,7 @@ export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps
                   </div>
                   )}
 
-                  {activeSection === "financieros" && (
+                  {showFinancial && activeSection === "financieros" && (
                   <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-2">
                     <h3 className="text-xs font-semibold uppercase text-foreground">
                       Margen y parámetros
@@ -2649,19 +2664,21 @@ export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps
               </div>
             }
             />
-            <KpiCard
-              title="Gastos financieros"
-              value={formatCurrency(summary.monthlyFinancial + summary.monthlyPolicy)}
-              variant="amber"
-              size="sm"
-              tooltip={
-                <div className="space-y-1.5">
-                  <div className="font-semibold">Desglose:</div>
-                  <div className="text-xs">Costo financiero: {formatCurrency(summary.monthlyFinancial)}</div>
-                  <div className="text-xs">Póliza: {formatCurrency(summary.monthlyPolicy)}</div>
-                </div>
-              }
-            />
+            {showFinancial && (
+              <KpiCard
+                title="Gastos financieros"
+                value={formatCurrency(summary.monthlyFinancial + summary.monthlyPolicy)}
+                variant="amber"
+                size="sm"
+                tooltip={
+                  <div className="space-y-1.5">
+                    <div className="font-semibold">Desglose:</div>
+                    <div className="text-xs">Costo financiero: {formatCurrency(summary.monthlyFinancial)}</div>
+                    <div className="text-xs">Póliza: {formatCurrency(summary.monthlyPolicy)}</div>
+                  </div>
+                }
+              />
+            )}
           </div>
           <div className="flex justify-end">
             <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5">
