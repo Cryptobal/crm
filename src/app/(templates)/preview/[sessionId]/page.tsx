@@ -53,8 +53,11 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
     );
   }
 
-  // 3. Obtener datos de Zoho
+  // 3. Obtener datos de la sesión
   const zohoData = webhookSession.zohoData as any;
+
+  // Detectar si es un borrador CPQ (ya tiene datos en formato PresentationPayload)
+  const isCpqDraft = !!zohoData._cpqQuoteId;
 
   // 4. Obtener template (usa el especificado o el default)
   const template = await prisma.template.findFirst({
@@ -67,7 +70,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
         <div className="text-center max-w-md">
-          <h1 className="text-3xl font-bold mb-4">❌ Template no encontrado</h1>
+          <h1 className="text-3xl font-bold mb-4">Template no encontrado</h1>
           <p className="text-white/70">
             No hay templates disponibles actualmente.
           </p>
@@ -76,8 +79,20 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
     );
   }
 
-  // 5. Mapear datos de Zoho a PresentationPayload
-  const presentationData = mapZohoDataToPresentation(zohoData, sessionId, template.slug);
+  // 5. Mapear datos a PresentationPayload
+  // Para borradores CPQ, los datos ya vienen en formato PresentationPayload
+  // Para datos Zoho, se usa el mapper de Zoho
+  let presentationData;
+  if (isCpqDraft) {
+    // Los datos del CPQ ya están en formato PresentationPayload
+    presentationData = {
+      ...zohoData,
+      id: sessionId,
+      template_id: template.slug,
+    };
+  } else {
+    presentationData = mapZohoDataToPresentation(zohoData, sessionId, template.slug);
+  }
 
   // 6. Extraer datos del contacto
   const contactName = `${zohoData.contact?.First_Name || ''} ${zohoData.contact?.Last_Name || ''}`.trim();

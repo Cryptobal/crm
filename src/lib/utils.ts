@@ -39,6 +39,18 @@ export function formatUF(value: number): string {
 }
 
 /**
+ * Formatea números en UF con el texto "UF" al final (para documentos/cotizaciones).
+ * Ejemplos: 60 → "60,00 UF", 1234.56 → "1.234,56 UF"
+ */
+export function formatUFSuffix(value: number): string {
+  const formatted = new Intl.NumberFormat('es-CL', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+  return `${formatted} UF`;
+}
+
+/**
  * Formatea números con separadores locales (es-CL).
  * Por defecto usa 0 decimales.
  */
@@ -72,26 +84,30 @@ export function parseLocalizedNumber(value: string): number {
  * Formatea moneda automáticamente según el tipo
  * @param value - Valor numérico
  * @param currency - 'CLF' para UF, 'CLP' para pesos, 'UF' para UF, 'USD' para dólares
+ * @param options.ufSuffix - Si true y currency es UF, usa formato "1.234,56 UF" (UF al final, para documentos)
  */
-export function formatCurrency(value: number, currency: string = 'CLP'): string {
-  // Normalizar currency (CLF = UF)
+export function formatCurrency(
+  value: number,
+  currency: string = 'CLP',
+  options?: { ufSuffix?: boolean }
+): string {
   const normalizedCurrency = currency.toUpperCase();
   
   if (normalizedCurrency === 'CLF' || normalizedCurrency === 'UF') {
-    return formatUF(value);
-  } else if (normalizedCurrency === 'CLP') {
+    return options?.ufSuffix ? formatUFSuffix(value) : formatUF(value);
+  }
+  if (normalizedCurrency === 'CLP') {
     return formatCLP(value);
-  } else if (normalizedCurrency === 'USD') {
+  }
+  if (normalizedCurrency === 'USD') {
     return new Intl.NumberFormat('es-CL', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
-  } else {
-    // Fallback a CLP
-    return formatCLP(value);
   }
+  return formatCLP(value);
 }
 
 /**

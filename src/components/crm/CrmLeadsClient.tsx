@@ -17,14 +17,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { CrmLead } from "@/types";
-import { Plus, Loader2, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { Plus, Loader2, CheckCircle2, Clock, XCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 /* ─── Form types ─── */
 
 type LeadFormState = {
   companyName: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
   source: string;
@@ -32,7 +33,8 @@ type LeadFormState = {
 
 type ApproveFormState = {
   accountName: string;
-  contactName: string;
+  contactFirstName: string;
+  contactLastName: string;
   email: string;
   phone: string;
   dealTitle: string;
@@ -44,11 +46,14 @@ type ApproveFormState = {
 
 const DEFAULT_FORM: LeadFormState = {
   companyName: "",
-  name: "",
+  firstName: "",
+  lastName: "",
   email: "",
   phone: "",
   source: "",
 };
+
+type DuplicateAccount = { id: string; name: string; rut?: string | null; type?: string };
 
 /* ─── Status badge helper ─── */
 
@@ -87,9 +92,12 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
   const [approveOpen, setApproveOpen] = useState(false);
   const [approveLeadId, setApproveLeadId] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
+  const [duplicates, setDuplicates] = useState<DuplicateAccount[]>([]);
+  const [duplicateChecked, setDuplicateChecked] = useState(false);
   const [approveForm, setApproveForm] = useState<ApproveFormState>({
     accountName: "",
-    contactName: "",
+    contactFirstName: "",
+    contactLastName: "",
     email: "",
     phone: "",
     dealTitle: "",
@@ -118,6 +126,10 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
 
   const updateApproveForm = (key: keyof ApproveFormState, value: string) => {
     setApproveForm((prev) => ({ ...prev, [key]: value }));
+    if (key === "accountName") {
+      setDuplicateChecked(false);
+      setDuplicates([]);
+    }
   };
 
   const createLead = async () => {
@@ -146,12 +158,16 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
 
   const openApproveModal = (lead: CrmLead) => {
     setApproveLeadId(lead.id);
+    setDuplicates([]);
+    setDuplicateChecked(false);
+    const fullName = [lead.firstName, lead.lastName].filter(Boolean).join(" ");
     setApproveForm({
       accountName: lead.companyName || "",
-      contactName: lead.name || "",
+      contactFirstName: lead.firstName || "",
+      contactLastName: lead.lastName || "",
       email: lead.email || "",
       phone: lead.phone || "",
-      dealTitle: `Oportunidad ${lead.companyName || lead.name || ""}`.trim(),
+      dealTitle: `Oportunidad ${lead.companyName || fullName || ""}`.trim(),
       rut: "",
       industry: "",
       segment: "",
@@ -166,8 +182,27 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
       toast.error("El nombre de la empresa es obligatorio.");
       return;
     }
+
     setApproving(true);
     try {
+      // First check for duplicates if not already checked
+      if (!duplicateChecked) {
+        const checkRes = await fetch(`/api/crm/leads/${approveLeadId}/approve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...approveForm, checkDuplicates: true }),
+        });
+        const checkData = await checkRes.json();
+        if (checkData.duplicates && checkData.duplicates.length > 0) {
+          setDuplicates(checkData.duplicates);
+          setDuplicateChecked(true);
+          setApproving(false);
+          return; // Show duplicates, user must confirm
+        }
+        setDuplicateChecked(true);
+      }
+
+      // Proceed with approval
       const response = await fetch(`/api/crm/leads/${approveLeadId}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -184,6 +219,8 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
       );
       setApproveOpen(false);
       setApproveLeadId(null);
+      setDuplicates([]);
+      setDuplicateChecked(false);
       toast.success("Lead aprobado — Cuenta, contacto y negocio creados");
     } catch (error) {
       console.error(error);
@@ -191,6 +228,11 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
     } finally {
       setApproving(false);
     }
+  };
+
+  const leadDisplayName = (lead: CrmLead) => {
+    const parts = [lead.firstName, lead.lastName].filter(Boolean);
+    return parts.length > 0 ? parts.join(" ") : "Sin contacto";
   };
 
   return (
@@ -216,7 +258,7 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
+              <div className="space-y-2 md:col-span-2">
                 <Label>Empresa</Label>
                 <Input
                   value={form.companyName}
@@ -226,11 +268,20 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Contacto</Label>
+                <Label>Nombre</Label>
                 <Input
-                  value={form.name}
-                  onChange={(event) => updateForm("name", event.target.value)}
-                  placeholder="Nombre del contacto"
+                  value={form.firstName}
+                  onChange={(event) => updateForm("firstName", event.target.value)}
+                  placeholder="Nombre"
+                  className={inputClassName}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Apellido</Label>
+                <Input
+                  value={form.lastName}
+                  onChange={(event) => updateForm("lastName", event.target.value)}
+                  placeholder="Apellido"
                   className={inputClassName}
                 />
               </div>
@@ -281,6 +332,25 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
               Revisa y edita los datos antes de crear la cuenta, contacto y negocio.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Duplicate warning */}
+          {duplicates.length > 0 && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+              <div className="flex items-center gap-2 text-amber-400 text-sm font-medium">
+                <AlertTriangle className="h-4 w-4" />
+                Posible(s) duplicado(s) encontrado(s)
+              </div>
+              {duplicates.map((dup) => (
+                <div key={dup.id} className="text-xs text-muted-foreground pl-6">
+                  {dup.name} {dup.rut ? `(${dup.rut})` : ""} — {dup.type === "client" ? "Cliente" : "Prospecto"}
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground pl-6">
+                Puedes continuar si es una empresa distinta.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-5">
             {/* Account section */}
             <div className="space-y-3">
@@ -336,11 +406,20 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
               </h4>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Nombre</Label>
+                  <Label className="text-xs">Nombre *</Label>
                   <Input
-                    value={approveForm.contactName}
-                    onChange={(e) => updateApproveForm("contactName", e.target.value)}
-                    placeholder="Nombre completo"
+                    value={approveForm.contactFirstName}
+                    onChange={(e) => updateApproveForm("contactFirstName", e.target.value)}
+                    placeholder="Nombre"
+                    className={inputClassName}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Apellido</Label>
+                  <Input
+                    value={approveForm.contactLastName}
+                    onChange={(e) => updateApproveForm("contactLastName", e.target.value)}
+                    placeholder="Apellido"
                     className={inputClassName}
                   />
                 </div>
@@ -398,7 +477,7 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
             </Button>
             <Button onClick={approveLead} disabled={approving}>
               {approving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Confirmar aprobación
+              {duplicates.length > 0 ? "Crear de todos modos" : "Confirmar aprobación"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -431,7 +510,7 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
                   <StatusBadge status={lead.status} />
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {lead.name || "Sin contacto"} · {lead.email || "Sin email"}{" "}
+                  {leadDisplayName(lead)} · {lead.email || "Sin email"}{" "}
                   {lead.phone ? `· ${lead.phone}` : ""}
                 </p>
                 {lead.source && (
@@ -474,7 +553,7 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
                   {lead.companyName || "Empresa sin nombre"}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {lead.name || "Sin contacto"}
+                  {leadDisplayName(lead)}
                 </p>
               </div>
               <StatusBadge status={lead.status} />

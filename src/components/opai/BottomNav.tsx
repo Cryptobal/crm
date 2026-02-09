@@ -13,6 +13,7 @@ import {
   Contact,
   TrendingUp,
   DollarSign,
+  MapPin,
 } from 'lucide-react';
 
 const MAIN_NAV_ITEMS = [
@@ -26,6 +27,7 @@ const MAIN_NAV_ITEMS = [
 const CRM_NAV_ITEMS = [
   { href: '/crm/leads', label: 'Leads', icon: Users },
   { href: '/crm/accounts', label: 'Cuentas', icon: Building2 },
+  { href: '/crm/installations', label: 'Instalaciones', icon: MapPin },
   { href: '/crm/deals', label: 'Negocios', icon: TrendingUp },
   { href: '/crm/contacts', label: 'Contactos', icon: Contact },
   { href: '/crm/cotizaciones', label: 'CPQ', icon: DollarSign },

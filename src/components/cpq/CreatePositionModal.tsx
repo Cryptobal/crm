@@ -18,6 +18,7 @@ import { Calculator, Plus } from "lucide-react";
 interface CreatePositionModalProps {
   quoteId: string;
   onCreated?: () => void;
+  disabled?: boolean;
 }
 
 const TIME_OPTIONS = [
@@ -64,7 +65,7 @@ const getShiftHours = (startTime: string, endTime: string) => {
   return diffMinutes / 60;
 };
 
-export function CreatePositionModal({ quoteId, onCreated }: CreatePositionModalProps) {
+export function CreatePositionModal({ quoteId, onCreated, disabled }: CreatePositionModalProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
@@ -201,7 +202,7 @@ export function CreatePositionModal({ quoteId, onCreated }: CreatePositionModalP
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="gap-2">
+        <Button size="sm" className="gap-2" disabled={disabled}>
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Agregar Puesto</span>
         </Button>
@@ -241,9 +242,33 @@ export function CreatePositionModal({ quoteId, onCreated }: CreatePositionModalP
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1.5">
-                  <Label className="text-sm">Hora inicio</Label>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm">Horario</Label>
+                  <div className="flex gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={form.startTime === "08:00" && form.endTime === "20:00" ? "default" : "outline"}
+                      className="h-7 px-2.5 text-xs"
+                      onClick={() => setForm((p) => ({ ...p, startTime: "08:00", endTime: "20:00" }))}
+                    >
+                      Día
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={form.startTime === "20:00" && form.endTime === "08:00" ? "default" : "outline"}
+                      className="h-7 px-2.5 text-xs"
+                      onClick={() => setForm((p) => ({ ...p, startTime: "20:00", endTime: "08:00" }))}
+                    >
+                      Noche
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Hora inicio</Label>
                   <select
                     className="flex h-10 w-full rounded-md border border-input bg-card px-3 text-sm"
                     value={form.startTime}
@@ -265,6 +290,7 @@ export function CreatePositionModal({ quoteId, onCreated }: CreatePositionModalP
                       <option key={time} value={time}>{time}</option>
                     ))}
                   </select>
+                </div>
                 </div>
               </div>
               <div className="text-sm text-muted-foreground">

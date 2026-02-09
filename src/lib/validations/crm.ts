@@ -7,7 +7,8 @@ import { z } from "zod";
 // ── Lead ──
 export const createLeadSchema = z.object({
   companyName: z.string().trim().max(200).optional().nullable(),
-  name: z.string().trim().max(200).optional().nullable(),
+  firstName: z.string().trim().max(100).optional().nullable(),
+  lastName: z.string().trim().max(100).optional().nullable(),
   email: z.string().trim().email("Email inválido").max(200).optional().nullable().or(z.literal("")),
   phone: z.string().trim().max(30).optional().nullable(),
   source: z.string().trim().max(200).optional().nullable(),
@@ -16,7 +17,8 @@ export const createLeadSchema = z.object({
 
 export const approveLeadSchema = z.object({
   accountName: z.string().trim().min(1, "Nombre de empresa es requerido").max(200).optional(),
-  contactName: z.string().trim().max(200).optional(),
+  contactFirstName: z.string().trim().max(100).optional(),
+  contactLastName: z.string().trim().max(100).optional(),
   email: z.string().trim().email("Email inválido").max(200).optional().or(z.literal("")),
   phone: z.string().trim().max(30).optional(),
   dealTitle: z.string().trim().max(200).optional(),
@@ -50,11 +52,43 @@ export const createAccountSchema = z.object({
 // ── Contact ──
 export const createContactSchema = z.object({
   accountId: z.string().uuid("accountId inválido"),
-  name: z.string().trim().min(1, "Nombre es requerido").max(200),
-  email: z.string().trim().email("Email inválido").max(200).optional().nullable().or(z.literal("")),
+  firstName: z.string().trim().min(1, "Nombre es requerido").max(100),
+  lastName: z.string().trim().min(1, "Apellido es requerido").max(100),
+  email: z.string().trim().email("Email inválido").max(200),
   phone: z.string().trim().max(30).optional().nullable(),
   roleTitle: z.string().trim().max(100).optional().nullable(),
   isPrimary: z.boolean().default(false),
+});
+
+export const updateContactSchema = z.object({
+  firstName: z.string().trim().min(1, "Nombre es requerido").max(100).optional(),
+  lastName: z.string().trim().min(1, "Apellido es requerido").max(100).optional(),
+  email: z.string().trim().email("Email inválido").max(200).optional(),
+  phone: z.string().trim().max(30).optional().nullable(),
+  roleTitle: z.string().trim().max(100).optional().nullable(),
+  isPrimary: z.boolean().optional(),
+});
+
+// ── Installation ──
+export const createInstallationSchema = z.object({
+  accountId: z.string().uuid("accountId inválido"),
+  name: z.string().trim().min(1, "Nombre es requerido").max(200),
+  address: z.string().trim().max(500).optional().nullable(),
+  city: z.string().trim().max(100).optional().nullable(),
+  commune: z.string().trim().max(100).optional().nullable(),
+  lat: z.number().optional().nullable(),
+  lng: z.number().optional().nullable(),
+  notes: z.string().trim().max(2000).optional().nullable(),
+});
+
+export const updateInstallationSchema = z.object({
+  name: z.string().trim().min(1, "Nombre es requerido").max(200).optional(),
+  address: z.string().trim().max(500).optional().nullable(),
+  city: z.string().trim().max(100).optional().nullable(),
+  commune: z.string().trim().max(100).optional().nullable(),
+  lat: z.number().optional().nullable(),
+  lng: z.number().optional().nullable(),
+  notes: z.string().trim().max(2000).optional().nullable(),
 });
 
 // ── Deal ──

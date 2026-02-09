@@ -2,7 +2,8 @@ export interface CrmLead {
   id: string;
   status: string;
   source?: string | null;
-  name?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   email?: string | null;
   phone?: string | null;
   companyName?: string | null;
@@ -22,6 +23,30 @@ export interface CrmAccount {
   type: CrmAccountType;
   status: string;
   createdAt: string;
+}
+
+export interface CrmInstallation {
+  id: string;
+  accountId: string;
+  name: string;
+  address?: string | null;
+  city?: string | null;
+  commune?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface CrmContact {
+  id: string;
+  accountId: string;
+  firstName: string;
+  lastName: string;
+  email?: string | null;
+  phone?: string | null;
+  roleTitle?: string | null;
+  isPrimary: boolean;
 }
 
 export interface CrmPipelineStage {
@@ -45,7 +70,8 @@ export interface CrmDeal {
   stage: CrmPipelineStage;
   primaryContact?: {
     id: string;
-    name: string;
+    firstName: string;
+    lastName: string;
     email?: string | null;
   } | null;
   quotes?: {

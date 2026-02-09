@@ -6,7 +6,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatUFSuffix } from '@/lib/utils';
+import { getUfValue, clpToUf } from '@/lib/uf';
+import { computeCpqQuoteCosts } from '@/modules/cpq/costing/compute-quote-costs';
 
 export async function POST(
   _request: NextRequest,
@@ -21,7 +23,7 @@ export async function POST(
 
     const tenantId = session.user.tenantId;
 
-    // Obtener cotización completa
+    // Obtener cotización completa con CRM context
     const quote = await prisma.cpqQuote.findFirst({
       where: { id, tenantId },
       include: {
@@ -32,6 +34,8 @@ export async function POST(
             puestoTrabajo: true,
           },
         },
+        parameters: true,
+        installation: true,
       },
     });
 
@@ -39,113 +43,141 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Quote not found' }, { status: 404 });
     }
 
-    // Obtener costos calculados
-    const costsResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/api/cpq/quotes/${id}/costs`,
-      { cache: 'no-store' }
-    );
-    const costsData = await costsResponse.json();
-    const summary = costsData.success ? costsData.data.summary : null;
+    // Load contact if available
+    let contactName = '';
+    if (quote.contactId) {
+      const contact = await prisma.crmContact.findUnique({
+        where: { id: quote.contactId },
+        select: { firstName: true, lastName: true },
+      });
+      if (contact) {
+        contactName = `${contact.firstName} ${contact.lastName}`.trim();
+      }
+    }
 
-    // Generar HTML simple para el PDF
+    const installationName = quote.installation?.name || '';
+
+    // Calcular costos en servidor
+    let summary: Awaited<ReturnType<typeof computeCpqQuoteCosts>> | null = null;
+    try {
+      summary = await computeCpqQuoteCosts(id);
+    } catch {
+      // Si falla el cálculo, el HTML se genera sin resumen de costos adicionales
+    }
+
+    // Pricing parameters
+    const marginPct = Number(quote.parameters?.marginPct ?? 20);
+    const margin = marginPct / 100;
+    const financialRatePctVal = Number(quote.parameters?.financialRatePct ?? 0);
+    const policyRatePctVal = Number(quote.parameters?.policyRatePct ?? 0);
+    const policyContractMonthsVal = Number(quote.parameters?.policyContractMonths ?? 12);
+    const policyContractPctVal = Number(quote.parameters?.policyContractPct ?? 100);
+    const contractMonthsVal = Number(quote.parameters?.contractMonths ?? 12);
+    const policyFactor = contractMonthsVal > 0
+      ? (policyContractMonthsVal * (policyContractPctVal / 100)) / contractMonthsVal
+      : 0;
+
+    const totalGuards = summary?.totalGuards ?? quote.positions.reduce((s: number, p: { numGuards: number }) => s + p.numGuards, 0);
+    const currency = (quote.currency || 'CLP') as 'CLP' | 'UF';
+    const ufVal = currency === 'UF' ? await getUfValue() : 0;
+
+    const formatPrice = (clp: number) =>
+      currency === 'UF' && ufVal > 0 ? formatUFSuffix(clpToUf(clp, ufVal)) : formatCurrency(clp, 'CLP');
+
+    // Base additional costs (everything except financials/policy)
+    const baseAdditionalCostsTotal = summary
+      ? Math.max(0, (summary.monthlyExtras ?? 0) - (summary.monthlyFinancial ?? 0) - (summary.monthlyPolicy ?? 0))
+      : 0;
+
+    // Compute sale price per position
+    const positionsRows = quote.positions
+      .map(
+        (pos: { id: string; customName?: string | null; puestoTrabajo?: { name: string } | null; numGuards: number; startTime?: string | null; endTime?: string | null; weekdays?: string[] | null; monthlyPositionCost: unknown }) => {
+          const proportion = totalGuards > 0 ? pos.numGuards / totalGuards : 0;
+          const additionalForPos = baseAdditionalCostsTotal * proportion;
+          const totalCostPos = Number(pos.monthlyPositionCost) + additionalForPos;
+          const bwm = margin < 1 ? totalCostPos / (1 - margin) : totalCostPos;
+          const fc = bwm * (financialRatePctVal / 100);
+          const pc = bwm * (policyRatePctVal / 100) * policyFactor;
+          const salePrice = bwm + fc + pc;
+          return `<tr><td>${pos.customName || pos.puestoTrabajo?.name || 'Puesto'}</td><td>${pos.numGuards}</td><td>${pos.startTime || '-'} - ${pos.endTime || '-'}</td><td>${(pos.weekdays?.join(', ') || '-').replace(/,/g, ', ')}</td><td class="num">${formatPrice(salePrice)}</td></tr>`;
+        }
+      )
+      .join('');
+
+    // Total sale price
+    let totalSalePrice = 0;
+    if (summary) {
+      const costsBase =
+        summary.monthlyPositions +
+        (summary.monthlyUniforms ?? 0) +
+        (summary.monthlyExams ?? 0) +
+        (summary.monthlyMeals ?? 0) +
+        (summary.monthlyVehicles ?? 0) +
+        (summary.monthlyInfrastructure ?? 0) +
+        (summary.monthlyCostItems ?? 0);
+      const baseWithMargin = margin < 1 ? costsBase / (1 - margin) : costsBase;
+      totalSalePrice = baseWithMargin + (summary.monthlyFinancial ?? 0) + (summary.monthlyPolicy ?? 0);
+    }
+
+    const validUntilStr = quote.validUntil ? new Date(quote.validUntil).toLocaleDateString('es-CL') : '';
+    const notesEscaped = quote.notes ? String(quote.notes).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') : '';
+
+    const contactLine = contactName ? `${contactName}<br>` : '';
+    const installationLine = installationName ? `${installationName}<br>` : '';
+
     const html = `
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${quote.code} - ${quote.clientName || 'Cliente'}</title>
   <style>
+    @page { size: A4; margin: 10mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Arial', sans-serif; padding: 40px; color: #1a1a1a; }
-    .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #1db990; padding-bottom: 20px; }
-    .header h1 { font-size: 28px; color: #1db990; margin-bottom: 10px; }
-    .header p { font-size: 14px; color: #666; }
-    .section { margin-bottom: 30px; }
-    .section-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; color: #1a1a1a; border-bottom: 1px solid #ddd; padding-bottom: 8px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th { background: #f5f5f5; padding: 10px; text-align: left; font-size: 12px; font-weight: 600; border-bottom: 2px solid #ddd; }
-    td { padding: 10px; font-size: 12px; border-bottom: 1px solid #eee; }
-    .total-row { font-weight: bold; background: #f9f9f9; }
-    .total-row td { border-top: 2px solid #1db990; font-size: 14px; }
-    .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #999; }
+    body { font-family: Arial, sans-serif; font-size: 10px; line-height: 1.3; color: #1a1a1a; padding: 10px 14px; max-width: 210mm; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2563eb; padding-bottom: 8px; margin-bottom: 10px; }
+    .brand { font-size: 18px; font-weight: bold; color: #1e3a5f; }
+    .brand-sub { font-size: 9px; color: #64748b; margin-top: 2px; }
+    .meta { text-align: right; font-size: 10px; color: #444; }
+    .meta strong { display: block; font-size: 12px; color: #1a1a1a; margin-bottom: 2px; }
+    h2 { font-size: 11px; margin-bottom: 6px; color: #1e3a5f; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 10px; }
+    th { background: #eff6ff; padding: 5px 6px; text-align: left; font-weight: 600; color: #1e3a5f; }
+    td { padding: 4px 6px; border-bottom: 1px solid #eee; }
+    td.num { text-align: right; white-space: nowrap; }
+    tr.total td { font-weight: bold; border-top: 2px solid #2563eb; background: #eff6ff; padding: 6px; font-size: 11px; color: #1e3a5f; }
+    .notes { font-size: 9px; color: #555; margin-top: 8px; padding: 6px; background: #f8fafc; border-radius: 4px; border-left: 3px solid #2563eb; }
+    .footer { margin-top: 10px; padding-top: 6px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 9px; color: #94a3b8; }
+    @media print { body { padding: 0; } }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>GARD SECURITY</h1>
-    <p>Propuesta Económica de Servicios de Seguridad</p>
-    <p style="margin-top: 10px;"><strong>${quote.code}</strong> · ${quote.clientName || 'Cliente'}</p>
-    ${quote.validUntil ? `<p>Válida hasta: ${new Date(quote.validUntil).toLocaleDateString('es-CL')}</p>` : ''}
+    <div>
+      <div class="brand">GARD SECURITY</div>
+      <div class="brand-sub">Servicios de seguridad integral</div>
+    </div>
+    <div class="meta">
+      <strong>${quote.code}</strong>
+      ${quote.clientName || 'Cliente'}<br>
+      ${contactLine}${installationLine}${validUntilStr ? `Válida hasta: ${validUntilStr}` : ''}
+    </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Puestos de Trabajo</div>
-    <table>
-      <thead>
-        <tr>
-          <th>Puesto</th>
-          <th>Guardias</th>
-          <th>Horario</th>
-          <th>Días</th>
-          <th style="text-align: right;">Costo Mensual</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${quote.positions.map((pos: any) => `
-          <tr>
-            <td>${pos.customName || pos.puestoTrabajo?.name || 'Puesto'}</td>
-            <td>${pos.numGuards}</td>
-            <td>${pos.startTime || ''} - ${pos.endTime || ''}</td>
-            <td>${pos.weekdays?.join(', ') || 'N/A'}</td>
-            <td style="text-align: right;">${formatCurrency(Number(pos.monthlyPositionCost), 'CLP')}</td>
-          </tr>
-        `).join('')}
-        <tr class="total-row">
-          <td colspan="4" style="text-align: right;">Total Puestos:</td>
-          <td style="text-align: right;">${summary ? formatCurrency(summary.monthlyPositions, 'CLP') : 'N/A'}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  <h2>Puestos de trabajo · ${totalGuards} guardia(s)</h2>
+  <table>
+    <thead><tr><th>Puesto</th><th>Guardias</th><th>Horario</th><th>Días</th><th class="num">Precio mensual</th></tr></thead>
+    <tbody>${positionsRows}<tr class="total"><td colspan="4" style="text-align:right">Precio venta mensual</td><td class="num">${totalSalePrice > 0 ? formatPrice(totalSalePrice) : 'N/A'}</td></tr></tbody>
+  </table>
 
-  ${summary ? `
-  <div class="section">
-    <div class="section-title">Costos Adicionales</div>
-    <table>
-      <tbody>
-        ${summary.monthlyUniforms > 0 ? `<tr><td>Uniformes</td><td style="text-align: right;">${formatCurrency(summary.monthlyUniforms, 'CLP')}</td></tr>` : ''}
-        ${summary.monthlyExams > 0 ? `<tr><td>Exámenes médicos/psicológicos</td><td style="text-align: right;">${formatCurrency(summary.monthlyExams, 'CLP')}</td></tr>` : ''}
-        ${summary.monthlyMeals > 0 ? `<tr><td>Alimentación</td><td style="text-align: right;">${formatCurrency(summary.monthlyMeals, 'CLP')}</td></tr>` : ''}
-        ${summary.monthlyVehicles > 0 ? `<tr><td>Vehículos</td><td style="text-align: right;">${formatCurrency(summary.monthlyVehicles, 'CLP')}</td></tr>` : ''}
-        ${summary.monthlyInfrastructure > 0 ? `<tr><td>Infraestructura</td><td style="text-align: right;">${formatCurrency(summary.monthlyInfrastructure, 'CLP')}</td></tr>` : ''}
-        ${summary.monthlyCostItems > 0 ? `<tr><td>Costos operacionales</td><td style="text-align: right;">${formatCurrency(summary.monthlyCostItems, 'CLP')}</td></tr>` : ''}
-        ${summary.monthlyFinancial > 0 ? `<tr><td>Costo financiero</td><td style="text-align: right;">${formatCurrency(summary.monthlyFinancial, 'CLP')}</td></tr>` : ''}
-        ${summary.monthlyPolicy > 0 ? `<tr><td>Póliza de seguro</td><td style="text-align: right;">${formatCurrency(summary.monthlyPolicy, 'CLP')}</td></tr>` : ''}
-        <tr class="total-row">
-          <td style="text-align: right;">COSTO TOTAL MENSUAL:</td>
-          <td style="text-align: right;">${formatCurrency(summary.monthlyTotal, 'CLP')}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-  ` : ''}
+  ${notesEscaped ? `<div class="notes">Notas: ${notesEscaped}</div>` : ''}
 
-  ${quote.notes ? `
-  <div class="section">
-    <div class="section-title">Notas</div>
-    <p style="font-size: 12px; color: #666; line-height: 1.6;">${quote.notes}</p>
-  </div>
-  ` : ''}
-
-  <div class="footer">
-    <p>GARD Security · Propuesta generada el ${new Date().toLocaleDateString('es-CL')}</p>
-    <p>www.gard.cl · contacto@gard.cl</p>
-  </div>
+  <div class="footer">Generado el ${new Date().toLocaleDateString('es-CL')} · www.gard.cl · contacto@gard.cl</div>
 </body>
-</html>
-    `.trim();
+</html>`.trim();
 
-    // Por ahora retornar el HTML (en producción usarías Playwright para convertir a PDF)
-    // Para simplificar, retornamos HTML que el navegador puede imprimir como PDF
     return new NextResponse(html, {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',

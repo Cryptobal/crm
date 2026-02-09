@@ -260,30 +260,55 @@ export function EditPositionModal({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1.5">
-                  <Label className="text-sm">Hora inicio</Label>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-card px-3 text-sm"
-                    value={form.startTime}
-                    onChange={(e) => setForm((p) => ({ ...p, startTime: e.target.value }))}
-                  >
-                    {TIME_OPTIONS.map((time) => (
-                      <option key={time} value={time}>{time}</option>
-                    ))}
-                  </select>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm">Horario</Label>
+                  <div className="flex gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={form.startTime === "08:00" && form.endTime === "20:00" ? "default" : "outline"}
+                      className="h-7 px-2.5 text-xs"
+                      onClick={() => setForm((p) => ({ ...p, startTime: "08:00", endTime: "20:00" }))}
+                    >
+                      Día
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={form.startTime === "20:00" && form.endTime === "08:00" ? "default" : "outline"}
+                      className="h-7 px-2.5 text-xs"
+                      onClick={() => setForm((p) => ({ ...p, startTime: "20:00", endTime: "08:00" }))}
+                    >
+                      Noche
+                    </Button>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm">Hora término</Label>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-card px-3 text-sm"
-                    value={form.endTime}
-                    onChange={(e) => setForm((p) => ({ ...p, endTime: e.target.value }))}
-                  >
-                    {TIME_OPTIONS.map((time) => (
-                      <option key={time} value={time}>{time}</option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Hora inicio</Label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-card px-3 text-sm"
+                      value={form.startTime}
+                      onChange={(e) => setForm((p) => ({ ...p, startTime: e.target.value }))}
+                    >
+                      {TIME_OPTIONS.map((time) => (
+                        <option key={time} value={time}>{time}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Hora término</Label>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-card px-3 text-sm"
+                      value={form.endTime}
+                      onChange={(e) => setForm((p) => ({ ...p, endTime: e.target.value }))}
+                    >
+                      {TIME_OPTIONS.map((time) => (
+                        <option key={time} value={time}>{time}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
               <div className="text-sm text-muted-foreground">

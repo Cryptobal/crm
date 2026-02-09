@@ -69,9 +69,9 @@ export function AppShell({ sidebar, topbar, children, userName, className }: App
         </header>
       )}
 
-      {/* ── Desktop sidebar ── */}
+      {/* ── Desktop sidebar (siempre visible: expandida o colapsada con iconos) ── */}
       {sidebar && (
-        <div className={cn('hidden lg:block', !isSidebarOpen && 'lg:hidden')}>
+        <div className="hidden lg:block">
           {isValidElement(sidebar)
             ? cloneElement(
                 sidebar as ReactElement<{
@@ -85,18 +85,6 @@ export function AppShell({ sidebar, topbar, children, userName, className }: App
               )
             : sidebar}
         </div>
-      )}
-
-      {/* ── Desktop reopen button ── */}
-      {sidebar && !isSidebarOpen && (
-        <button
-          type="button"
-          className="fixed bottom-6 left-6 z-40 hidden h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-lg transition-colors hover:bg-accent hover:text-foreground lg:inline-flex"
-          onClick={() => setIsSidebarOpen(true)}
-          aria-label="Abrir navegación"
-        >
-          <Menu className="h-4 w-4" />
-        </button>
       )}
 
       {/* ── Mobile drawer overlay ── */}
@@ -129,7 +117,13 @@ export function AppShell({ sidebar, topbar, children, userName, className }: App
       )}
 
       {/* ── Main content ── */}
-      <div className={cn(isSidebarOpen ? 'lg:pl-60' : 'lg:pl-0', className)}>
+      <div
+        className={cn(
+          'transition-[padding] duration-200 ease-out',
+          isSidebarOpen ? 'lg:pl-60' : 'lg:pl-[72px]',
+          className
+        )}
+      >
         {topbar}
         <main className="flex-1">
           <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 pb-20 lg:pb-6 animate-in-page">

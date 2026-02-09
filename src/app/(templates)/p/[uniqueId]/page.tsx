@@ -77,14 +77,13 @@ export default async function PublicPresentationPage({ params, searchParams }: P
 
   // 5. Extraer datos del cliente
   const clientData = presentation.clientData as any;
-  const zohoData = clientData;
+  const isCpqData = !!clientData._cpqQuoteId;
 
   // 6. Mapear datos a formato de presentación
-  const presentationData = mapZohoDataToPresentation(
-    zohoData,
-    uniqueId,
-    presentation.template.slug
-  );
+  // Para datos CPQ, ya vienen en formato PresentationPayload
+  const presentationData = isCpqData
+    ? { ...clientData, id: uniqueId, template_id: presentation.template.slug }
+    : mapZohoDataToPresentation(clientData, uniqueId, presentation.template.slug);
 
   // 7. Obtener info del viewer para analytics
   const headersList = await headers();
@@ -154,8 +153,13 @@ export async function generateMetadata({ params }: PublicPresentationPageProps) 
   }
 
   const clientData = presentation.clientData as any;
-  const companyName = clientData?.account?.Account_Name || 'Cliente';
-  const subject = clientData?.quote?.Subject || 'Propuesta';
+  const isCpq = !!clientData?._cpqQuoteId;
+  const companyName = isCpq
+    ? (clientData?.client?.company_name || 'Cliente')
+    : (clientData?.account?.Account_Name || 'Cliente');
+  const subject = isCpq
+    ? (clientData?.quote?.subject || 'Propuesta')
+    : (clientData?.quote?.Subject || 'Propuesta');
 
   return {
     title: `${subject} - ${companyName} | Gard Security`,

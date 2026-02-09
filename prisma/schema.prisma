@@ -369,31 +369,43 @@ model PayrollSalaryComponent {
 // ============================================
 
 model CpqQuote {
-  id             String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  tenantId       String        @map("tenant_id")
-  code           String        @unique @map("code")
-  status         String        @default("draft")
-  clientName     String?       @map("client_name")
-  validUntil     DateTime?     @map("valid_until") @db.Date
-  notes          String?
-  totalPositions Int           @default(0) @map("total_positions")
-  totalGuards    Int           @default(0) @map("total_guards")
-  monthlyCost    Decimal       @default(0) @map("monthly_cost") @db.Decimal(12, 2)
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId         String        @map("tenant_id")
+  code             String        @unique @map("code")
+  status           String        @default("draft")
+  clientName       String?       @map("client_name")
+  validUntil       DateTime?     @map("valid_until") @db.Date
+  notes            String?
+  totalPositions   Int           @default(0) @map("total_positions")
+  totalGuards      Int           @default(0) @map("total_guards")
+  monthlyCost      Decimal       @default(0) @map("monthly_cost") @db.Decimal(12, 2)
+  // CRM context (optional - a quote can exist without CRM)
+  accountId        String?       @map("account_id") @db.Uuid
+  contactId        String?       @map("contact_id") @db.Uuid
+  dealId           String?       @map("deal_id") @db.Uuid
+  installationId   String?       @map("installation_id") @db.Uuid
+  // Currency & AI
+  currency         String        @default("CLP") // "CLP" | "UF"
+  aiDescription    String?       @map("ai_description")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  positions       CpqPosition[]
-  parameters      CpqQuoteParameters?
-  uniformItems    CpqQuoteUniformItem[]
-  examItems       CpqQuoteExamItem[]
-  costItems       CpqQuoteCostItem[]
-  meals           CpqQuoteMeal[]
-  vehicles        CpqQuoteVehicle[]
-  infrastructure  CpqQuoteInfrastructure[]
+  positions        CpqPosition[]
+  parameters       CpqQuoteParameters?
+  uniformItems     CpqQuoteUniformItem[]
+  examItems        CpqQuoteExamItem[]
+  costItems        CpqQuoteCostItem[]
+  meals            CpqQuoteMeal[]
+  vehicles         CpqQuoteVehicle[]
+  infrastructure   CpqQuoteInfrastructure[]
+  installation     CrmInstallation? @relation(fields: [installationId], references: [id], onDelete: SetNull)
 
   @@index([tenantId], map: "idx_cpq_quotes_tenant")
   @@index([status], map: "idx_cpq_quotes_status")
   @@index([createdAt(sort: Desc)], map: "idx_cpq_quotes_created_desc")
+  @@index([accountId], map: "idx_cpq_quotes_account")
+  @@index([dealId], map: "idx_cpq_quotes_deal")
+  @@index([installationId], map: "idx_cpq_quotes_installation")
   @@map("quotes")
   @@schema("cpq")
 }
@@ -661,7 +673,8 @@ model CrmLead {
   tenantId           String    @map("tenant_id")
   status             String    @default("pending")
   source             String?
-  name               String?
+  firstName          String?   @map("first_name")
+  lastName           String?   @map("last_name")
   email              String?
   phone              String?
   companyName        String?   @map("company_name")
@@ -698,8 +711,9 @@ model CrmAccount {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  contacts CrmContact[]
-  deals    CrmDeal[]
+  contacts      CrmContact[]
+  deals         CrmDeal[]
+  installations CrmInstallation[]
 
   @@index([tenantId], map: "idx_crm_accounts_tenant")
   @@index([status], map: "idx_crm_accounts_status")
@@ -709,11 +723,35 @@ model CrmAccount {
   @@schema("crm")
 }
 
+model CrmInstallation {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId  String   @map("tenant_id")
+  accountId String   @map("account_id") @db.Uuid
+  name      String
+  address   String?
+  city      String?
+  commune   String?
+  lat       Float?
+  lng       Float?
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  account CrmAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  quotes  CpqQuote[]
+
+  @@index([tenantId], map: "idx_crm_installations_tenant")
+  @@index([accountId], map: "idx_crm_installations_account")
+  @@map("installations")
+  @@schema("crm")
+}
+
 model CrmContact {
   id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   tenantId   String   @map("tenant_id")
   accountId  String   @map("account_id") @db.Uuid
-  name       String
+  firstName  String   @map("first_name")
+  lastName   String   @map("last_name")
   email      String?
   phone      String?
   roleTitle  String?  @map("role_title")

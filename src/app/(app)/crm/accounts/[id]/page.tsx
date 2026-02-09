@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { getDefaultTenantId } from "@/lib/tenant";
 import { PageHeader, Breadcrumb } from "@/components/opai";
 import { CrmAccountDetailClient } from "@/components/crm/CrmAccountDetailClient";
+import { CrmSubnav } from "@/components/crm/CrmSubnav";
 
 export default async function CrmAccountDetailPage({
   params,
@@ -35,7 +36,8 @@ export default async function CrmAccountDetailPage({
         include: { stage: true, primaryContact: true },
         orderBy: { createdAt: "desc" },
       },
-      _count: { select: { contacts: true, deals: true } },
+      installations: { orderBy: { createdAt: "desc" } },
+      _count: { select: { contacts: true, deals: true, installations: true } },
     },
   });
 
@@ -60,6 +62,7 @@ export default async function CrmAccountDetailPage({
         description={`${account.type === "client" ? "Cliente" : "Prospecto"} · ${account.industry || "Sin industria"}`}
         className="mb-6"
       />
+      <CrmSubnav />
       <CrmAccountDetailClient account={data} />
     </>
   );

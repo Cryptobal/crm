@@ -1,10 +1,12 @@
 /**
- * Modal para enviar cotización CPQ por email
+ * Modal para enviar cotización CPQ como Presentación
+ * Flujo: Selección de template + destinatario → Crear borrador → Abrir preview
+ * El envío real se hace desde la vista de preview (/preview/[sessionId])
  */
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +18,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Send } from "lucide-react";
+import {
+  Send,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  ExternalLink,
+  ChevronRight,
+  ChevronLeft,
+  Eye,
+} from "lucide-react";
 import { toast } from "sonner";
 
 interface SendCpqQuoteModalProps {
@@ -24,61 +35,134 @@ interface SendCpqQuoteModalProps {
   quoteCode: string;
   clientName?: string;
   disabled?: boolean;
+  hasAccount?: boolean;
+  hasContact?: boolean;
+  contactName?: string;
+  contactEmail?: string;
 }
+
+interface TemplateOption {
+  slug: string;
+  name: string;
+}
+
+const TEMPLATES: TemplateOption[] = [
+  { slug: "commercial", name: "Presentación Comercial" },
+];
+
+type Step = "template" | "recipient" | "creating" | "success";
 
 export function SendCpqQuoteModal({
   quoteId,
   quoteCode,
   clientName,
   disabled,
+  hasAccount,
+  hasContact,
+  contactName,
+  contactEmail,
 }: SendCpqQuoteModalProps) {
   const [open, setOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState(clientName || "");
-  const [sending, setSending] = useState(false);
+  const [step, setStep] = useState<Step>("template");
+  const [creating, setCreating] = useState(false);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Template selection
+  const [selectedTemplate, setSelectedTemplate] = useState("commercial");
 
-    if (!email || !email.includes('@')) {
-      toast.error("Ingresa un email válido");
-      return;
-    }
+  // Recipient
+  const [recipientName, setRecipientName] = useState(contactName || "");
+  const [recipientEmail, setRecipientEmail] = useState(contactEmail || "");
+  const [ccEmails, setCcEmails] = useState<string[]>([""]);
 
-    setSending(true);
+  // Success state
+  const [previewUrl, setPreviewUrl] = useState("");
+
+  const canSend = hasAccount && hasContact;
+
+  useEffect(() => {
+    if (contactName) setRecipientName(contactName);
+    if (contactEmail) setRecipientEmail(contactEmail);
+  }, [contactName, contactEmail]);
+
+  const handleCreateDraft = async () => {
+    if (!canSend || !recipientEmail.trim()) return;
+
+    setCreating(true);
+    setStep("creating");
     try {
-      // Generar PDF
-      const pdfResponse = await fetch(`/api/cpq/quotes/${quoteId}/export-pdf`, {
-        method: "POST",
-      });
+      const validCcEmails = ccEmails
+        .map((e) => e.trim())
+        .filter((e) => e && e.includes("@"));
 
-      if (!pdfResponse.ok) {
-        throw new Error("Error al generar PDF");
+      const response = await fetch(
+        `/api/cpq/quotes/${quoteId}/create-draft`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            templateSlug: selectedTemplate,
+            recipientEmail: recipientEmail.trim(),
+            recipientName: recipientName.trim(),
+            ccEmails: validCcEmails,
+          }),
+        }
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Error al crear borrador");
       }
 
-      const pdfHtml = await pdfResponse.text();
+      setPreviewUrl(data.data?.previewUrl || "");
+      setStep("success");
+      toast.success("Borrador creado. Revisa la propuesta antes de enviar.");
 
-      // TODO: Aquí deberías enviar por email usando Resend
-      // Por ahora, simulamos el envío y mostramos éxito
-      // En producción, crear endpoint /api/cpq/quotes/[id]/send-email que:
-      // 1. Genere el PDF
-      // 2. Lo envíe por email con Resend
-      // 3. Actualice el estado de la cotización a "sent"
-
-      toast.success(`Cotización enviada a ${email}`);
-      setOpen(false);
-      setEmail("");
-      setName(clientName || "");
+      // Open preview in new tab
+      if (data.data?.previewUrl) {
+        window.open(data.data.previewUrl, "_blank");
+      }
     } catch (error) {
-      console.error("Error sending quote:", error);
-      toast.error("No se pudo enviar la cotización");
+      console.error("Error creating draft:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo crear el borrador"
+      );
+      setStep("recipient"); // go back to recipient step
     } finally {
-      setSending(false);
+      setCreating(false);
     }
   };
 
+  const resetModal = () => {
+    setStep("template");
+    setSelectedTemplate("commercial");
+    setCcEmails([""]);
+    setPreviewUrl("");
+  };
+
+  const addCcField = () => {
+    if (ccEmails.length < 5) setCcEmails([...ccEmails, ""]);
+  };
+
+  const removeCcField = (index: number) => {
+    setCcEmails(ccEmails.filter((_, i) => i !== index));
+  };
+
+  const updateCcEmail = (index: number, value: string) => {
+    const updated = [...ccEmails];
+    updated[index] = value;
+    setCcEmails(updated);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) resetModal();
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="sm" className="gap-2" disabled={disabled}>
           <Send className="h-4 w-4" />
@@ -87,36 +171,251 @@ export function SendCpqQuoteModal({
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Enviar cotización</DialogTitle>
+          <DialogTitle>
+            {step === "template" && "Enviar propuesta"}
+            {step === "recipient" && "Confirmar destinatario"}
+            {step === "creating" && "Generando borrador..."}
+            {step === "success" && "Borrador listo"}
+          </DialogTitle>
           <DialogDescription>
-            Envía {quoteCode} al cliente por email
+            {step === "template" && `Selecciona el template para ${quoteCode}`}
+            {step === "recipient" && "Confirma el destinatario y genera el borrador"}
+            {step === "creating" && "Preparando la propuesta para revisión"}
+            {step === "success" && "Revisa la propuesta y envíala desde la vista previa"}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSend} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Nombre del cliente</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Empresa o contacto"
-              required
-            />
+
+        {/* Step 1: Template Selection */}
+        {step === "template" && (
+          <div className="space-y-4">
+            {/* Validation checks */}
+            <div className="space-y-2">
+              <CheckItem
+                ok={!!hasAccount}
+                label="Cuenta (empresa) asignada"
+                detail={clientName}
+              />
+              <CheckItem ok={!!hasContact} label="Contacto con email asignado" />
+            </div>
+
+            {!canSend && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <p className="text-xs text-amber-400 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  Asigna una cuenta y un contacto en el paso &quot;Datos&quot;
+                  antes de enviar.
+                </p>
+              </div>
+            )}
+
+            {canSend && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Template</Label>
+                  <div className="space-y-2">
+                    {TEMPLATES.map((t) => (
+                      <button
+                        key={t.slug}
+                        type="button"
+                        onClick={() => setSelectedTemplate(t.slug)}
+                        className={`w-full rounded-lg border p-3 text-left text-sm transition-colors ${
+                          selectedTemplate === t.slug
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-card hover:bg-accent/30"
+                        }`}
+                      >
+                        {t.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <Button
+                  onClick={() => setStep("recipient")}
+                  className="w-full gap-2"
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
-          <div className="space-y-1.5">
-            <Label>Email</Label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="cliente@empresa.com"
-              required
-            />
+        )}
+
+        {/* Step 2: Recipient Confirmation */}
+        {step === "recipient" && (
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Nombre del destinatario</Label>
+                <Input
+                  value={recipientName}
+                  onChange={(e) => setRecipientName(e.target.value)}
+                  placeholder="Nombre del contacto"
+                  className="bg-background"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Email del destinatario *</Label>
+                <Input
+                  type="email"
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  placeholder="correo@empresa.com"
+                  className="bg-background"
+                />
+              </div>
+            </div>
+
+            {/* CC */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">
+                Copias (CC) - Opcional
+              </Label>
+              {ccEmails.map((email, i) => (
+                <div key={i} className="flex gap-2">
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => updateCcEmail(i, e.target.value)}
+                    placeholder="cc@empresa.com"
+                    className="bg-background text-sm"
+                  />
+                  {ccEmails.length > 1 && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-10 w-10 shrink-0 text-destructive"
+                      onClick={() => removeCcField(i)}
+                    >
+                      &times;
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {ccEmails.length < 5 && (
+                <button
+                  type="button"
+                  onClick={addCcField}
+                  className="text-xs text-primary hover:underline"
+                >
+                  + Agregar otro CC
+                </button>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
+              <p className="text-xs text-blue-400">
+                Se creará un borrador de la propuesta. Podrás revisarla antes de
+                enviarla al destinatario.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setStep("template")}
+                className="gap-1"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Atrás
+              </Button>
+              <Button
+                onClick={handleCreateDraft}
+                disabled={creating || !recipientEmail.trim()}
+                className="flex-1 gap-2"
+              >
+                {creating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generando...
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-4 w-4" />
+                    Ver borrador
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-          <Button type="submit" className="w-full" disabled={sending}>
-            {sending ? "Enviando..." : "Enviar cotización"}
-          </Button>
-        </form>
+        )}
+
+        {/* Step 3: Creating */}
+        {step === "creating" && (
+          <div className="text-center py-8 space-y-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+            <p className="text-sm text-muted-foreground">
+              Generando borrador de propuesta...
+            </p>
+          </div>
+        )}
+
+        {/* Step 4: Success */}
+        {step === "success" && (
+          <div className="text-center py-4 space-y-4">
+            <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Borrador creado</p>
+              <p className="text-xs text-muted-foreground">
+                La propuesta se abrió en una nueva pestaña.
+                Revísala y envíala desde ahí.
+              </p>
+            </div>
+
+            {previewUrl && (
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Abrir vista previa de nuevo
+              </a>
+            )}
+
+            <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
+              <p className="text-xs text-blue-400">
+                Desde la vista previa podrás verificar los datos y hacer clic en
+                &quot;Enviar por Email&quot; para enviar la propuesta al cliente.
+              </p>
+            </div>
+
+            <Button onClick={() => setOpen(false)} className="mt-2">
+              Cerrar
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function CheckItem({
+  ok,
+  label,
+  detail,
+}: {
+  ok: boolean;
+  label: string;
+  detail?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      {ok ? (
+        <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+      ) : (
+        <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
+      )}
+      <span className={ok ? "text-foreground" : "text-muted-foreground"}>
+        {label}
+        {detail && (
+          <span className="text-xs text-muted-foreground ml-1">
+            ({detail})
+          </span>
+        )}
+      </span>
+    </div>
   );
 }

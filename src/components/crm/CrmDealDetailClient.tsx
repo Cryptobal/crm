@@ -42,7 +42,8 @@ type DealQuote = {
 
 type ContactRow = {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email?: string | null;
   phone?: string | null;
   roleTitle?: string | null;
@@ -55,7 +56,7 @@ type DealDetail = {
   amount: string;
   stage?: { name: string } | null;
   account?: { id: string; name: string } | null;
-  primaryContact?: { name: string; email?: string | null } | null;
+  primaryContact?: { firstName: string; lastName: string; email?: string | null } | null;
   quotes?: DealQuote[];
 };
 
@@ -93,7 +94,7 @@ export function CrmDealDetailClient({
   const applyPlaceholders = (value: string) => {
     const replacements: Record<string, string> = {
       "{cliente}": deal.account?.name || "",
-      "{contacto}": deal.primaryContact?.name || "",
+      "{contacto}": deal.primaryContact ? `${deal.primaryContact.firstName} ${deal.primaryContact.lastName}`.trim() : "",
       "{negocio}": deal.title || "",
       "{etapa}": deal.stage?.name || "",
       "{monto}": deal.amount ? Number(deal.amount).toLocaleString("es-CL") : "",
@@ -218,7 +219,7 @@ export function CrmDealDetailClient({
           <div className="flex items-center justify-between">
             <span>Contacto</span>
             <span className="font-medium">
-              {deal.primaryContact?.name || "Sin contacto"}
+              {deal.primaryContact ? `${deal.primaryContact.firstName} ${deal.primaryContact.lastName}`.trim() : "Sin contacto"}
             </span>
           </div>
         </CardContent>
@@ -418,7 +419,7 @@ export function CrmDealDetailClient({
               className="flex flex-col gap-1 rounded-md border px-3 py-2"
             >
               <div className="flex items-center justify-between">
-                <p className="font-medium">{contact.name}</p>
+                <p className="font-medium">{`${contact.firstName} ${contact.lastName}`.trim()}</p>
                 {contact.isPrimary && <Badge variant="outline">Principal</Badge>}
               </div>
               <p className="text-xs text-muted-foreground">

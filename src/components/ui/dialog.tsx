@@ -32,11 +32,29 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onPointerDownOutside, onInteractOutside, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      onPointerDownOutside={(e) => {
+        // Evitar que el dialog se cierre al hacer clic en el dropdown de Google Places
+        const target = e.target as HTMLElement;
+        if (target?.closest?.(".pac-container")) {
+          e.preventDefault();
+          return;
+        }
+        onPointerDownOutside?.(e);
+      }}
+      onInteractOutside={(e) => {
+        // Idem para interactOutside (cubre focus y pointer)
+        const target = e.target as HTMLElement;
+        if (target?.closest?.(".pac-container")) {
+          e.preventDefault();
+          return;
+        }
+        onInteractOutside?.(e);
+      }}
       className={cn(
         // Mobile: bottom sheet style
         "fixed inset-x-0 bottom-0 z-50 grid w-full gap-4 border-t border-border bg-card p-6 shadow-xl duration-300 rounded-t-2xl max-h-[90vh] overflow-y-auto",

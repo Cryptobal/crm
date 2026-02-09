@@ -17,6 +17,7 @@ import {
 import { EditPositionModal } from "@/components/cpq/EditPositionModal";
 import { CostBreakdownModal } from "@/components/cpq/CostBreakdownModal";
 import { formatCurrency, sortWeekdays } from "@/components/cpq/utils";
+import { cn } from "@/lib/utils";
 import type { CpqPosition } from "@/types/cpq";
 import { ChevronDown, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
@@ -25,6 +26,7 @@ interface CpqPositionCardProps {
   quoteId: string;
   position: CpqPosition;
   onUpdated?: () => void;
+  readOnly?: boolean;
   totalGuards?: number;
   baseAdditionalCostsTotal?: number;
   marginPct?: number;
@@ -40,6 +42,7 @@ export function CpqPositionCard({
   quoteId,
   position,
   onUpdated,
+  readOnly = false,
   totalGuards = 1,
   baseAdditionalCostsTotal = 0,
   marginPct = 20,
@@ -99,6 +102,24 @@ export function CpqPositionCard({
     }
   };
 
+  const handleClone = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/cpq/quotes/${quoteId}/positions/${position.id}/clone`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      toast.success("Puesto clonado");
+      onUpdated?.();
+    } catch (err) {
+      console.error("Error cloning position:", err);
+      toast.error("No se pudo clonar el puesto");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const daysLabel = sortWeekdays(position.weekdays || []).join(", ");
   const title = position.customName || position.puestoTrabajo?.name || "Puesto";
   const shiftHours = (() => {
@@ -118,7 +139,10 @@ export function CpqPositionCard({
   return (
     <Card className="overflow-hidden border border-muted/40">
       <div className="flex items-start justify-between gap-3 border-b bg-muted/20 p-3">
-        <div>
+        <div
+          className={cn("flex-1", !readOnly && "cursor-pointer hover:text-primary transition-colors")}
+          onClick={readOnly ? undefined : () => setOpenEdit(true)}
+        >
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-foreground">{title}</h3>
             <Badge variant="outline" className="text-xs">
@@ -135,6 +159,7 @@ export function CpqPositionCard({
             {healthLabel}
           </p>
         </div>
+        {!readOnly && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="icon" variant="ghost" className="h-9 w-9">
@@ -143,14 +168,18 @@ export function CpqPositionCard({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => setOpenEdit(true)}>Editar</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleClone} disabled={loading}>
+              Clonar
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={handleRecalculate} disabled={loading}>
               Recalcular costo
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleDelete} disabled={loading}>
+            <DropdownMenuItem onClick={handleDelete} disabled={loading} className="text-destructive">
               Eliminar
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        )}
       </div>
 
       <div className={`${detailsOpen ? 'grid' : 'hidden'} sm:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 p-3`}>

@@ -60,14 +60,23 @@ export async function PATCH(
     const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
     const body = await request.json();
 
+    // Build update data - only include fields that are present in the body
+    const updateData: Record<string, unknown> = {};
+    if (body.status !== undefined) updateData.status = body.status;
+    if (body.clientName !== undefined) updateData.clientName = body.clientName?.trim() || null;
+    if (body.validUntil !== undefined) updateData.validUntil = body.validUntil ? new Date(body.validUntil) : null;
+    if (body.notes !== undefined) updateData.notes = body.notes?.trim() || null;
+    // CRM context fields
+    if (body.accountId !== undefined) updateData.accountId = body.accountId || null;
+    if (body.contactId !== undefined) updateData.contactId = body.contactId || null;
+    if (body.dealId !== undefined) updateData.dealId = body.dealId || null;
+    if (body.installationId !== undefined) updateData.installationId = body.installationId || null;
+    if (body.currency !== undefined) updateData.currency = body.currency || "CLP";
+    if (body.aiDescription !== undefined) updateData.aiDescription = body.aiDescription || null;
+
     const updated = await prisma.cpqQuote.updateMany({
       where: { id, tenantId },
-      data: {
-        status: body.status,
-        clientName: body.clientName?.trim() || null,
-        validUntil: body.validUntil ? new Date(body.validUntil) : null,
-        notes: body.notes?.trim() || null,
-      },
+      data: updateData,
     });
 
     if (!updated.count) {

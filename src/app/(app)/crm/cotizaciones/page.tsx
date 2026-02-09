@@ -10,6 +10,7 @@ import { getDefaultTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/opai";
 import { CrmSubnav } from "@/components/crm/CrmSubnav";
 import { CrmCotizacionesClient } from "@/components/crm/CrmCotizacionesClient";
+import { computeCpqQuoteCosts } from "@/modules/cpq/costing/compute-quote-costs";
 
 export default async function CrmCotizacionesPage() {
   const session = await auth();
@@ -33,19 +34,62 @@ export default async function CrmCotizacionesPage() {
         status: true,
         clientName: true,
         monthlyCost: true,
+        currency: true,
         totalPositions: true,
         totalGuards: true,
         createdAt: true,
+        parameters: {
+          select: { salePriceMonthly: true, marginPct: true },
+        },
       },
     }),
     prisma.crmAccount.findMany({
       where: { tenantId },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, type: true },
+      select: { id: true, name: true },
     }),
   ]);
 
-  const initialQuotes = JSON.parse(JSON.stringify(quotes));
+  // Enriquecer con salePriceMonthly calculado si está en 0
+  const enrichedQuotes = await Promise.all(
+    quotes.map(async (q) => {
+      let salePriceMonthly = Number(q.parameters?.salePriceMonthly ?? 0);
+      const marginPct = Number(q.parameters?.marginPct ?? 20);
+      if (salePriceMonthly <= 0) {
+        try {
+          const summary = await computeCpqQuoteCosts(q.id);
+          const margin = marginPct / 100;
+          const costsBase =
+            summary.monthlyPositions +
+            (summary.monthlyUniforms ?? 0) +
+            (summary.monthlyExams ?? 0) +
+            (summary.monthlyMeals ?? 0) +
+            (summary.monthlyVehicles ?? 0) +
+            (summary.monthlyInfrastructure ?? 0) +
+            (summary.monthlyCostItems ?? 0);
+          const bwm = margin < 1 ? costsBase / (1 - margin) : costsBase;
+          salePriceMonthly = bwm + (summary.monthlyFinancial ?? 0) + (summary.monthlyPolicy ?? 0);
+        } catch {
+          // mantener 0 si falla el cálculo
+        }
+      }
+      return {
+        id: q.id,
+        code: q.code,
+        status: q.status,
+        clientName: q.clientName,
+        monthlyCost: q.monthlyCost,
+        currency: q.currency ?? "CLP",
+        salePriceMonthly,
+        marginPct,
+        totalPositions: q.totalPositions,
+        totalGuards: q.totalGuards,
+        createdAt: q.createdAt,
+      };
+    })
+  );
+
+  const initialQuotes = JSON.parse(JSON.stringify(enrichedQuotes));
   const initialAccounts = JSON.parse(JSON.stringify(accounts));
 
   return (

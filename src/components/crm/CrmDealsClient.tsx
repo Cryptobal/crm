@@ -168,7 +168,7 @@ function DealCard({
             {deal.title}
           </Link>
           <p className="text-xs text-muted-foreground">
-            {deal.account?.name} · {deal.primaryContact?.name || "Sin contacto"}
+            {deal.account?.name} · {deal.primaryContact ? `${deal.primaryContact.firstName} ${deal.primaryContact.lastName}`.trim() : "Sin contacto"}
           </p>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">
@@ -739,7 +739,7 @@ export function CrmDealsClient({
                       {deal.title}
                     </Link>
                     <p className="text-xs text-muted-foreground">
-                      {deal.account?.name} · {deal.primaryContact?.name || "Sin contacto"}
+                      {deal.account?.name} · {deal.primaryContact ? `${deal.primaryContact.firstName} ${deal.primaryContact.lastName}`.trim() : "Sin contacto"}
                     </p>
                   </div>
                   <Badge variant="outline">{deal.stage?.name}</Badge>

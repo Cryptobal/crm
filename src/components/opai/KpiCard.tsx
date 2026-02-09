@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { ArrowUp, ArrowDown, Minus, Info } from 'lucide-react';
 
 export type TrendType = 'up' | 'down' | 'neutral';
 export type KpiVariant = 'default' | 'blue' | 'emerald' | 'purple' | 'amber' | 'indigo' | 'sky' | 'teal';
@@ -16,6 +16,10 @@ export interface KpiCardProps {
   variant?: KpiVariant;
   size?: 'sm' | 'md' | 'lg';
   tooltip?: ReactNode;
+  /** Tooltip que se muestra al hacer hover sobre el botón "i" junto al título (ej. explicación del cálculo) */
+  titleInfoTooltip?: ReactNode;
+  /** Clases adicionales para la descripción (ej. para agrandar o colorear) */
+  descriptionClassName?: string;
 }
 
 /**
@@ -37,6 +41,8 @@ export function KpiCard({
   variant = 'default',
   size = 'md',
   tooltip,
+  titleInfoTooltip,
+  descriptionClassName,
 }: KpiCardProps) {
   const trendIcons = { up: ArrowUp, down: ArrowDown, neutral: Minus };
   const trendColors = {
@@ -79,9 +85,17 @@ export function KpiCard({
       padding,
       className
     )}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center justify-between gap-1 mb-2">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5 min-w-0">
           {title}
+          {titleInfoTooltip != null && (
+            <span className="group/info relative shrink-0 inline-flex">
+              <Info className="h-3.5 w-3.5 text-muted-foreground/70 hover:text-muted-foreground cursor-help" aria-hidden />
+              <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden w-64 max-w-[calc(100vw-2rem)] rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg group-hover/info:block z-50">
+                {titleInfoTooltip}
+              </span>
+            </span>
+          )}
         </span>
         {icon && (
           <span className="text-muted-foreground/60">{icon}</span>
@@ -99,7 +113,7 @@ export function KpiCard({
             </span>
           )}
           {description && (
-            <span className="text-muted-foreground">{description}</span>
+            <span className={cn("text-muted-foreground", descriptionClassName)}>{description}</span>
           )}
         </div>
       )}

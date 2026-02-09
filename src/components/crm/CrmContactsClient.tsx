@@ -16,12 +16,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
+import { Plus, Pencil, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 type ContactRow = {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email?: string | null;
   phone?: string | null;
   roleTitle?: string | null;
@@ -39,7 +40,8 @@ type AccountRow = {
 
 type ContactFormState = {
   accountId: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
   roleTitle: string;
@@ -48,7 +50,8 @@ type ContactFormState = {
 
 const DEFAULT_FORM: ContactFormState = {
   accountId: "",
-  name: "",
+  firstName: "",
+  lastName: "",
   email: "",
   phone: "",
   roleTitle: "",
@@ -66,6 +69,9 @@ export function CrmContactsClient({
   const [form, setForm] = useState<ContactFormState>(DEFAULT_FORM);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+
   const inputClassName =
     "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
   const selectClassName =
@@ -80,8 +86,16 @@ export function CrmContactsClient({
       toast.error("Selecciona un cliente.");
       return;
     }
-    if (!form.name.trim()) {
-      toast.error("El nombre del contacto es obligatorio.");
+    if (!form.firstName.trim()) {
+      toast.error("El nombre es obligatorio.");
+      return;
+    }
+    if (!form.lastName.trim()) {
+      toast.error("El apellido es obligatorio.");
+      return;
+    }
+    if (!form.email.trim()) {
+      toast.error("El email es obligatorio.");
       return;
     }
     setLoading(true);
@@ -98,6 +112,7 @@ export function CrmContactsClient({
       setContacts((prev) => [payload.data, ...prev]);
       setForm(DEFAULT_FORM);
       setOpen(false);
+      toast.success("Contacto creado");
     } catch (error) {
       console.error(error);
       toast.error("No se pudo crear el contacto.");
@@ -105,6 +120,59 @@ export function CrmContactsClient({
       setLoading(false);
     }
   };
+
+  const openEditModal = (contact: ContactRow) => {
+    setEditingId(contact.id);
+    setForm({
+      accountId: contact.account?.id || "",
+      firstName: contact.firstName,
+      lastName: contact.lastName,
+      email: contact.email || "",
+      phone: contact.phone || "",
+      roleTitle: contact.roleTitle || "",
+      isPrimary: contact.isPrimary || false,
+    });
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    setLoading(true);
+    try {
+      const response = await fetch("/api/crm/contacts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingId,
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email: form.email,
+          phone: form.phone || null,
+          roleTitle: form.roleTitle || null,
+          isPrimary: form.isPrimary,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || "Error actualizando contacto");
+      }
+      setContacts((prev) =>
+        prev.map((c) => (c.id === editingId ? payload.data : c))
+      );
+      setEditOpen(false);
+      setEditingId(null);
+      setForm(DEFAULT_FORM);
+      toast.success("Contacto actualizado");
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo actualizar el contacto.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const contactName = (c: ContactRow) =>
+    [c.firstName, c.lastName].filter(Boolean).join(" ") || "Sin nombre";
 
   return (
     <div className="space-y-6">
@@ -128,7 +196,7 @@ export function CrmContactsClient({
             </DialogHeader>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
-                <Label>Cliente</Label>
+                <Label>Cliente *</Label>
                 <select
                   className={selectClassName}
                   value={form.accountId}
@@ -143,25 +211,25 @@ export function CrmContactsClient({
                 </select>
               </div>
               <div className="space-y-2">
-                <Label>Nombre</Label>
+                <Label>Nombre *</Label>
                 <Input
-                  value={form.name}
-                  onChange={(event) => updateForm("name", event.target.value)}
-                  placeholder="Nombre completo"
+                  value={form.firstName}
+                  onChange={(event) => updateForm("firstName", event.target.value)}
+                  placeholder="Nombre"
                   className={inputClassName}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Cargo</Label>
+                <Label>Apellido *</Label>
                 <Input
-                  value={form.roleTitle}
-                  onChange={(event) => updateForm("roleTitle", event.target.value)}
-                  placeholder="Gerente, jefe, etc."
+                  value={form.lastName}
+                  onChange={(event) => updateForm("lastName", event.target.value)}
+                  placeholder="Apellido"
                   className={inputClassName}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label>Email *</Label>
                 <Input
                   value={form.email}
                   onChange={(event) => updateForm("email", event.target.value)}
@@ -178,7 +246,16 @@ export function CrmContactsClient({
                   className={inputClassName}
                 />
               </div>
-              <div className="md:col-span-2">
+              <div className="space-y-2">
+                <Label>Cargo</Label>
+                <Input
+                  value={form.roleTitle}
+                  onChange={(event) => updateForm("roleTitle", event.target.value)}
+                  placeholder="Gerente, jefe, etc."
+                  className={inputClassName}
+                />
+              </div>
+              <div className="flex items-end">
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
@@ -191,12 +268,81 @@ export function CrmContactsClient({
             </div>
             <DialogFooter>
               <Button onClick={createContact} disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Guardar contacto
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Edit modal */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar contacto</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Nombre *</Label>
+              <Input
+                value={form.firstName}
+                onChange={(e) => updateForm("firstName", e.target.value)}
+                className={inputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Apellido *</Label>
+              <Input
+                value={form.lastName}
+                onChange={(e) => updateForm("lastName", e.target.value)}
+                className={inputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email *</Label>
+              <Input
+                value={form.email}
+                onChange={(e) => updateForm("email", e.target.value)}
+                className={inputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Teléfono</Label>
+              <Input
+                value={form.phone}
+                onChange={(e) => updateForm("phone", e.target.value)}
+                className={inputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Cargo</Label>
+              <Input
+                value={form.roleTitle}
+                onChange={(e) => updateForm("roleTitle", e.target.value)}
+                className={inputClassName}
+              />
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.isPrimary}
+                  onChange={(e) => updateForm("isPrimary", e.target.checked)}
+                />
+                Contacto principal
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+            <Button onClick={saveEdit} disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>
@@ -215,15 +361,26 @@ export function CrmContactsClient({
               className="flex flex-col gap-2 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
             >
               <div>
-                <p className="font-medium">{contact.name}</p>
+                <p className="font-medium">{contactName(contact)}</p>
                 <p className="text-sm text-muted-foreground">
                   {contact.email || "Sin email"} · {contact.phone || "Sin teléfono"}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {contact.account?.name || "Sin cliente asociado"}
+                  {contact.roleTitle ? ` · ${contact.roleTitle}` : ""}
                 </p>
               </div>
-              {contact.isPrimary && <Badge variant="outline">Principal</Badge>}
+              <div className="flex items-center gap-2">
+                {contact.isPrimary && <Badge variant="outline">Principal</Badge>}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  onClick={() => openEditModal(contact)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           ))}
         </CardContent>

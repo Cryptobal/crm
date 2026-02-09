@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/opai/EmptyState";
 import { FileText, Search, ExternalLink, Plus } from "lucide-react";
+import { formatCLP, formatNumber } from "@/lib/utils";
 
 type QuoteRow = {
   id: string;
@@ -15,6 +16,9 @@ type QuoteRow = {
   status: string;
   clientName?: string | null;
   monthlyCost: string | number;
+  salePriceMonthly: string | number;
+  marginPct?: number;
+  currency: string;
   totalPositions: number;
   totalGuards: number;
   createdAt: string;
@@ -23,7 +27,6 @@ type QuoteRow = {
 type AccountRow = {
   id: string;
   name: string;
-  type: string;
 };
 
 const STATUS_MAP: Record<string, { label: string; className: string }> = {
@@ -163,11 +166,24 @@ export function CrmCotizacionesClient({
                         {quote.clientName || "Sin cliente"} · {quote.totalGuards} guardias · {quote.totalPositions} puestos
                       </p>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0 ml-3">
-                      <span className="text-sm font-medium">
-                        ${Number(quote.monthlyCost).toLocaleString("es-CL")}
-                      </span>
-                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+                    <div className="flex items-center gap-4 shrink-0 ml-3 text-right">
+                      <div className="text-xs">
+                        <p className="text-muted-foreground">P. venta</p>
+                        <p className="text-sm font-medium">{formatCLP(Number(quote.salePriceMonthly))}</p>
+                      </div>
+                      <div className="text-xs">
+                        <p className="text-muted-foreground">Costo</p>
+                        <p className="text-sm">{formatCLP(Number(quote.monthlyCost))}</p>
+                      </div>
+                      <div className="text-xs">
+                        <p className="text-muted-foreground">Margen</p>
+                        <p className="text-sm font-medium text-emerald-400">
+                          {quote.marginPct != null
+                            ? `${formatNumber(quote.marginPct, { minDecimals: 1, maxDecimals: 1 })}%`
+                            : "—"}
+                        </p>
+                      </div>
+                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors self-center" />
                     </div>
                   </Link>
                 );

@@ -9,9 +9,17 @@ import { PageHeader } from "@/components/opai";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ArrowLeft, Save, Plus, Trash2, ChevronDown, Info } from "lucide-react";
 import { toast } from "sonner";
-import { formatNumber, parseLocalizedNumber } from "@/lib/utils";
+import { formatNumber, parseLocalizedNumber, cn } from "@/lib/utils";
 
 type CatalogItem = {
   id: string;
@@ -87,6 +95,7 @@ export function CpqCatalogConfig({ showHeader = true }: { showHeader?: boolean }
     uniformChangesPerYear: 3,
   });
   const [savingGlobals, setSavingGlobals] = useState(false);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<CatalogItem | null>(null);
   const [newItems, setNewItems] = useState<Record<string, NewItemState>>(() =>
     GROUPS.reduce((acc, group) => {
       acc[group.id] = makeNewItemState(group.types[0]);
@@ -185,6 +194,7 @@ export function CpqCatalogConfig({ showHeader = true }: { showHeader?: boolean }
   };
 
   const deactivateItem = async (item: CatalogItem) => {
+    setDeleteConfirmItem(null);
     setSavingId(item.id);
     try {
       const res = await fetch(`/api/cpq/catalog/${item.id}`, { method: "DELETE" });
@@ -413,7 +423,12 @@ export function CpqCatalogConfig({ showHeader = true }: { showHeader?: boolean }
                     return (
                       <div
                         key={item.id}
-                        className="rounded-md border border-border/60 p-2 space-y-3"
+                        className={cn(
+                          "rounded-md border p-2 space-y-3",
+                          item.isDefault
+                            ? "border-emerald-500/50 bg-emerald-500/5"
+                            : "border-border/60"
+                        )}
                       >
                         <button
                           type="button"
@@ -426,13 +441,20 @@ export function CpqCatalogConfig({ showHeader = true }: { showHeader?: boolean }
                           }
                           aria-expanded={!isCollapsed}
                         >
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold truncate">
-                              {item.name || "Sin nombre"}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatNumberLocal(item.basePrice ?? 0)} / {item.unit || "mes"}
-                            </p>
+                          <div className="min-w-0 flex items-center gap-2">
+                            {item.isDefault && (
+                              <span className="shrink-0 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-medium text-emerald-500">
+                                Default
+                              </span>
+                            )}
+                            <div>
+                              <p className="text-sm font-semibold truncate">
+                                {item.name || "Sin nombre"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatNumberLocal(item.basePrice ?? 0)} / {item.unit || "mes"}
+                              </p>
+                            </div>
                           </div>
                           <ChevronDown
                             className={`h-4 w-4 text-muted-foreground transition-transform ${
@@ -497,7 +519,7 @@ export function CpqCatalogConfig({ showHeader = true }: { showHeader?: boolean }
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => deactivateItem(item)}
+                                  onClick={() => setDeleteConfirmItem(item)}
                                   disabled={savingId === item.id || !item.active}
                                   className="h-9 w-9 p-0"
                                   aria-label="Eliminar item"
@@ -603,6 +625,30 @@ export function CpqCatalogConfig({ showHeader = true }: { showHeader?: boolean }
       {loading && (
         <div className="text-xs text-muted-foreground">Cargando catálogo...</div>
       )}
+
+      <Dialog open={!!deleteConfirmItem} onOpenChange={(open) => !open && setDeleteConfirmItem(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar eliminación</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que deseas eliminar <strong>"{deleteConfirmItem?.name}"</strong>? Esta acción
+              no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setDeleteConfirmItem(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmItem && deactivateItem(deleteConfirmItem)}
+              disabled={savingId === deleteConfirmItem?.id}
+            >
+              {savingId === deleteConfirmItem?.id ? "Eliminando..." : "Eliminar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { hasAppAccess } from '@/lib/app-access';
 import { PageHeader } from '@/components/opai';
 import { CrmSubnav } from '@/components/crm/CrmSubnav';
 import Link from 'next/link';
-import { Users, Building, TrendingUp, Contact, DollarSign, FileText, ChevronRight } from 'lucide-react';
+import { Users, Building, TrendingUp, Contact, DollarSign, FileText, ChevronRight, MapPin } from 'lucide-react';
 
 const modules = [
   {
@@ -24,6 +24,13 @@ const modules = [
     icon: Building,
     href: '/crm/accounts',
     color: 'text-blue-400 bg-blue-400/10',
+  },
+  {
+    title: 'Instalaciones',
+    description: 'Sedes y ubicaciones de clientes.',
+    icon: MapPin,
+    href: '/crm/installations',
+    color: 'text-teal-400 bg-teal-400/10',
   },
   {
     title: 'Negocios',

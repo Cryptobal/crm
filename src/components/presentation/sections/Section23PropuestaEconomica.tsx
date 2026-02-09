@@ -8,7 +8,7 @@ import { Section23_PropuestaEconomica } from '@/types/presentation';
 import { SectionWrapper, ContainerWrapper } from '../SectionWrapper';
 import { useThemeClasses } from '../ThemeProvider';
 import { cn } from '@/lib/utils';
-import { formatCurrency, formatUF } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { FileText, Calendar, TrendingUp, Sparkles, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { DownloadPricingButtonV3 } from '../DownloadPricingButtonV3';
@@ -41,8 +41,8 @@ export function Section23PropuestaEconomica({
     if (showTokens && value === 999999) {
       return '[PRECIO]';
     }
-    // Usar formatCurrency que detecta automáticamente CLF/UF vs CLP
-    return formatCurrency(value, pricing.currency);
+    // UF: formato "X,XX UF" (UF al final). CLP: formato $.
+    return formatCurrency(value, pricing.currency, { ufSuffix: true });
   };
   
   return (

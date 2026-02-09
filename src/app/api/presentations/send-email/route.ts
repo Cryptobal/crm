@@ -125,23 +125,54 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 9. Guardar presentación en BD (con tenant)
-    const presentation = await prisma.presentation.create({
-      data: {
-        uniqueId,
-        templateId: template.id,
+    // 9. Guardar o actualizar presentación en BD
+    // Si hay una presentación draft existente para esta sesión (flujo CPQ), actualizarla
+    const existingDraftPresentation = await prisma.presentation.findFirst({
+      where: {
+        clientData: { path: ['id'], equals: sessionId },
+        status: 'draft',
         tenantId,
-        clientData: zohoData,
-        status: 'sent',
-        recipientEmail,
-        recipientName,
-        ccEmails: ccEmails.filter((email: string) => email && email.trim()),
-        emailSentAt: new Date(),
-        emailProvider: 'resend',
-        emailMessageId: emailResponse.data?.id || null,
-        tags: ['zoho', 'auto-sent'],
       },
     });
+
+    let presentation;
+    if (existingDraftPresentation) {
+      // Actualizar la presentación draft existente a sent
+      presentation = await prisma.presentation.update({
+        where: { id: existingDraftPresentation.id },
+        data: {
+          status: 'sent',
+          recipientEmail,
+          recipientName,
+          ccEmails: ccEmails.filter((email: string) => email && email.trim()),
+          emailSentAt: new Date(),
+          emailProvider: 'resend',
+          emailMessageId: emailResponse.data?.id || null,
+          tags: ['cpq', 'sent-from-preview'],
+        },
+      });
+      // Use existing uniqueId for the public URL
+      const existingUrl = `${siteUrl}/p/${existingDraftPresentation.uniqueId}`;
+      // Override presentationUrl for the response
+      Object.defineProperty(presentation, '_publicUrl', { value: existingUrl });
+    } else {
+      presentation = await prisma.presentation.create({
+        data: {
+          uniqueId,
+          templateId: template.id,
+          tenantId,
+          clientData: zohoData,
+          status: 'sent',
+          recipientEmail,
+          recipientName,
+          ccEmails: ccEmails.filter((email: string) => email && email.trim()),
+          emailSentAt: new Date(),
+          emailProvider: 'resend',
+          emailMessageId: emailResponse.data?.id || null,
+          tags: ['zoho', 'auto-sent'],
+        },
+      });
+    }
 
     // 10. Actualizar contador de uso del template
     await prisma.template.update({
@@ -154,6 +185,61 @@ export async function POST(req: NextRequest) {
       where: { sessionId },
       data: { status: 'completed' },
     });
+
+    // 11b. Si es una cotización CPQ, actualizar su status a "sent"
+    const cpqQuoteId = zohoData._cpqQuoteId;
+    if (cpqQuoteId) {
+      try {
+        await prisma.cpqQuote.update({
+          where: { id: cpqQuoteId },
+          data: { status: 'sent' },
+        });
+
+        // Log en CRM history
+        const cpqDealId = zohoData._cpqDealId;
+        const cpqQuoteCode = zohoData._cpqQuoteCode || '';
+
+        await prisma.crmHistoryLog.create({
+          data: {
+            tenantId,
+            entityType: 'quote',
+            entityId: cpqQuoteId,
+            action: 'presentation_sent',
+            details: {
+              to: recipientEmail,
+              contactName: recipientName,
+              quoteCode: cpqQuoteCode,
+              presentationUrl: existingDraftPresentation
+                ? `${siteUrl}/p/${existingDraftPresentation.uniqueId}`
+                : presentationUrl,
+              presentationId: presentation.id,
+            },
+          },
+        });
+
+        if (cpqDealId) {
+          await prisma.crmHistoryLog.create({
+            data: {
+              tenantId,
+              entityType: 'deal',
+              entityId: cpqDealId,
+              action: 'presentation_sent',
+              details: {
+                quoteCode: cpqQuoteCode,
+                presentationUrl: existingDraftPresentation
+                  ? `${siteUrl}/p/${existingDraftPresentation.uniqueId}`
+                  : presentationUrl,
+                presentationId: presentation.id,
+                recipientEmail,
+              },
+            },
+          });
+        }
+      } catch (cpqError) {
+        console.error('Error updating CPQ quote status:', cpqError);
+        // Don't fail the whole operation if CPQ update fails
+      }
+    }
 
     // 12. Log en audit (con tenant opcional)
     await prisma.auditLog.create({
@@ -221,12 +307,15 @@ export async function POST(req: NextRequest) {
     }
 
     // 14. Retornar respuesta exitosa
+    const finalUniqueId = existingDraftPresentation?.uniqueId || uniqueId;
+    const finalPublicUrl = `${siteUrl}/p/${finalUniqueId}`;
+
     return NextResponse.json({
       success: true,
       presentation: {
         id: presentation.id,
-        uniqueId,
-        publicUrl: presentationUrl,
+        uniqueId: finalUniqueId,
+        publicUrl: finalPublicUrl,
       },
       email: {
         messageId: emailResponse.data?.id,

@@ -1,15 +1,115 @@
 "use client";
 
-import { SubNav } from "@/components/opai/SubNav";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { ChevronDown } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 
-const CRM_NAV_ITEMS = [
+export const CRM_NAV_ITEMS = [
   { href: "/crm/leads", label: "Leads" },
   { href: "/crm/accounts", label: "Cuentas" },
+  { href: "/crm/installations", label: "Instalaciones" },
   { href: "/crm/contacts", label: "Contactos" },
   { href: "/crm/deals", label: "Negocios" },
   { href: "/crm/cotizaciones", label: "Cotizaciones" },
 ];
 
-export function CrmSubnav() {
-  return <SubNav items={CRM_NAV_ITEMS} />;
+/**
+ * CrmSubnav - Navegación de módulos CRM.
+ *
+ * Desktop: pills horizontales con scroll.
+ * Móvil: dropdown compacto que muestra el módulo activo.
+ */
+export function CrmSubnav({ className }: { className?: string }) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const activeItem = CRM_NAV_ITEMS.find(
+    (item) => pathname === item.href || pathname?.startsWith(item.href + "/")
+  );
+
+  // Cerrar dropdown al hacer clic fuera
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <nav className={cn("mb-6", className)}>
+      {/* Desktop: pills horizontales */}
+      <div className="hidden sm:block -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
+          {CRM_NAV_ITEMS.map((item) => {
+            const isActive =
+              pathname === item.href || pathname?.startsWith(item.href + "/");
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors shrink-0",
+                  isActive
+                    ? "bg-primary/15 text-primary border border-primary/30"
+                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground border border-transparent"
+                )}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Móvil: dropdown compacto */}
+      <div className="sm:hidden relative" ref={dropdownRef}>
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium w-full"
+        >
+          <span className="flex-1 text-left">
+            {activeItem?.label || "Módulos CRM"}
+          </span>
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 text-muted-foreground transition-transform",
+              open && "rotate-180"
+            )}
+          />
+        </button>
+        {open && (
+          <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border border-border bg-card shadow-lg py-1">
+            {CRM_NAV_ITEMS.map((item) => {
+              const isActive =
+                pathname === item.href ||
+                pathname?.startsWith(item.href + "/");
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    "block px-3 py-2 text-sm transition-colors",
+                    isActive
+                      ? "text-primary bg-primary/10 font-medium"
+                      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </nav>
+  );
 }

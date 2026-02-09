@@ -231,22 +231,6 @@ export function CpqPricingCalc({
           <span className="font-mono">{formatCurrency(salePriceMonthly)}</span>
         </div>
       </div>
-
-      <div className="text-xs text-muted-foreground bg-muted/20 rounded-md p-2 space-y-1">
-        <div className="font-semibold">Fórmula:</div>
-        <div className="font-mono text-xs">
-          PV = (CB / (1 - M%)) + CF + PP
-        </div>
-        <div className="font-mono text-xs">
-          CF = (CB / (1 - M%)) × TF%
-        </div>
-        <div className="font-mono text-xs">
-          PP = (CB / (1 - M%)) × (Meses póliza × % contrato / Meses contrato) × TP%
-        </div>
-        <div>
-          CB = Costos base | M = Margen | TF = Tasa financiera | TP = Tasa póliza
-        </div>
-      </div>
     </Card>
   );
 }

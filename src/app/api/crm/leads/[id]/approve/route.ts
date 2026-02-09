@@ -1,6 +1,7 @@
 /**
  * API Route: /api/crm/leads/[id]/approve
  * POST - Aprobar prospecto y convertir a cliente + contacto + negocio
+ * Incluye deteccion de duplicados por nombre de empresa
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -39,13 +40,37 @@ export async function POST(
     const accountName =
       body?.accountName?.trim() ||
       lead.companyName?.trim() ||
-      lead.name?.trim() ||
+      [lead.firstName, lead.lastName].filter(Boolean).join(" ") ||
       "Cliente sin nombre";
 
-    const contactName =
-      body?.contactName?.trim() ||
-      lead.name?.trim() ||
-      "Contacto principal";
+    // Duplicate detection: check if account with same name already exists
+    const duplicates = await prisma.crmAccount.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        name: { equals: accountName, mode: "insensitive" },
+      },
+      select: { id: true, name: true, rut: true, type: true },
+      take: 5,
+    });
+
+    // If checkDuplicates flag is set, return duplicates without creating
+    if (body?.checkDuplicates && duplicates.length > 0) {
+      return NextResponse.json({
+        success: true,
+        duplicates,
+        message: `Se encontraron ${duplicates.length} cuenta(s) con nombre similar`,
+      });
+    }
+
+    const contactFirstName =
+      body?.contactFirstName?.trim() ||
+      lead.firstName?.trim() ||
+      "Contacto";
+
+    const contactLastName =
+      body?.contactLastName?.trim() ||
+      lead.lastName?.trim() ||
+      "";
 
     const pipelineStage = await prisma.crmPipelineStage.findFirst({
       where: { tenantId: ctx.tenantId, isActive: true },
@@ -83,7 +108,8 @@ export async function POST(
         data: {
           tenantId: ctx.tenantId,
           accountId: account.id,
-          name: contactName,
+          firstName: contactFirstName,
+          lastName: contactLastName,
           email: body?.email?.trim() || lead.email || null,
           phone: body?.phone?.trim() || lead.phone || null,
           roleTitle: body?.roleTitle?.trim() || null,

@@ -4,7 +4,18 @@ import { useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/opai/EmptyState";
+import { CrmInstallationsClient } from "./CrmInstallationsClient";
 import {
   Building2,
   Users,
@@ -13,12 +24,17 @@ import {
   Phone,
   Globe,
   MapPin,
-  FileText,
+  Warehouse,
+  Pencil,
+  Trash2,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 
 type ContactRow = {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email?: string | null;
   phone?: string | null;
   roleTitle?: string | null;
@@ -31,7 +47,18 @@ type DealRow = {
   amount: string;
   status: string;
   stage?: { name: string; color?: string | null } | null;
-  primaryContact?: { name: string } | null;
+  primaryContact?: { firstName: string; lastName: string } | null;
+};
+
+type InstallationRow = {
+  id: string;
+  name: string;
+  address?: string | null;
+  city?: string | null;
+  commune?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  notes?: string | null;
 };
 
 type AccountDetail = {
@@ -48,16 +75,76 @@ type AccountDetail = {
   notes?: string | null;
   contacts: ContactRow[];
   deals: DealRow[];
-  _count: { contacts: number; deals: number };
+  installations: InstallationRow[];
+  _count: { contacts: number; deals: number; installations: number };
 };
 
-type Tab = "info" | "contacts" | "deals";
+type Tab = "info" | "contacts" | "deals" | "installations";
 
-export function CrmAccountDetailClient({ account }: { account: AccountDetail }) {
+export function CrmAccountDetailClient({ account: initialAccount }: { account: AccountDetail }) {
+  const [account, setAccount] = useState(initialAccount);
   const [activeTab, setActiveTab] = useState<Tab>("info");
+  const [editContact, setEditContact] = useState<ContactRow | null>(null);
+  const [editForm, setEditForm] = useState({ firstName: "", lastName: "", email: "", phone: "", roleTitle: "", isPrimary: false });
+  const [savingContact, setSavingContact] = useState(false);
+
+  const openContactEdit = (contact: ContactRow) => {
+    setEditContact(contact);
+    setEditForm({
+      firstName: contact.firstName,
+      lastName: contact.lastName,
+      email: contact.email || "",
+      phone: contact.phone || "",
+      roleTitle: contact.roleTitle || "",
+      isPrimary: contact.isPrimary || false,
+    });
+  };
+
+  const saveContact = async () => {
+    if (!editContact) return;
+    setSavingContact(true);
+    try {
+      const res = await fetch("/api/crm/contacts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editContact.id, ...editForm }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setAccount((prev) => ({
+        ...prev,
+        contacts: prev.contacts.map((c) => (c.id === editContact.id ? { ...c, ...editForm } : c)),
+      }));
+      setEditContact(null);
+      toast.success("Contacto actualizado");
+    } catch {
+      toast.error("No se pudo actualizar");
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
+  const deleteContact = async (id: string) => {
+    if (!confirm("¿Eliminar este contacto?")) return;
+    try {
+      const res = await fetch(`/api/crm/contacts?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setAccount((prev) => ({
+        ...prev,
+        contacts: prev.contacts.filter((c) => c.id !== id),
+        _count: { ...prev._count, contacts: prev._count.contacts - 1 },
+      }));
+      toast.success("Contacto eliminado");
+    } catch {
+      toast.error("No se pudo eliminar");
+    }
+  };
+
+  const inputCn = "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
 
   const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: "info", label: "Información" },
+    { key: "installations", label: "Instalaciones", count: account._count.installations },
     { key: "contacts", label: "Contactos", count: account._count.contacts },
     { key: "deals", label: "Negocios", count: account._count.deals },
   ];
@@ -168,7 +255,7 @@ export function CrmAccountDetailClient({ account }: { account: AccountDetail }) 
               <EmptyState
                 icon={<Users className="h-8 w-8" />}
                 title="Sin contactos"
-                description="Este cuenta no tiene contactos registrados."
+                description="Esta cuenta no tiene contactos registrados."
                 compact
               />
             ) : (
@@ -176,11 +263,12 @@ export function CrmAccountDetailClient({ account }: { account: AccountDetail }) 
                 {account.contacts.map((contact) => (
                   <div
                     key={contact.id}
-                    className="flex flex-col gap-1 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-1 rounded-lg border p-3 cursor-pointer hover:bg-accent/30 transition-colors sm:flex-row sm:items-center sm:justify-between"
+                    onClick={() => openContactEdit(contact)}
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm">{contact.name}</p>
+                        <p className="font-medium text-sm">{`${contact.firstName} ${contact.lastName}`.trim()}</p>
                         {contact.isPrimary && (
                           <Badge variant="outline" className="text-[10px]">
                             Principal
@@ -191,24 +279,96 @@ export function CrmAccountDetailClient({ account }: { account: AccountDetail }) 
                         {contact.roleTitle || "Sin cargo"}
                       </p>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      {contact.email && (
-                        <span className="flex items-center gap-1">
-                          <Mail className="h-3 w-3" />
-                          {contact.email}
-                        </span>
-                      )}
-                      {contact.phone && (
-                        <span className="flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          {contact.phone}
-                        </span>
-                      )}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        {contact.email && (
+                          <span className="flex items-center gap-1">
+                            <Mail className="h-3 w-3" />
+                            {contact.email}
+                          </span>
+                        )}
+                        {contact.phone && (
+                          <span className="flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            {contact.phone}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openContactEdit(contact)}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteContact(contact.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Contact Edit Modal */}
+      <Dialog open={!!editContact} onOpenChange={(v) => !v && setEditContact(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar contacto</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Nombre *</Label>
+              <Input value={editForm.firstName} onChange={(e) => setEditForm((p) => ({ ...p, firstName: e.target.value }))} className={inputCn} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Apellido *</Label>
+              <Input value={editForm.lastName} onChange={(e) => setEditForm((p) => ({ ...p, lastName: e.target.value }))} className={inputCn} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Email *</Label>
+              <Input value={editForm.email} onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))} className={inputCn} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Teléfono</Label>
+              <Input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} className={inputCn} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cargo</Label>
+              <Input value={editForm.roleTitle} onChange={(e) => setEditForm((p) => ({ ...p, roleTitle: e.target.value }))} className={inputCn} />
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={editForm.isPrimary} onChange={(e) => setEditForm((p) => ({ ...p, isPrimary: e.target.checked }))} />
+                Principal
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditContact(null)}>Cancelar</Button>
+            <Button onClick={saveContact} disabled={savingContact}>
+              {savingContact && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Installations Tab ── */}
+      {activeTab === "installations" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Warehouse className="h-4 w-4" />
+              Instalaciones
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CrmInstallationsClient
+              accountId={account.id}
+              initialInstallations={account.installations}
+            />
           </CardContent>
         </Card>
       )}
@@ -239,7 +399,7 @@ export function CrmAccountDetailClient({ account }: { account: AccountDetail }) 
                       <p className="text-sm font-medium">{deal.title}</p>
                       <p className="text-xs text-muted-foreground">
                         ${Number(deal.amount).toLocaleString("es-CL")}
-                        {deal.primaryContact ? ` · ${deal.primaryContact.name}` : ""}
+                        {deal.primaryContact ? ` · ${deal.primaryContact.firstName} ${deal.primaryContact.lastName}`.trim() : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

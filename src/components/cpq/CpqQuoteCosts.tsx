@@ -32,6 +32,7 @@ interface CpqQuoteCostsProps {
   quoteId: string;
   variant?: "modal" | "inline";
   showFinancial?: boolean;
+  readOnly?: boolean;
 }
 
 const DEFAULT_PARAMS: CpqQuoteParameters = {
@@ -68,6 +69,7 @@ export function CpqQuoteCosts({
   quoteId,
   variant = "modal",
   showFinancial = true,
+  readOnly = false,
 }: CpqQuoteCostsProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1710,21 +1712,12 @@ export function CpqQuoteCosts({
         )}
       </div>
 
-      <div
-        className={`flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between ${
-          isInline
-            ? "sticky bottom-0 border-t border-border/60 bg-background/95 px-2 py-3 backdrop-blur"
-            : "mt-4"
-        }`}
-      >
-        <Badge variant="outline" className="text-xs">
-          Mobile-first · Los cambios se guardan al presionar "Guardar cambios"
-        </Badge>
+      {/* Save button at the end */}
+      <div className="flex justify-end pt-2">
         <Button
           size="sm"
           onClick={() => handleSave()}
-          disabled={saving}
-          className=""
+          disabled={saving || readOnly}
         >
           {saving ? "Guardando..." : "Guardar cambios"}
         </Button>
@@ -1744,9 +1737,8 @@ export function CpqQuoteCosts({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="gap-2" onClick={loadData}>
-            <RefreshCw className="h-3 w-3" />
-            <span className="hidden sm:inline">Actualizar</span>
+          <Button size="sm" onClick={() => handleSave()} disabled={saving || readOnly}>
+            {saving ? "Guardando..." : "Guardar cambios"}
           </Button>
           {!isInline && (
           <Dialog open={open} onOpenChange={setOpen}>
@@ -2609,15 +2601,11 @@ export function CpqQuoteCosts({
                 </div>
               )}
 
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <Badge variant="outline" className="text-xs">
-                  Mobile-first · Los cambios se guardan al presionar "Guardar cambios"
-                </Badge>
+              <div className="mt-4 flex justify-end">
                 <Button
                   size="sm"
                   onClick={() => handleSave()}
-                  disabled={saving}
-                  className=""
+                  disabled={saving || readOnly}
                 >
                   {saving ? "Guardando..." : "Guardar cambios"}
                 </Button>
@@ -2634,13 +2622,21 @@ export function CpqQuoteCosts({
 
       {summary ? (
         <div className="space-y-3">
-          <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9">
+          <div className="grid gap-2 grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 [&>*]:min-h-[88px]">
             <KpiCard
               title="Uniformes"
               value={formatCurrency(summary.monthlyUniforms)}
               variant="blue"
               size="sm"
-            tooltip={
+              titleInfoTooltip={
+                <div className="space-y-1">
+                  <div className="font-semibold">Cálculo</div>
+                  <p className="text-muted-foreground">
+                    Se suma el costo de cada ítem de uniforme activo (precio mensual). Total = (costo del set × recambios por año ÷ 12) × número de guardias.
+                  </p>
+                </div>
+              }
+              tooltip={
               <div className="space-y-1.5">
                 <div className="font-semibold">Ítems activos:</div>
                 {uniforms
@@ -2668,7 +2664,15 @@ export function CpqQuoteCosts({
               value={formatCurrency(summary.monthlyExams)}
               variant="indigo"
               size="sm"
-            tooltip={
+              titleInfoTooltip={
+                <div className="space-y-1">
+                  <div className="font-semibold">Cálculo</div>
+                  <p className="text-muted-foreground">
+                    Se suma el costo de cada ítem de examen activo. La frecuencia anual es el mayor entre (12 ÷ meses de estadía) y los recambios de uniforme por año. Total = (costo del set × frecuencia anual ÷ 12) × número de guardias.
+                  </p>
+                </div>
+              }
+              tooltip={
               <div className="space-y-1.5">
                 <div className="font-semibold">Ítems activos:</div>
                 {exams
@@ -2696,7 +2700,15 @@ export function CpqQuoteCosts({
               value={formatCurrency(summary.monthlyMeals)}
               variant="sky"
               size="sm"
-            tooltip={
+              titleInfoTooltip={
+                <div className="space-y-1">
+                  <div className="font-semibold">Cálculo</div>
+                  <p className="text-muted-foreground">
+                    Por cada tipo de comida activo: precio unitario × comidas por día × días de servicio. El total es la suma de todos (precios normalizados a mensual según la unidad del catálogo).
+                  </p>
+                </div>
+              }
+              tooltip={
               <div className="space-y-1.5">
                 <div className="font-semibold">Ítems activos:</div>
                 {meals

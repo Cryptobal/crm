@@ -38,19 +38,30 @@ export function AppSidebar({
   className,
 }: AppSidebarProps) {
   const pathname = usePathname();
+  const collapsed = !isSidebarOpen;
 
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-30 h-screen w-60 border-r border-border bg-card",
-        "flex flex-col",
+        "fixed left-0 top-0 z-30 h-screen border-r border-border bg-card flex flex-col transition-[width] duration-200 ease-out",
+        collapsed ? "w-[72px]" : "w-60",
         className
       )}
     >
-      {/* Logo — compacto */}
-      <div className="flex h-14 items-center gap-2.5 border-b border-border px-4">
+      {/* Logo — compacto o solo icono */}
+      <div
+        className={cn(
+          "flex h-14 items-center border-b border-border shrink-0 transition-[padding] duration-200",
+          collapsed ? "justify-center px-0" : "gap-2.5 px-4"
+        )}
+      >
         {logo || (
-          <Link href="/hub" className="flex items-center gap-2.5" onClick={onNavigate}>
+          <Link
+            href="/hub"
+            className={cn("flex items-center", collapsed ? "justify-center" : "gap-2.5")}
+            onClick={onNavigate}
+            title={collapsed ? "OPAI" : undefined}
+          >
             <Image
               src="/logo escudo blanco.png"
               alt="Gard Security"
@@ -58,9 +69,9 @@ export function AppSidebar({
               height={28}
               className="h-7 w-7 object-contain"
             />
-            <span className="text-sm font-semibold tracking-tight">
-              OPAI
-            </span>
+            {!collapsed && (
+              <span className="text-sm font-semibold tracking-tight">OPAI</span>
+            )}
           </Link>
         )}
       </div>
@@ -80,19 +91,21 @@ export function AppSidebar({
                 key={item.href}
                 href={item.href}
                 onClick={onNavigate}
+                title={collapsed ? item.label : undefined}
                 className={cn(
-                  "group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                  "group relative flex items-center rounded-md text-sm transition-colors",
+                  collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2",
                   isActive
                     ? "bg-accent text-foreground font-medium"
                     : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                 )}
               >
-                {/* Active indicator bar */}
+                {/* Active indicator bar — siempre visible */}
                 {isActive && (
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-primary" />
                 )}
                 <Icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
+                {!collapsed && <span>{item.label}</span>}
               </Link>
             );
           })}
@@ -100,37 +113,57 @@ export function AppSidebar({
       </nav>
 
       {/* User footer */}
-      <div className="border-t border-border p-3">
+      <div
+        className={cn(
+          "border-t border-border shrink-0 transition-[padding] duration-200",
+          collapsed ? "p-2" : "p-3"
+        )}
+      >
         {/* User info */}
         {(userName || userEmail) && (
           <Link
             href="/opai/perfil"
             onClick={onNavigate}
-            className="mb-2 flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-accent"
+            title={collapsed ? userName || userEmail : undefined}
+            className={cn(
+              "flex rounded-md transition-colors hover:bg-accent",
+              collapsed ? "justify-center p-2 mb-1" : "items-center gap-2.5 px-2 py-1.5 mb-2"
+            )}
           >
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
               {userName?.charAt(0)?.toUpperCase() || userEmail?.charAt(0)?.toUpperCase() || '?'}
             </div>
-            <div className="min-w-0 flex-1">
-              {userName && (
-                <p className="truncate text-xs font-medium text-foreground">{userName}</p>
-              )}
-              {userEmail && (
-                <p className="truncate text-xs text-muted-foreground">{userEmail}</p>
-              )}
-            </div>
+            {!collapsed && (
+              <div className="min-w-0 flex-1">
+                {userName && (
+                  <p className="truncate text-xs font-medium text-foreground">{userName}</p>
+                )}
+                {userEmail && (
+                  <p className="truncate text-xs text-muted-foreground">{userEmail}</p>
+                )}
+              </div>
+            )}
           </Link>
         )}
 
         {/* Footer actions + collapse toggle */}
-        <div className="flex items-center justify-between gap-1">
-          <div className="min-w-0 flex-1">{footer}</div>
+        <div className={cn("flex gap-1", collapsed ? "flex-col items-center" : "items-center justify-between")}>
+          {footer && (
+            <div
+              className={cn(
+                "min-w-0",
+                collapsed && "[&>a]:flex [&>a]:w-full [&>a]:justify-center [&>a>span]:hidden"
+              )}
+            >
+              {footer}
+            </div>
+          )}
           {onToggleSidebar && (
             <button
               type="button"
-              className="hidden lg:inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="hidden lg:inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               onClick={onToggleSidebar}
-              aria-label={isSidebarOpen ? 'Cerrar navegación' : 'Abrir navegación'}
+              aria-label={isSidebarOpen ? 'Contraer navegación' : 'Expandir navegación'}
             >
               {isSidebarOpen ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
             </button>

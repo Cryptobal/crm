@@ -6,3 +6,7 @@ export * from "./CrmContactsClient";
 export * from "./CrmCotizacionesClient";
 export * from "./CrmSubnav";
 export * from "./CrmDealDetailClient";
+export * from "./CrmInstallationsClient";
+export * from "./CrmInstallationsListClient";
+export * from "./CrmInstallationDetailClient";
+export * from "./InstallationEditButton";

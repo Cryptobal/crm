@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { chromium } from 'playwright-core';
 import chromiumPkg from '@sparticuz/chromium';
 import { PricingData } from '@/types/presentation';
-import { formatCurrency, formatUF } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Vercel: 60s timeout para Pro plan
@@ -37,14 +37,8 @@ const LOGO_SVG_BASE64 = `data:image/svg+xml;base64,${Buffer.from(`<svg width="18
 function generatePricingHTML(data: PricingRequest): string {
   const { clientName, quoteNumber, quoteDate, pricing, contactEmail, contactPhone } = data;
   
-  const formatPrice = (value: number) => {
-    const curr = pricing.currency as string;
-    if (curr === 'CLF' || curr === 'UF' || curr === 'uf') {
-      return formatUF(value);
-    } else {
-      return formatCurrency(value, 'CLP');
-    }
-  };
+  const formatPrice = (value: number) =>
+    formatCurrency(value, pricing.currency as string, { ufSuffix: true });
 
   const itemsHTML = pricing.items.map(item => `
     <tr class="border-b border-gray-100">

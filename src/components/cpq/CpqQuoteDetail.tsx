@@ -19,7 +19,8 @@ import { CpqQuoteCosts } from "@/components/cpq/CpqQuoteCosts";
 import { CpqPricingCalc } from "@/components/cpq/CpqPricingCalc";
 import { SendCpqQuoteModal } from "@/components/cpq/SendCpqQuoteModal";
 import { formatCurrency } from "@/components/cpq/utils";
-import { cn, formatNumber, parseLocalizedNumber } from "@/lib/utils";
+import { cn, formatNumber, parseLocalizedNumber, formatCLP, formatUFSuffix } from "@/lib/utils";
+import { clpToUf } from "@/lib/uf";
 import type {
   CpqQuote,
   CpqPosition,
@@ -33,7 +34,15 @@ import type {
   CpqQuoteInfrastructure,
 } from "@/types/cpq";
 import { toast } from "sonner";
-import { ArrowLeft, Copy, RefreshCw, FileText, Users, Layers, Calculator, ChevronLeft, ChevronRight, ChevronDown, Check, Trash2, Download, Send } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { AddressAutocomplete, type AddressResult } from "@/components/ui/AddressAutocomplete";
+import { ArrowLeft, Copy, RefreshCw, FileText, Users, Layers, Calculator, ChevronLeft, ChevronRight, ChevronDown, Check, Trash2, Download, Send, Sparkles, Loader2, Plus } from "lucide-react";
 
 interface CpqQuoteDetailProps {
   quoteId: string;
@@ -70,6 +79,8 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
   const [marginPct, setMarginPct] = useState(20);
   const [cloning, setCloning] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [statusChangePending, setStatusChangePending] = useState<"draft" | "sent" | null>(null);
+  const [changingStatus, setChangingStatus] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -87,8 +98,123 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
   const [savingQuote, setSavingQuote] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
 
-  const steps = ["Datos", "Puestos", "Costos", "Resumen"];
-  const stepIcons = [FileText, Users, Layers, Calculator];
+  // CRM context
+  const [crmAccounts, setCrmAccounts] = useState<{ id: string; name: string }[]>([]);
+  const [crmInstallations, setCrmInstallations] = useState<{ id: string; name: string; city?: string | null }[]>([]);
+  const [crmContacts, setCrmContacts] = useState<{ id: string; firstName: string; lastName: string; email?: string | null }[]>([]);
+  const [crmDeals, setCrmDeals] = useState<{ id: string; title: string }[]>([]);
+  const [crmContext, setCrmContext] = useState({
+    accountId: "" as string,
+    installationId: "" as string,
+    contactId: "" as string,
+    dealId: "" as string,
+    currency: "CLP" as string,
+  });
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [ufValue, setUfValue] = useState<number | null>(null);
+  const [aiCustomInstruction, setAiCustomInstruction] = useState("");
+
+  // Inline creation modals
+  const [inlineCreateType, setInlineCreateType] = useState<"account" | "installation" | "contact" | "deal" | null>(null);
+  const [inlineForm, setInlineForm] = useState({
+    name: "",
+    firstName: "",
+    lastName: "",
+    email: "",
+    title: "",
+    address: "",
+    city: "",
+    commune: "",
+    lat: null as number | null,
+    lng: null as number | null,
+  });
+  const [inlineCreating, setInlineCreating] = useState(false);
+
+  const createInline = async () => {
+    if (!inlineCreateType) return;
+    setInlineCreating(true);
+    try {
+      let endpoint = "";
+      let body: Record<string, unknown> = {};
+
+      switch (inlineCreateType) {
+        case "account":
+          endpoint = "/api/crm/accounts";
+          body = { name: inlineForm.name, type: "prospect" };
+          break;
+        case "installation":
+          endpoint = "/api/crm/installations";
+          body = {
+            accountId: crmContext.accountId,
+            name: inlineForm.name,
+            address: inlineForm.address || null,
+            city: inlineForm.city || null,
+            commune: inlineForm.commune || null,
+            lat: inlineForm.lat ?? null,
+            lng: inlineForm.lng ?? null,
+          };
+          break;
+        case "contact":
+          endpoint = "/api/crm/contacts";
+          body = { accountId: crmContext.accountId, firstName: inlineForm.firstName, lastName: inlineForm.lastName, email: inlineForm.email };
+          break;
+        case "deal":
+          endpoint = "/api/crm/deals";
+          body = { accountId: crmContext.accountId, title: inlineForm.title || `Oportunidad ${quoteForm.clientName}` };
+          break;
+      }
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const err = new Error(data.error || "Error") as Error & { status?: number };
+        err.status = res.status;
+        throw err;
+      }
+
+      const created = data.data;
+
+      // Auto-select and refresh lists
+      switch (inlineCreateType) {
+        case "account":
+          setCrmAccounts((prev) => [...prev, { id: created.id, name: created.name }]);
+          saveCrmContext({ accountId: created.id, installationId: "", contactId: "", dealId: "" });
+          setQuoteForm((prev) => ({ ...prev, clientName: created.name }));
+          setQuoteDirty(true);
+          break;
+        case "installation":
+          setCrmInstallations((prev) => [...prev, { id: created.id, name: created.name, city: created.city }]);
+          saveCrmContext({ installationId: created.id });
+          break;
+        case "contact":
+          setCrmContacts((prev) => [...prev, { id: created.id, firstName: created.firstName, lastName: created.lastName, email: created.email }]);
+          saveCrmContext({ contactId: created.id });
+          break;
+        case "deal":
+          setCrmDeals((prev) => [...prev, { id: created.id, title: created.title }]);
+          saveCrmContext({ dealId: created.id });
+          break;
+      }
+
+      setInlineCreateType(null);
+      setInlineForm({ name: "", firstName: "", lastName: "", email: "", title: "", address: "", city: "", commune: "", lat: null, lng: null });
+      toast.success("Creado exitosamente");
+    } catch (error: unknown) {
+      console.error(error);
+      const msg = error instanceof Error ? error.message : "No se pudo crear";
+      toast.error(msg);
+    } finally {
+      setInlineCreating(false);
+    }
+  };
+
+  const isLocked = quote?.status === "sent";
+  const steps = ["Datos", "Puestos", "Costos", "Resumen", "Documento"];
+  const stepIcons = [FileText, Users, Layers, Calculator, Send];
   const formatDateInput = (value?: string | null) => (value ? value.split("T")[0] : "");
   const formatTime = (value: Date) =>
     value.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
@@ -174,8 +300,107 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       notes: quote.notes || "",
       status: quote.status,
     });
+    setCrmContext({
+      accountId: (quote as Record<string, unknown>).accountId as string || "",
+      installationId: (quote as Record<string, unknown>).installationId as string || "",
+      contactId: (quote as Record<string, unknown>).contactId as string || "",
+      dealId: (quote as Record<string, unknown>).dealId as string || "",
+      currency: (quote as Record<string, unknown>).currency as string || "CLP",
+    });
     setQuoteDirty(false);
   }, [quote]);
+
+  // Load UF value for CLP/UF display
+  useEffect(() => {
+    fetch("/api/fx/uf")
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setUfValue(d.value); })
+      .catch(() => {});
+  }, []);
+
+  // Load CRM accounts on mount
+  useEffect(() => {
+    fetch("/api/crm/accounts")
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setCrmAccounts(d.data.map((a: Record<string, string>) => ({ id: a.id, name: a.name }))); })
+      .catch(() => {});
+  }, []);
+
+  // Load installations/contacts/deals when account changes
+  useEffect(() => {
+    if (!crmContext.accountId) {
+      setCrmInstallations([]);
+      setCrmContacts([]);
+      setCrmDeals([]);
+      return;
+    }
+    Promise.all([
+      fetch(`/api/crm/installations?accountId=${crmContext.accountId}`).then((r) => r.json()),
+      fetch("/api/crm/contacts").then((r) => r.json()),
+      fetch("/api/crm/deals").then((r) => r.json()),
+    ]).then(([instData, contactData, dealData]) => {
+      if (instData.success) setCrmInstallations(instData.data);
+      if (contactData.success) {
+        setCrmContacts(
+          contactData.data
+            .filter((c: Record<string, string>) => c.accountId === crmContext.accountId)
+            .map((c: Record<string, string>) => ({ id: c.id, firstName: c.firstName, lastName: c.lastName, email: c.email }))
+        );
+      }
+      if (dealData.success) {
+        setCrmDeals(
+          dealData.data
+            .filter((d: Record<string, string>) => d.accountId === crmContext.accountId)
+            .map((d: Record<string, string>) => ({ id: d.id, title: d.title }))
+        );
+      }
+    }).catch(() => {});
+  }, [crmContext.accountId]);
+
+  const saveCrmContext = async (patch: Partial<typeof crmContext>) => {
+    const updated = { ...crmContext, ...patch };
+    setCrmContext(updated);
+    setQuoteDirty(true);
+    try {
+      await fetch(`/api/cpq/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountId: updated.accountId || null,
+          installationId: updated.installationId || null,
+          contactId: updated.contactId || null,
+          dealId: updated.dealId || null,
+          currency: updated.currency,
+        }),
+      });
+    } catch {}
+  };
+
+  const generateAiDescription = async () => {
+    setGeneratingAi(true);
+    try {
+      const res = await fetch("/api/ai/quote-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quoteId,
+          customInstruction: aiCustomInstruction.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      if (quote) {
+        (quote as Record<string, unknown>).aiDescription = data.data.description;
+        setQuote({ ...quote });
+      }
+      toast.success(aiCustomInstruction.trim() ? "Descripción refinada con AI" : "Descripción generada con AI");
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo generar la descripción AI");
+    } finally {
+      setGeneratingAi(false);
+    }
+  };
 
   const saveQuoteBasics = async (options?: { nextStep?: number }) => {
     setSavingQuote(true);
@@ -249,6 +474,29 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
     setActiveStep(clamped);
   };
 
+  const handleStatusChange = async (newStatus: "draft" | "sent") => {
+    if (!quote) return;
+    setChangingStatus(true);
+    try {
+      const res = await fetch(`/api/cpq/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Error");
+      setQuote(data.data);
+      setQuoteForm((prev) => ({ ...prev, status: newStatus }));
+      setStatusChangePending(null);
+      toast.success(newStatus === "draft" ? "Cotización en borrador. Ya puedes editar." : "Cotización marcada como enviada.");
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast.error("No se pudo actualizar el estado.");
+    } finally {
+      setChangingStatus(false);
+    }
+  };
+
   const handleClone = async () => {
     setCloning(true);
     try {
@@ -298,17 +546,20 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
         throw new Error("Error al generar PDF");
       }
       const html = await response.text();
-      
-      // Abrir en nueva ventana para imprimir como PDF
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(html);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 500);
-      }
-      
-      toast.success("PDF generado. Usa Imprimir → Guardar como PDF");
+      const iframe = document.createElement("iframe");
+      iframe.setAttribute("style", "position:fixed;width:0;height:0;border:0;opacity:0;pointer-events:none;");
+      iframe.srcdoc = html;
+      document.body.appendChild(iframe);
+      const onLoad = () => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } finally {
+          setTimeout(() => document.body.removeChild(iframe), 1000);
+        }
+      };
+      iframe.onload = onLoad;
+      toast.success("Abre el diálogo de impresión y elige «Guardar como PDF»");
     } catch (error) {
       console.error("Error downloading PDF:", error);
       toast.error("No se pudo generar el PDF");
@@ -339,6 +590,41 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
   const financialItem = costItems.find((item) => item.catalogItem?.type === "financial");
   const policyItem = costItems.find((item) => item.catalogItem?.type === "policy");
   const monthlyTotal = costSummary?.monthlyTotal ?? stats.monthly + additionalCostsTotal;
+
+  // Sale price calculation (same formula as CpqPricingCalc)
+  const salePriceMonthly = useMemo(() => {
+    if (!costSummary) return 0;
+    const margin = marginPct / 100;
+    const costsBase =
+      costSummary.monthlyPositions +
+      (costSummary.monthlyUniforms ?? 0) +
+      (costSummary.monthlyExams ?? 0) +
+      (costSummary.monthlyMeals ?? 0) +
+      (costSummary.monthlyVehicles ?? 0) +
+      (costSummary.monthlyInfrastructure ?? 0) +
+      (costSummary.monthlyCostItems ?? 0);
+    const baseWithMargin = margin < 1 ? costsBase / (1 - margin) : costsBase;
+    return baseWithMargin + (costSummary.monthlyFinancial ?? 0) + (costSummary.monthlyPolicy ?? 0);
+  }, [costSummary, marginPct]);
+
+  // Per-position sale price for document preview
+  const positionSalePrices = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!costSummary || positions.length === 0) return map;
+    const tg = stats.totalGuards;
+    const margin = marginPct / 100;
+    const pf = contractMonths > 0 ? (policyContractMonths * (policyContractPct / 100)) / contractMonths : 0;
+    for (const pos of positions) {
+      const proportion = tg > 0 ? pos.numGuards / tg : 0;
+      const additionalForPos = baseAdditionalCostsTotal * proportion;
+      const totalCostPos = Number(pos.monthlyPositionCost) + additionalForPos;
+      const bwm = margin < 1 ? totalCostPos / (1 - margin) : totalCostPos;
+      const fc = bwm * (financialRatePct / 100);
+      const pc = bwm * (policyRatePct / 100) * pf;
+      map.set(pos.id, bwm + fc + pc);
+    }
+    return map;
+  }, [positions, costSummary, marginPct, stats.totalGuards, baseAdditionalCostsTotal, financialRatePct, policyRatePct, policyContractMonths, policyContractPct, contractMonths]);
   const saveLabel = savingQuote
     ? "Guardando..."
     : quoteDirty
@@ -346,14 +632,14 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
     : lastSavedAt
     ? `Guardado ${formatTime(lastSavedAt)}`
     : "Sin cambios";
+  const isLastStep = activeStep === steps.length - 1;
   const nextLabel =
-    activeStep === steps.length - 1
-      ? "Listo"
+    isLastStep
+      ? "Volver a cotizaciones"
       : activeStep === 0 && quoteDirty
       ? "Guardar y seguir"
       : "Siguiente";
-  const nextDisabled =
-    activeStep === steps.length - 1 || (activeStep === 0 && savingQuote);
+  const nextDisabled = activeStep === 0 && savingQuote;
 
   if (loading && !quote) {
     return (
@@ -396,16 +682,47 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
           </Link>
           <PageHeader
             title={quote.code}
-            description={quote.clientName || "Sin cliente"}
+            description={[
+              quote.clientName || "Sin cliente",
+              crmContext.contactId
+                ? (() => {
+                    const c = crmContacts.find((x) => x.id === crmContext.contactId);
+                    return c ? `${c.firstName} ${c.lastName}`.trim() : "";
+                  })()
+                : "",
+              crmContext.installationId
+                ? (() => {
+                    const inst = crmInstallations.find((x) => x.id === crmContext.installationId);
+                    return inst ? inst.name : "";
+                  })()
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           />
         </div>
         <div className="flex items-center gap-2">
-          <SendCpqQuoteModal
-            quoteId={quoteId}
-            quoteCode={quote.code}
-            clientName={quote.clientName || undefined}
-            disabled={!quote || positions.length === 0}
-          />
+          {quote.status === "sent" ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              onClick={() => setStatusChangePending("draft")}
+              disabled={changingStatus}
+            >
+              {changingStatus ? "Guardando..." : "Volver a borrador"}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10"
+              onClick={() => setStatusChangePending("sent")}
+              disabled={changingStatus}
+            >
+              {changingStatus ? "Guardando..." : "Marcar como enviada"}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -443,7 +760,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
             variant="destructive"
             className="gap-2"
             onClick={handleDelete}
-            disabled={deleting}
+            disabled={deleting || isLocked}
           >
             <Trash2 className="h-4 w-4" />
             <span className="hidden sm:inline">
@@ -455,7 +772,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
 
       <Stepper steps={steps} currentStep={activeStep} onStepClick={goToStep} className="mb-6" />
 
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-5">
         <KpiCard
           title="Puestos"
           value={positions.length}
@@ -473,14 +790,30 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
         <KpiCard
           title="Costo mensual"
           value={formatCurrency(monthlyTotal)}
+          variant="amber"
+          size="lg"
+          className="col-span-1"
+        />
+        <KpiCard
+          title="Margen"
+          value={`${formatNumber(marginPct, { minDecimals: 1, maxDecimals: 1 })}%`}
           variant="emerald"
           size="lg"
+          className="col-span-1"
+        />
+        <KpiCard
+          title="Precio venta"
+          value={formatCLP(salePriceMonthly)}
+          description={ufValue && ufValue > 0 ? formatUFSuffix(clpToUf(salePriceMonthly, ufValue)) : undefined}
+          descriptionClassName="text-base font-semibold text-emerald-400"
+          variant="emerald"
+          size="md"
           className="col-span-2 sm:col-span-1"
         />
       </div>
 
       {activeStep === 0 && (
-        <Card className="p-3 sm:p-4 space-y-3">
+        <Card className="p-3 sm:p-4 space-y-3" inert={isLocked ? "inert" : undefined}>
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold">Datos básicos</h2>
@@ -501,6 +834,195 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
               </span>
             </div>
           </div>
+
+          {/* CRM Context */}
+          <div className="space-y-3 rounded-md border border-border p-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contexto CRM</h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Cuenta (empresa)</Label>
+                <div className="flex gap-1">
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    value={crmContext.accountId}
+                    onChange={(e) => {
+                      const accountId = e.target.value;
+                      const account = crmAccounts.find((a) => a.id === accountId);
+                      saveCrmContext({ accountId, installationId: "", contactId: "", dealId: "" });
+                      if (account) {
+                        setQuoteForm((prev) => ({ ...prev, clientName: account.name }));
+                        setQuoteDirty(true);
+                      }
+                    }}
+                  >
+                    <option value="">Seleccionar cuenta...</option>
+                    {crmAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" onClick={() => { setInlineForm({ name: "", firstName: "", lastName: "", email: "", title: "", address: "", city: "", commune: "", lat: null, lng: null }); setInlineCreateType("account"); }}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Instalación</Label>
+                <div className="flex gap-1">
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    value={crmContext.installationId}
+                    onChange={(e) => saveCrmContext({ installationId: e.target.value })}
+                    disabled={!crmContext.accountId}
+                  >
+                    <option value="">Seleccionar instalación...</option>
+                    {crmInstallations.map((i) => (
+                      <option key={i.id} value={i.id}>{i.name}{i.city ? ` (${i.city})` : ""}</option>
+                    ))}
+                  </select>
+                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" disabled={!crmContext.accountId} onClick={() => { setInlineForm({ name: "", firstName: "", lastName: "", email: "", title: "", address: "", city: "", commune: "", lat: null, lng: null }); setInlineCreateType("installation"); }}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Contacto</Label>
+                <div className="flex gap-1">
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    value={crmContext.contactId}
+                    onChange={(e) => saveCrmContext({ contactId: e.target.value })}
+                    disabled={!crmContext.accountId}
+                  >
+                    <option value="">Seleccionar contacto...</option>
+                    {crmContacts.map((c) => (
+                      <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.email ? ` (${c.email})` : ""}</option>
+                    ))}
+                  </select>
+                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" disabled={!crmContext.accountId} onClick={() => { setInlineForm({ name: "", firstName: "", lastName: "", email: "", title: "", address: "", city: "", commune: "", lat: null, lng: null }); setInlineCreateType("contact"); }}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Negocio</Label>
+                <div className="flex gap-1">
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    value={crmContext.dealId}
+                    onChange={(e) => saveCrmContext({ dealId: e.target.value })}
+                    disabled={!crmContext.accountId}
+                  >
+                    <option value="">Seleccionar negocio...</option>
+                    {crmDeals.map((d) => (
+                      <option key={d.id} value={d.id}>{d.title}</option>
+                    ))}
+                  </select>
+                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" disabled={!crmContext.accountId} onClick={() => { setInlineForm({ name: "", firstName: "", lastName: "", email: "", title: "", address: "", city: "", commune: "", lat: null, lng: null }); setInlineCreateType("deal"); }}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Inline Create Modal */}
+          <Dialog open={!!inlineCreateType} onOpenChange={(v) => !v && setInlineCreateType(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>
+                  {inlineCreateType === "account" && "Nueva cuenta"}
+                  {inlineCreateType === "installation" && "Nueva instalación"}
+                  {inlineCreateType === "contact" && "Nuevo contacto"}
+                  {inlineCreateType === "deal" && "Nuevo negocio"}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                {(inlineCreateType === "account" || inlineCreateType === "installation") && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Nombre *</Label>
+                      <Input
+                        value={inlineForm.name}
+                        onChange={(e) => setInlineForm((p) => ({ ...p, name: e.target.value }))}
+                        placeholder={inlineCreateType === "account" ? "Nombre de empresa" : "Nombre de instalación"}
+                        className="bg-background"
+                        autoFocus
+                      />
+                    </div>
+                    {inlineCreateType === "installation" && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Dirección * (Google Maps)</Label>
+                        <AddressAutocomplete
+                          value={inlineForm.address}
+                          onChange={(result: AddressResult) =>
+                            setInlineForm((p) => ({
+                              ...p,
+                              address: result.address,
+                              city: result.city ?? p.city,
+                              commune: result.commune ?? p.commune,
+                              lat: result.lat,
+                              lng: result.lng,
+                            }))
+                          }
+                          placeholder="Buscar dirección en Google Maps..."
+                          className="bg-background"
+                          showMap={false}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+                {inlineCreateType === "contact" && (
+                  <>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
+                      El email identifica al contacto. Es obligatorio y evita duplicados.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Nombre *</Label>
+                        <Input value={inlineForm.firstName} onChange={(e) => setInlineForm((p) => ({ ...p, firstName: e.target.value }))} className="bg-background" autoFocus />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Apellido *</Label>
+                        <Input value={inlineForm.lastName} onChange={(e) => setInlineForm((p) => ({ ...p, lastName: e.target.value }))} className="bg-background" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Email *</Label>
+                      <Input value={inlineForm.email} onChange={(e) => setInlineForm((p) => ({ ...p, email: e.target.value }))} placeholder="correo@empresa.com" className="bg-background" />
+                    </div>
+                  </>
+                )}
+                {inlineCreateType === "deal" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Título del negocio</Label>
+                    <Input
+                      value={inlineForm.title}
+                      onChange={(e) => setInlineForm((p) => ({ ...p, title: e.target.value }))}
+                      placeholder={`Oportunidad ${quoteForm.clientName}`}
+                      className="bg-background"
+                      autoFocus
+                    />
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setInlineCreateType(null)}>Cancelar</Button>
+                <Button
+                  onClick={createInline}
+                  disabled={
+                    inlineCreating ||
+                    (inlineCreateType === "account" && !inlineForm.name.trim()) ||
+                    (inlineCreateType === "installation" && (!inlineForm.name.trim() || !inlineForm.address.trim())) ||
+                    (inlineCreateType === "contact" && (!inlineForm.firstName.trim() || !inlineForm.lastName.trim() || !inlineForm.email.trim()))
+                  }
+                >
+                  {inlineCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Crear
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1.5">
@@ -527,36 +1049,25 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                 className="h-10 bg-background text-sm"
               />
             </div>
-            <div className="space-y-1.5 md:col-span-2">
-              <Label className="text-xs">Notas</Label>
-              <Input
-                value={quoteForm.notes}
-                onChange={(e) => {
-                  setQuoteForm((prev) => ({ ...prev, notes: e.target.value }));
-                  setQuoteDirty(true);
-                }}
-                placeholder="Observaciones internas"
-                className="h-10 bg-background text-sm"
-              />
-            </div>
-            <div className="space-y-1.5 md:col-span-2">
-              <Label className="text-xs">Estado</Label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-card px-3 text-sm"
-                value={quoteForm.status}
-                onChange={(e) => {
-                  setQuoteForm((prev) => ({
-                    ...prev,
-                    status: e.target.value as CpqQuote["status"],
-                  }));
-                  setQuoteDirty(true);
-                }}
-              >
-                <option value="draft">Borrador</option>
-                <option value="sent">Enviada</option>
-                <option value="approved">Aprobada</option>
-                <option value="rejected">Rechazada</option>
-              </select>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Moneda</Label>
+              <div className="flex gap-1">
+                {["CLP", "UF"].map((cur) => (
+                  <button
+                    key={cur}
+                    type="button"
+                    onClick={() => saveCrmContext({ currency: cur })}
+                    className={cn(
+                      "flex-1 rounded-md px-3 py-2 text-sm font-medium border transition-colors",
+                      crmContext.currency === cur
+                        ? "bg-primary/15 text-primary border-primary/30"
+                        : "bg-background text-muted-foreground border-input hover:bg-accent/50"
+                    )}
+                  >
+                    {cur}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -578,7 +1089,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       )}
 
       {activeStep === 1 && (
-        <Card className="p-3 sm:p-4">
+        <Card className="p-3 sm:p-4" inert={isLocked ? "inert" : undefined}>
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold">Puestos de trabajo</h2>
@@ -586,7 +1097,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                 {quote.status}
               </Badge>
             </div>
-            <CreatePositionModal quoteId={quoteId} onCreated={refresh} />
+            <CreatePositionModal quoteId={quoteId} onCreated={refresh} disabled={isLocked} />
           </div>
           <p className="mb-3 text-xs text-muted-foreground">
             Agrega uno o más puestos. Puedes editar o duplicar luego.
@@ -604,6 +1115,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                   position={position}
                   quoteId={quoteId}
                   onUpdated={refresh}
+                  readOnly={isLocked}
                   totalGuards={stats.totalGuards}
                     baseAdditionalCostsTotal={baseAdditionalCostsTotal}
                   marginPct={marginPct}
@@ -621,32 +1133,13 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       )}
 
       {activeStep === 2 && (
-        <CpqQuoteCosts quoteId={quoteId} variant="inline" showFinancial={false} />
+        <div inert={isLocked ? "inert" : undefined}>
+          <CpqQuoteCosts quoteId={quoteId} variant="inline" showFinancial={false} readOnly={isLocked} />
+        </div>
       )}
 
       {activeStep === 3 && (
-        <div className="space-y-3">
-          <Card className="p-3 sm:p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold">Resumen y precio</h2>
-                <p className="text-xs text-muted-foreground">
-                  Revisa totales y margen antes de enviar la cotización.
-                </p>
-              </div>
-              <Badge variant="outline" className="text-xs">
-                {quote.status}
-              </Badge>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="rounded-md border border-border/50 p-2">
-                <p className="text-xs text-muted-foreground uppercase">Adicionales</p>
-                <p className="text-sm font-semibold">{formatCurrency(additionalCostsTotal)}</p>
-              </div>
-            </div>
-          </Card>
-
+        <div className="space-y-3" inert={isLocked ? "inert" : undefined}>
           <Card className="p-3 sm:p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -916,7 +1409,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
           <CpqPricingCalc
             summary={costSummary}
             marginPct={marginPct}
-            onMarginChange={async (newMargin) => {
+            onMarginChange={isLocked ? undefined : async (newMargin) => {
               setMarginPct(newMargin);
               try {
                 await fetch(`/api/cpq/quotes/${quoteId}/margin`, {
@@ -946,6 +1439,171 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
         </div>
       )}
 
+      {/* ── Step 5: Documento ── */}
+      {activeStep === 4 && (
+        <div className="space-y-4" inert={isLocked ? "inert" : undefined}>
+          <Card className="p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold">Documento y envío</h2>
+                <p className="text-xs text-muted-foreground">
+                  Genera la descripción AI, revisa el documento y envía al cliente.
+                </p>
+              </div>
+              <Badge variant="outline" className="text-xs">{quote.status}</Badge>
+            </div>
+
+            {/* AI Description */}
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Descripción AI</Label>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs"
+                  onClick={generateAiDescription}
+                  disabled={generatingAi}
+                >
+                  {generatingAi ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  {generatingAi ? "Generando..." : aiCustomInstruction.trim() ? "Refinar con AI" : "Generar con AI"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Genera un resumen ejecutivo profesional para la propuesta. Puedes editarlo después.
+              </p>
+              <Input
+                value={aiCustomInstruction}
+                onChange={(e) => setAiCustomInstruction(e.target.value)}
+                placeholder="Instrucción para ajustar la descripción (ej: «más corto», «énfasis en retail») — opcional"
+                className="h-9 text-sm"
+              />
+              <textarea
+                value={(quote as Record<string, unknown>).aiDescription as string || ""}
+                onChange={(e) => {
+                  // Save AI description directly
+                  fetch(`/api/cpq/quotes/${quoteId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ aiDescription: e.target.value }),
+                  }).catch(() => {});
+                }}
+                placeholder="Haz clic en 'Generar con AI' para crear una descripción profesional basada en los datos de la cotización..."
+                className="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                rows={5}
+              />
+            </div>
+
+            {/* Document Preview */}
+            <div className="rounded-md border border-border overflow-hidden">
+              <div className="bg-muted/30 px-4 py-3 border-b">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Vista previa del documento</p>
+              </div>
+              <div className="p-4 space-y-3 bg-white text-black text-sm" style={{ fontFamily: "Arial, sans-serif" }}>
+                <div className="flex justify-between items-start border-b-2 pb-2" style={{ borderColor: "#2563eb" }}>
+                  <div className="text-lg font-bold" style={{ color: "#1e3a5f" }}>GARD SECURITY</div>
+                  <div className="text-right text-xs text-gray-600">
+                    <p className="font-bold text-sm text-black">{quote.code}</p>
+                    <p>{quote.clientName || "Cliente"}</p>
+                    {(() => {
+                      const c = crmContext.contactId ? crmContacts.find((x) => x.id === crmContext.contactId) : null;
+                      return c ? <p>{c.firstName} {c.lastName}</p> : null;
+                    })()}
+                    {(() => {
+                      const inst = crmContext.installationId ? crmInstallations.find((x) => x.id === crmContext.installationId) : null;
+                      return inst ? <p>{inst.name}</p> : null;
+                    })()}
+                    {quote.validUntil && <p>Válida hasta: {new Date(quote.validUntil).toLocaleDateString("es-CL")}</p>}
+                  </div>
+                </div>
+
+                {(quote as Record<string, unknown>).aiDescription && (
+                  <p className="text-xs text-gray-600 bg-blue-50 rounded p-2 italic">
+                    {(quote as Record<string, unknown>).aiDescription as string}
+                  </p>
+                )}
+
+                <div>
+                  <p className="text-xs font-semibold border-b pb-1 mb-2">
+                    Puestos de trabajo · {stats.totalGuards} guardia(s)
+                  </p>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr style={{ background: "#eff6ff" }}>
+                        <th className="text-left p-1.5 font-semibold">Puesto</th>
+                        <th className="text-left p-1.5 font-semibold">Guardias</th>
+                        <th className="text-left p-1.5 font-semibold">Horario</th>
+                        <th className="text-right p-1.5 font-semibold">Precio mensual</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {positions.map((pos) => {
+                        const clp = positionSalePrices.get(pos.id) ?? Number(pos.monthlyPositionCost);
+                        const formatted =
+                          crmContext.currency === "UF" && ufValue && ufValue > 0
+                            ? formatUFSuffix(clpToUf(clp, ufValue))
+                            : formatCLP(clp);
+                        return (
+                          <tr key={pos.id} className="border-b border-gray-100">
+                            <td className="p-1.5">{pos.customName || pos.puestoTrabajo?.name || "Puesto"}</td>
+                            <td className="p-1.5">{pos.numGuards}</td>
+                            <td className="p-1.5">{pos.startTime} - {pos.endTime}</td>
+                            <td className="p-1.5 text-right">{formatted}</td>
+                          </tr>
+                        );
+                      })}
+                      <tr className="font-bold border-t-2" style={{ borderColor: "#2563eb", background: "#eff6ff" }}>
+                        <td colSpan={3} className="p-1.5 text-right">Total mensual</td>
+                        <td className="p-1.5 text-right">
+                          {crmContext.currency === "UF" && ufValue && ufValue > 0
+                            ? formatUFSuffix(clpToUf(salePriceMonthly, ufValue))
+                            : formatCLP(salePriceMonthly)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="text-center text-[10px] text-gray-400 border-t pt-2">
+                  Generado el {new Date().toLocaleDateString("es-CL")} · www.gard.cl
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                className="flex-1 gap-2"
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf || !quote}
+              >
+                <Download className="h-4 w-4" />
+                {downloadingPdf ? "Generando PDF..." : "Descargar PDF"}
+              </Button>
+              <SendCpqQuoteModal
+                quoteId={quoteId}
+                quoteCode={quote.code}
+                clientName={quote.clientName || undefined}
+                disabled={!quote || positions.length === 0 || quote.status === "sent"}
+                hasAccount={!!crmContext.accountId}
+                hasContact={!!crmContext.contactId}
+                contactName={(() => {
+                  const c = crmContext.contactId ? crmContacts.find((x) => x.id === crmContext.contactId) : null;
+                  return c ? `${c.firstName} ${c.lastName}`.trim() : undefined;
+                })()}
+                contactEmail={(() => {
+                  const c = crmContext.contactId ? crmContacts.find((x) => x.id === crmContext.contactId) : null;
+                  return c?.email || undefined;
+                })()}
+              />
+            </div>
+          </Card>
+        </div>
+      )}
+
       <div className="sticky bottom-0 z-20 -mx-4 border-t border-border/60 bg-background/95 px-4 py-2 backdrop-blur">
         <div className="flex items-center justify-between gap-2">
           <Button
@@ -964,14 +1622,60 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
           <Button
             size="sm"
             className="gap-1"
-            onClick={() => void goToStep(activeStep + 1)}
+            onClick={() => {
+              if (isLastStep) {
+                router.push("/crm/cotizaciones");
+              } else {
+                void goToStep(activeStep + 1);
+              }
+            }}
             disabled={nextDisabled}
           >
             {nextLabel}
-            <ChevronRight className="h-4 w-4" />
+            {!isLastStep && <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
       </div>
+
+      {/* Confirmación Volver a borrador */}
+      <Dialog open={statusChangePending === "draft"} onOpenChange={(v) => !v && setStatusChangePending(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Volver a borrador</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            ¿Volver esta cotización a borrador? Podrás editar los valores nuevamente. Para marcarla como enviada otra vez, usa &quot;Marcar como enviada&quot;.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusChangePending(null)} disabled={changingStatus}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void handleStatusChange("draft")} disabled={changingStatus}>
+              {changingStatus ? "Guardando..." : "Volver a borrador"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmación Marcar como enviada */}
+      <Dialog open={statusChangePending === "sent"} onOpenChange={(v) => !v && setStatusChangePending(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Marcar como enviada</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            ¿Marcar esta cotización como enviada? Una vez enviada, no podrás modificar nada hasta que la vuelvas a borrador.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusChangePending(null)} disabled={changingStatus}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void handleStatusChange("sent")} disabled={changingStatus}>
+              {changingStatus ? "Guardando..." : "Marcar como enviada"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
