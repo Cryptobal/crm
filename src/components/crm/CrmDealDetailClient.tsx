@@ -16,7 +16,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import Link from "next/link";
-import { Loader2, ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Loader2, ExternalLink, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type QuoteOption = {
@@ -85,6 +86,20 @@ export function CrmDealDetailClient({
   );
   const [emailBody, setEmailBody] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+
+  const router = useRouter();
+
+  const deleteDeal = async () => {
+    if (!confirm("¿Eliminar este negocio? Se eliminarán las cotizaciones vinculadas y el historial.")) return;
+    try {
+      const res = await fetch(`/api/crm/deals/${deal.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      toast.success("Negocio eliminado");
+      router.push("/crm/deals");
+    } catch {
+      toast.error("No se pudo eliminar");
+    }
+  };
 
   const selectClassName =
     "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
@@ -188,8 +203,17 @@ export function CrmDealDetailClient({
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle>Resumen</CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={deleteDeal}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            Eliminar negocio
+          </Button>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div className="flex items-center justify-between">

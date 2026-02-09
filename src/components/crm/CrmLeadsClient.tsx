@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { CrmLead } from "@/types";
-import { Plus, Loader2, CheckCircle2, Clock, XCircle, AlertTriangle } from "lucide-react";
+import { Plus, Loader2, CheckCircle2, Clock, XCircle, AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 /* ─── Form types ─── */
@@ -244,6 +244,18 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
   const leadDisplayName = (lead: CrmLead) => {
     const parts = [lead.firstName, lead.lastName].filter(Boolean);
     return parts.length > 0 ? parts.join(" ") : "Sin contacto";
+  };
+
+  const deleteLead = async (id: string) => {
+    if (!confirm("¿Eliminar este prospecto? Se desvincularán las instalaciones asociadas.")) return;
+    try {
+      const res = await fetch(`/api/crm/leads/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setLeads((prev) => prev.filter((l) => l.id !== id));
+      toast.success("Prospecto eliminado");
+    } catch {
+      toast.error("No se pudo eliminar");
+    }
   };
 
   return (
@@ -568,12 +580,20 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
                       )}
                     </div>
                   </div>
+                  <div className="flex items-center gap-2 shrink-0">
                   <Button
                     onClick={() => openApproveModal(lead)}
                     size="sm"
-                    className="shrink-0"
                   >
                     Revisar y aprobar
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    onClick={(e) => { e.stopPropagation(); deleteLead(lead.id); }}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
 
@@ -650,7 +670,17 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
                   {leadDisplayName(lead)}
                 </p>
               </div>
-              <StatusBadge status={lead.status} />
+              <div className="flex items-center gap-2">
+                <StatusBadge status={lead.status} />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  onClick={() => deleteLead(lead.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           ))}
         </CardContent>

@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import Link from "next/link";
-import { Loader2, Plus, Building2, Users, ChevronRight } from "lucide-react";
+import { Loader2, Plus, Building2, Users, ChevronRight, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type AccountFormState = {
@@ -89,6 +89,18 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
 
   const updateForm = (key: keyof AccountFormState, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const deleteAccount = async (id: string) => {
+    if (!confirm("¿Eliminar esta cuenta? Se eliminarán también contactos, negocios e instalaciones asociados.")) return;
+    try {
+      const res = await fetch(`/api/crm/accounts/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setAccounts((prev) => prev.filter((a) => a.id !== id));
+      toast.success("Cuenta eliminada");
+    } catch {
+      toast.error("No se pudo eliminar");
+    }
   };
 
   const createAccount = async () => {
@@ -282,12 +294,14 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
             </p>
           )}
           {filteredAccounts.map((account) => (
-            <Link
+            <div
               key={account.id}
-              href={`/crm/accounts/${account.id}`}
               className="flex flex-col gap-2 rounded-lg border p-4 transition-colors hover:bg-accent/30 md:flex-row md:items-center md:justify-between group"
             >
-              <div className="flex items-start gap-3">
+              <Link
+                href={`/crm/accounts/${account.id}`}
+                className="flex flex-1 items-start gap-3 min-w-0"
+              >
                 <div
                   className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
                     account.type === "client"
@@ -301,14 +315,14 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
                     <Users className="h-4 w-4" />
                   )}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="font-medium">{account.name}</p>
                   <p className="text-sm text-muted-foreground">
                     {account.rut || "Sin RUT"} · {account.industry || "Sin industria"}
                   </p>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
+              </Link>
+              <div className="flex items-center gap-2 shrink-0">
                 <Badge
                   variant="outline"
                   className={
@@ -325,9 +339,19 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
                 <Badge variant="outline">
                   {account._count?.deals ?? 0} negocios
                 </Badge>
-                <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 hidden md:block" />
+                <Link href={`/crm/accounts/${account.id}`}>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 hidden md:block" />
+                </Link>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  onClick={() => deleteAccount(account.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
-            </Link>
+            </div>
           ))}
         </CardContent>
       </Card>

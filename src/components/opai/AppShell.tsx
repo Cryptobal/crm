@@ -1,6 +1,7 @@
 'use client';
 
 import { cloneElement, isValidElement, ReactElement, ReactNode, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BottomNav } from './BottomNav';
@@ -58,7 +59,7 @@ export function AppShell({ sidebar, topbar, children, userName, className }: App
       {/* ── Mobile topbar ── */}
       {sidebar && (
         <header className="sticky top-0 z-30 flex min-h-12 items-center justify-between border-b border-border bg-card/95 px-4 py-2 backdrop-blur lg:hidden">
-          <span className="text-sm font-semibold tracking-tight">OPAI</span>
+          <Link href="/opai/inicio" className="text-sm font-semibold tracking-tight hover:opacity-80">OPAI</Link>
           <div className="flex items-center gap-2">
             <GlobalIndicators compact />
             <button

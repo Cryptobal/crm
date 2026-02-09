@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { MapPin, Building2, ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { MapPin, Building2, ExternalLink, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
@@ -23,7 +26,20 @@ export function CrmInstallationDetailClient({
 }: {
   installation: InstallationDetail;
 }) {
+  const router = useRouter();
   const hasCoords = installation.lat != null && installation.lng != null;
+
+  const deleteInstallation = async () => {
+    if (!confirm("¿Eliminar esta instalación?")) return;
+    try {
+      const res = await fetch(`/api/crm/installations/${installation.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      toast.success("Instalación eliminada");
+      router.push("/crm/installations");
+    } catch {
+      toast.error("No se pudo eliminar");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -80,8 +96,17 @@ export function CrmInstallationDetailClient({
       {/* Datos generales */}
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-base">Datos generales</CardTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={deleteInstallation}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
+              Eliminar
+            </Button>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             {installation.address ? (

@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Loader2 } from "lucide-react";
+import { Plus, Pencil, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 type ContactRow = {
@@ -135,15 +135,28 @@ export function CrmContactsClient({
     setEditOpen(true);
   };
 
+  const deleteContact = async (id: string) => {
+    if (!confirm("¿Eliminar este contacto?")) return;
+    try {
+      const response = await fetch(`/api/crm/contacts/${id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error();
+      setContacts((prev) => prev.filter((c) => c.id !== id));
+      setEditOpen(false);
+      setEditingId(null);
+      toast.success("Contacto eliminado");
+    } catch {
+      toast.error("No se pudo eliminar");
+    }
+  };
+
   const saveEdit = async () => {
     if (!editingId) return;
     setLoading(true);
     try {
-      const response = await fetch("/api/crm/contacts", {
+      const response = await fetch(`/api/crm/contacts/${editingId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: editingId,
           firstName: form.firstName,
           lastName: form.lastName,
           email: form.email,
@@ -379,6 +392,14 @@ export function CrmContactsClient({
                   onClick={() => openEditModal(contact)}
                 >
                   <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  onClick={() => deleteContact(contact.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>

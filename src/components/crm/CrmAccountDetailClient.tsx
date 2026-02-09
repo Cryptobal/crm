@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,7 @@ type AccountDetail = {
 type Tab = "info" | "contacts" | "deals" | "installations";
 
 export function CrmAccountDetailClient({ account: initialAccount }: { account: AccountDetail }) {
+  const router = useRouter();
   const [account, setAccount] = useState(initialAccount);
   const [activeTab, setActiveTab] = useState<Tab>("info");
   const [editContact, setEditContact] = useState<ContactRow | null>(null);
@@ -124,10 +126,22 @@ export function CrmAccountDetailClient({ account: initialAccount }: { account: A
     }
   };
 
+  const deleteAccount = async () => {
+    if (!confirm("¿Eliminar esta cuenta? Se eliminarán también contactos, negocios e instalaciones asociados.")) return;
+    try {
+      const res = await fetch(`/api/crm/accounts/${account.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      toast.success("Cuenta eliminada");
+      router.push("/crm/accounts");
+    } catch {
+      toast.error("No se pudo eliminar");
+    }
+  };
+
   const deleteContact = async (id: string) => {
     if (!confirm("¿Eliminar este contacto?")) return;
     try {
-      const res = await fetch(`/api/crm/contacts?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/crm/contacts/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setAccount((prev) => ({
         ...prev,
@@ -176,11 +190,20 @@ export function CrmAccountDetailClient({ account: initialAccount }: { account: A
       {activeTab === "info" && (
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Building2 className="h-4 w-4" />
                 Datos generales
               </CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={deleteAccount}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                Eliminar cuenta
+              </Button>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <InfoRow label="Tipo">

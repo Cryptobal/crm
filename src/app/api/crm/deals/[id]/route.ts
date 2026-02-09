@@ -1,0 +1,128 @@
+/**
+ * API Route: /api/crm/deals/[id]
+ * GET   - Obtener negocio
+ * PATCH - Actualizar negocio
+ * DELETE - Eliminar negocio
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { requireAuth, unauthorized, parseBody } from "@/lib/api-auth";
+import { createDealSchema } from "@/lib/validations/crm";
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
+    const { id } = await params;
+
+    const deal = await prisma.crmDeal.findFirst({
+      where: { id, tenantId: ctx.tenantId },
+      include: {
+        account: true,
+        stage: true,
+        primaryContact: true,
+      },
+    });
+
+    if (!deal) {
+      return NextResponse.json(
+        { success: false, error: "Negocio no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data: deal });
+  } catch (error) {
+    console.error("Error fetching deal:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch deal" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
+    const { id } = await params;
+
+    const existing = await prisma.crmDeal.findFirst({
+      where: { id, tenantId: ctx.tenantId },
+    });
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Negocio no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    const parsed = await parseBody(request, createDealSchema.partial());
+    if (parsed.error) return parsed.error;
+
+    const raw = parsed.data as Record<string, unknown>;
+    const data = { ...raw };
+    if (data.expectedCloseDate)
+      data.expectedCloseDate = new Date(data.expectedCloseDate as string);
+
+    const deal = await prisma.crmDeal.update({
+      where: { id },
+      data,
+      include: {
+        account: true,
+        stage: true,
+        primaryContact: true,
+      },
+    });
+
+    return NextResponse.json({ success: true, data: deal });
+  } catch (error) {
+    console.error("Error updating deal:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to update deal" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
+    const { id } = await params;
+
+    const existing = await prisma.crmDeal.findFirst({
+      where: { id, tenantId: ctx.tenantId },
+    });
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Negocio no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    // Cascade: stageHistory, dealQuotes, tasks se eliminan por onDelete: Cascade
+    await prisma.crmDeal.delete({ where: { id } });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting deal:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to delete deal" },
+      { status: 500 }
+    );
+  }
+}
