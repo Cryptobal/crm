@@ -356,11 +356,32 @@ export function CrmContactDetailClient({
       {/* ── Emails Tab ── */}
       {activeTab === "emails" && (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Mail className="h-4 w-4" />
               Correos enviados
             </CardTitle>
+            <div className="flex items-center gap-2">
+              {contact.phone && (
+                <a
+                  href={`https://wa.me/${contact.phone.replace(/\s/g, "").replace(/^\+/, "")}?text=${encodeURIComponent(`Hola ${contact.firstName}, `)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-500/20 transition-colors"
+                >
+                  WhatsApp
+                </a>
+              )}
+              {contact.email && (
+                <a
+                  href={`mailto:${contact.email}`}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 border border-primary/20 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+                >
+                  <Mail className="h-3 w-3" />
+                  Enviar email
+                </a>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <EmailHistoryList contactId={contact.id} compact />

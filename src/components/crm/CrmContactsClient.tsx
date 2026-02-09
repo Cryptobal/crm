@@ -445,9 +445,12 @@ export function CrmContactsClient({
                   key={contact.id}
                   className="flex flex-col gap-2 rounded-lg border p-3 sm:p-4 transition-colors hover:bg-accent/30 sm:flex-row sm:items-center sm:justify-between group"
                 >
-                  <div className="flex-1 min-w-0">
+                  <Link
+                    href={`/crm/contacts/${contact.id}`}
+                    className="flex-1 min-w-0"
+                  >
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm">{contactName(contact)}</p>
+                      <p className="font-medium text-sm hover:text-primary transition-colors">{contactName(contact)}</p>
                       {contact.isPrimary && (
                         <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
                           Principal
@@ -468,7 +471,7 @@ export function CrmContactsClient({
                         className="mt-0.5"
                       />
                     )}
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <Button
                       size="icon"
@@ -486,11 +489,9 @@ export function CrmContactsClient({
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
-                    {contact.account && (
-                      <Link href={`/crm/accounts/${contact.account.id}`}>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 hidden sm:block" />
-                      </Link>
-                    )}
+                    <Link href={`/crm/contacts/${contact.id}`}>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 hidden sm:block" />
+                    </Link>
                   </div>
                 </div>
               ))}

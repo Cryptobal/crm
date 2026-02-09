@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +60,7 @@ export type DealDetail = {
   amount: string;
   stage?: { name: string } | null;
   account?: { id: string; name: string } | null;
+  primaryContactId?: string | null;
   primaryContact?: { firstName: string; lastName: string; email?: string | null } | null;
   quotes?: DealQuote[];
   proposalLink?: string | null;
@@ -292,9 +293,17 @@ export function CrmDealDetailClient({
               </span>
             </InfoRow>
             <InfoRow label="Contacto">
-              <span className="font-medium">
-                {deal.primaryContact ? `${deal.primaryContact.firstName} ${deal.primaryContact.lastName}`.trim() : "Sin contacto"}
-              </span>
+              {deal.primaryContact && deal.primaryContactId ? (
+                <Link
+                  href={`/crm/contacts/${deal.primaryContactId}`}
+                  className="flex items-center gap-1 font-medium text-primary hover:underline"
+                >
+                  {`${deal.primaryContact.firstName} ${deal.primaryContact.lastName}`.trim()}
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              ) : (
+                <span className="font-medium">Sin contacto</span>
+              )}
             </InfoRow>
             <InfoRow label="Link propuesta">
               {deal.proposalLink ? (
@@ -431,11 +440,11 @@ export function CrmDealDetailClient({
                     Enviar correo
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-lg">
+                <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Enviar correo</DialogTitle>
                     <DialogDescription>
-                      Se enviará desde tu cuenta Gmail conectada.
+                      Se enviará desde tu cuenta Gmail conectada. Tu firma se adjuntará automáticamente.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-3">
@@ -447,7 +456,7 @@ export function CrmDealDetailClient({
                         onChange={(event) => selectTemplate(event.target.value)}
                         disabled={sending}
                       >
-                        <option value="">Selecciona un template</option>
+                        <option value="">Sin template</option>
                         {templates.map((template) => (
                           <option key={template.id} value={template.id}>
                             {template.name}
@@ -455,38 +464,41 @@ export function CrmDealDetailClient({
                         ))}
                       </select>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Para</Label>
-                      <input
-                        value={emailTo}
-                        onChange={(event) => setEmailTo(event.target.value)}
-                        className={`h-9 w-full rounded-md border px-3 text-sm ${inputClassName}`}
-                        placeholder="correo@cliente.com"
-                        disabled={sending}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Asunto</Label>
-                      <input
-                        value={emailSubject}
-                        onChange={(event) => setEmailSubject(event.target.value)}
-                        className={`h-9 w-full rounded-md border px-3 text-sm ${inputClassName}`}
-                        placeholder="Asunto"
-                        disabled={sending}
-                      />
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Para</Label>
+                        <input
+                          value={emailTo}
+                          onChange={(event) => setEmailTo(event.target.value)}
+                          className={`h-9 w-full rounded-md border px-3 text-sm ${inputClassName}`}
+                          placeholder="correo@cliente.com"
+                          disabled={sending}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Asunto</Label>
+                        <input
+                          value={emailSubject}
+                          onChange={(event) => setEmailSubject(event.target.value)}
+                          className={`h-9 w-full rounded-md border px-3 text-sm ${inputClassName}`}
+                          placeholder="Asunto del correo"
+                          disabled={sending}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label>Mensaje</Label>
-                      <textarea
+                      <EmailComposer
                         value={emailBody}
-                        onChange={(event) => setEmailBody(event.target.value)}
-                        className={`min-h-[120px] w-full rounded-md border px-3 py-2 text-sm ${inputClassName}`}
-                        placeholder="Escribe tu mensaje..."
+                        onChange={setEmailBody}
                         disabled={sending}
                       />
                     </div>
                   </div>
                   <DialogFooter>
+                    <Button variant="outline" onClick={() => setEmailOpen(false)}>
+                      Cancelar
+                    </Button>
                     <Button onClick={sendEmail} disabled={sending}>
                       {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Enviar correo
@@ -526,13 +538,14 @@ export function CrmDealDetailClient({
             ) : (
               <div className="space-y-2">
                 {contacts.map((contact) => (
-                  <div
+                  <Link
                     key={contact.id}
-                    className="flex flex-col gap-2 rounded-lg border p-3 sm:p-4 sm:flex-row sm:items-center sm:justify-between"
+                    href={`/crm/contacts/${contact.id}`}
+                    className="flex flex-col gap-2 rounded-lg border p-3 sm:p-4 sm:flex-row sm:items-center sm:justify-between transition-colors hover:bg-accent/30 group"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm">{`${contact.firstName} ${contact.lastName}`.trim()}</p>
+                        <p className="font-medium text-sm group-hover:text-primary transition-colors">{`${contact.firstName} ${contact.lastName}`.trim()}</p>
                         {contact.isPrimary && (
                           <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
                             Principal
@@ -543,7 +556,8 @@ export function CrmDealDetailClient({
                         {contact.roleTitle || "Sin cargo"} · {contact.email || "Sin email"} · {contact.phone || "Sin teléfono"}
                       </p>
                     </div>
-                  </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 shrink-0 hidden sm:block" />
+                  </Link>
                 ))}
               </div>
             )}
@@ -567,6 +581,60 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
     <div className="flex items-center justify-between">
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">{children}</span>
+    </div>
+  );
+}
+
+/** Mini editor rich-text para componer emails */
+function EmailComposer({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (html: string) => void;
+  disabled?: boolean;
+}) {
+  const [signatureHtml, setSignatureHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/crm/signatures?mine=true")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.data?.length > 0) {
+          const defaultSig = data.data.find((s: any) => s.isDefault) || data.data[0];
+          if (defaultSig?.htmlContent) {
+            setSignatureHtml(defaultSig.htmlContent);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  return (
+    <div className="space-y-3">
+      <div
+        className="min-h-[200px] w-full rounded-md border border-input bg-background px-4 py-3 text-sm text-foreground focus-within:ring-1 focus-within:ring-ring"
+      >
+        <div
+          contentEditable={!disabled}
+          suppressContentEditableWarning
+          className="min-h-[160px] outline-none prose prose-sm prose-invert max-w-none"
+          onInput={(e) => {
+            onChange((e.target as HTMLDivElement).innerHTML);
+          }}
+          dangerouslySetInnerHTML={{ __html: value || "" }}
+        />
+      </div>
+      {signatureHtml && (
+        <div className="rounded-md border border-border/50 bg-muted/20 p-3">
+          <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider font-medium">Firma (se agrega automáticamente)</p>
+          <div
+            className="text-xs opacity-70"
+            dangerouslySetInnerHTML={{ __html: signatureHtml }}
+          />
+        </div>
+      )}
     </div>
   );
 }
