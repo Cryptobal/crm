@@ -5,17 +5,22 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getDefaultTenantId } from "@/lib/tenant";
+import { requireAuth, unauthorized, parseBody } from "@/lib/api-auth";
+import { createAccountSchema } from "@/lib/validations/crm";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
+    const type = request.nextUrl.searchParams.get("type") || undefined;
 
     const accounts = await prisma.crmAccount.findMany({
-      where: { tenantId },
+      where: {
+        tenantId: ctx.tenantId,
+        ...(type ? { type } : {}),
+      },
       orderBy: { createdAt: "desc" },
     });
 
@@ -31,30 +36,27 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
-    const body = await request.json();
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
 
-    if (!body?.name?.trim()) {
-      return NextResponse.json(
-        { success: false, error: "Nombre es requerido" },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseBody(request, createAccountSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
     const account = await prisma.crmAccount.create({
       data: {
-        tenantId,
-        name: body.name.trim(),
-        rut: body?.rut?.trim() || null,
-        industry: body?.industry?.trim() || null,
-        size: body?.size?.trim() || null,
-        segment: body?.segment?.trim() || null,
-        ownerId: session?.user?.id || null,
-        status: body?.status?.trim() || "active",
-        website: body?.website?.trim() || null,
-        address: body?.address?.trim() || null,
-        notes: body?.notes?.trim() || null,
+        tenantId: ctx.tenantId,
+        name: body.name,
+        rut: body.rut || null,
+        industry: body.industry || null,
+        size: body.size || null,
+        segment: body.segment || null,
+        ownerId: ctx.userId,
+        type: body.type,
+        status: body.status,
+        website: body.website || null,
+        address: body.address || null,
+        notes: body.notes || null,
       },
     });
 

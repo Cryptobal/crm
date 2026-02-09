@@ -5,21 +5,22 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getDefaultTenantId } from "@/lib/tenant";
+import { requireAuth, unauthorized, parseBody } from "@/lib/api-auth";
+import { linkDealQuoteSchema } from "@/lib/validations/crm";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
     const { id } = await params;
 
     const links = await prisma.crmDealQuote.findMany({
-      where: { tenantId, dealId: id },
+      where: { tenantId: ctx.tenantId, dealId: id },
       orderBy: { createdAt: "desc" },
     });
 
@@ -38,21 +39,17 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
-    const { id } = await params;
-    const body = await request.json();
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
 
-    if (!body?.quoteId) {
-      return NextResponse.json(
-        { success: false, error: "quoteId es requerido" },
-        { status: 400 }
-      );
-    }
+    const { id } = await params;
+    const parsed = await parseBody(request, linkDealQuoteSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
     const link = await prisma.crmDealQuote.create({
       data: {
-        tenantId,
+        tenantId: ctx.tenantId,
         dealId: id,
         quoteId: body.quoteId,
       },
@@ -60,12 +57,12 @@ export async function POST(
 
     await prisma.crmHistoryLog.create({
       data: {
-        tenantId,
+        tenantId: ctx.tenantId,
         entityType: "deal",
         entityId: id,
         action: "deal_quote_linked",
         details: { quoteId: body.quoteId },
-        createdBy: session?.user?.id || null,
+        createdBy: ctx.userId,
       },
     });
 

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
+import { Loader2, Plus, Building2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 type AccountFormState = {
@@ -24,6 +24,7 @@ type AccountFormState = {
   rut: string;
   segment: string;
   industry: string;
+  type: "prospect" | "client";
 };
 
 type AccountRow = {
@@ -32,6 +33,7 @@ type AccountRow = {
   rut?: string | null;
   segment?: string | null;
   industry?: string | null;
+  type: "prospect" | "client";
   status: string;
   createdAt: string;
   _count?: {
@@ -45,15 +47,30 @@ const DEFAULT_FORM: AccountFormState = {
   rut: "",
   segment: "",
   industry: "",
+  type: "prospect",
 };
 
 export function CrmAccountsClient({ initialAccounts }: { initialAccounts: AccountRow[] }) {
   const [accounts, setAccounts] = useState<AccountRow[]>(initialAccounts);
   const [form, setForm] = useState<AccountFormState>(DEFAULT_FORM);
-  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<"all" | "prospect" | "client">("all");
   const inputClassName =
     "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
+  const selectClassName =
+    "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+
+  const filteredAccounts = useMemo(() => {
+    if (typeFilter === "all") return accounts;
+    return accounts.filter((a) => a.type === typeFilter);
+  }, [accounts, typeFilter]);
+
+  const counts = useMemo(() => {
+    const prospects = accounts.filter((a) => a.type === "prospect").length;
+    const clients = accounts.filter((a) => a.type === "client").length;
+    return { prospects, clients, total: accounts.length };
+  }, [accounts]);
 
   const updateForm = (key: keyof AccountFormState, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -61,10 +78,10 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
 
   const createAccount = async () => {
     if (!form.name.trim()) {
-      toast.error("El nombre del cliente es obligatorio.");
+      toast.error("El nombre es obligatorio.");
       return;
     }
-    setLoading(true);
+    setCreating(true);
     try {
       const response = await fetch("/api/crm/accounts", {
         method: "POST",
@@ -73,7 +90,7 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
       });
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload?.error || "Error creando cliente");
+        throw new Error(payload?.error || "Error creando cuenta");
       }
       setAccounts((prev) => [
         { ...payload.data, _count: { contacts: 0, deals: 0 } },
@@ -81,11 +98,16 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
       ]);
       setForm(DEFAULT_FORM);
       setOpen(false);
+      toast.success(
+        form.type === "prospect"
+          ? "Prospecto creado exitosamente"
+          : "Cliente creado exitosamente"
+      );
     } catch (error) {
       console.error(error);
-      toast.error("No se pudo crear el cliente.");
+      toast.error("No se pudo crear la cuenta.");
     } finally {
-      setLoading(false);
+      setCreating(false);
     }
   };
 
@@ -93,29 +115,40 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Gestiona clientes con información mínima.
+          Gestiona prospectos y clientes.
         </p>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="icon" variant="secondary" className="h-9 w-9">
               <Plus className="h-4 w-4" />
-              <span className="sr-only">Nuevo cliente</span>
+              <span className="sr-only">Nueva cuenta</span>
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Nuevo cliente</DialogTitle>
+              <DialogTitle>Nueva cuenta</DialogTitle>
               <DialogDescription>
-                Registra la cuenta con datos esenciales.
+                Registra un prospecto o cliente.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <Label>Tipo</Label>
+                <select
+                  className={selectClassName}
+                  value={form.type}
+                  onChange={(event) => updateForm("type", event.target.value)}
+                >
+                  <option value="prospect">Prospecto (en negociación)</option>
+                  <option value="client">Cliente (contrato vigente)</option>
+                </select>
+              </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Nombre</Label>
                 <Input
                   value={form.name}
                   onChange={(event) => updateForm("name", event.target.value)}
-                  placeholder="Empresa"
+                  placeholder="Nombre de la empresa"
                   className={inputClassName}
                 />
               </div>
@@ -148,37 +181,116 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={createAccount} disabled={loading}>
-                Guardar cliente
+              <Button onClick={createAccount} disabled={creating}>
+                {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Guardar
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
+      {/* Type filter pills */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setTypeFilter("all")}
+          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            typeFilter === "all"
+              ? "bg-foreground/10 text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Todos ({counts.total})
+        </button>
+        <button
+          type="button"
+          onClick={() => setTypeFilter("prospect")}
+          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            typeFilter === "prospect"
+              ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <span className="flex items-center gap-1">
+            <Users className="h-3 w-3" />
+            Prospectos ({counts.prospects})
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setTypeFilter("client")}
+          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            typeFilter === "client"
+              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <span className="flex items-center gap-1">
+            <Building2 className="h-3 w-3" />
+            Clientes ({counts.clients})
+          </span>
+        </button>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>Clientes</CardTitle>
-          <CardDescription>Listado de cuentas activas.</CardDescription>
+          <CardTitle>
+            {typeFilter === "prospect" ? "Prospectos" : typeFilter === "client" ? "Clientes" : "Cuentas"}
+          </CardTitle>
+          <CardDescription>
+            {typeFilter === "prospect"
+              ? "Empresas en negociación."
+              : typeFilter === "client"
+              ? "Empresas con contrato vigente."
+              : "Listado de prospectos y clientes."}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {accounts.length === 0 && (
+          {filteredAccounts.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              No hay clientes creados todavía.
+              {typeFilter === "all"
+                ? "No hay cuentas creadas todavía."
+                : `No hay ${typeFilter === "prospect" ? "prospectos" : "clientes"} todavía.`}
             </p>
           )}
-          {accounts.map((account) => (
+          {filteredAccounts.map((account) => (
             <div
               key={account.id}
               className="flex flex-col gap-2 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
             >
-              <div>
-                <p className="font-medium">{account.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {account.rut || "Sin RUT"} · {account.industry || "Sin industria"}
-                </p>
+              <div className="flex items-start gap-3">
+                <div
+                  className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                    account.type === "client"
+                      ? "bg-emerald-500/10 text-emerald-400"
+                      : "bg-amber-500/10 text-amber-400"
+                  }`}
+                >
+                  {account.type === "client" ? (
+                    <Building2 className="h-4 w-4" />
+                  ) : (
+                    <Users className="h-4 w-4" />
+                  )}
+                </div>
+                <div>
+                  <p className="font-medium">{account.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {account.rut || "Sin RUT"} · {account.industry || "Sin industria"}
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className={
+                    account.type === "client"
+                      ? "border-emerald-500/30 text-emerald-400"
+                      : "border-amber-500/30 text-amber-400"
+                  }
+                >
+                  {account.type === "client" ? "Cliente" : "Prospecto"}
+                </Badge>
                 <Badge variant="outline">
                   {account._count?.contacts ?? 0} contactos
                 </Badge>

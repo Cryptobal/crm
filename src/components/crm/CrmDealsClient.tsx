@@ -18,8 +18,6 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  defaultAnimateLayoutChanges,
-  AnimateLayoutChanges,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -41,7 +39,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/lib/hooks";
 import { CrmAccount, CrmDeal, CrmPipelineStage } from "@/types";
-import { GripVertical, Plus } from "lucide-react";
+import { GripVertical, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 type DealFormState = {
@@ -78,7 +76,8 @@ type DealCardProps = {
   onSelectQuote: (value: string) => void;
   onLinkQuote: () => void;
   onStageChange: (stageId: string) => void;
-  loading: boolean;
+  isLinking: boolean;
+  isChangingStage: boolean;
   isOverlay?: boolean;
 };
 
@@ -119,7 +118,8 @@ function DealCard({
   onSelectQuote,
   onLinkQuote,
   onStageChange,
-  loading,
+  isLinking,
+  isChangingStage,
   isOverlay = false,
 }: DealCardProps) {
   const {
@@ -177,59 +177,61 @@ function DealCard({
       {!isOverlay && (
         <>
           <div className="mt-3 space-y-2">
-        <Label className="text-xs">Cambiar etapa</Label>
-        <select
-          className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          value={deal.stage?.id || ""}
-          onChange={(event) => onStageChange(event.target.value)}
-        >
-          {stages.map((stage) => (
-            <option key={stage.id} value={stage.id}>
-              {stage.name}
-            </option>
-          ))}
-        </select>
+            <Label className="text-xs">Cambiar etapa</Label>
+            <select
+              className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+              value={deal.stage?.id || ""}
+              onChange={(event) => onStageChange(event.target.value)}
+              disabled={isChangingStage}
+            >
+              {stages.map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {stage.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="mt-3 space-y-2">
-        <Label className="text-xs">Cotizaciones</Label>
-        <div className="flex flex-wrap gap-2">
-          {(deal.quotes || []).length === 0 && (
-            <span className="text-xs text-muted-foreground">
-              Sin cotizaciones vinculadas.
-            </span>
-          )}
-          {(deal.quotes || []).map((quote) => {
-            const quoteInfo = quotesById[quote.quoteId];
-            return (
-              <Badge key={quote.id} variant="outline">
-                {quoteInfo?.code || "CPQ"}
-              </Badge>
-            );
-          })}
-        </div>
-        <div className="mt-2 flex gap-2">
-          <select
-            className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            value={selectedQuoteId}
-            onChange={(event) => onSelectQuote(event.target.value)}
-          >
-            <option value="">Selecciona cotización</option>
-            {quotes.map((quote) => (
-              <option key={quote.id} value={quote.id}>
-                {quote.code} · {quote.clientName || "Sin cliente"}
-              </option>
-            ))}
-          </select>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onLinkQuote}
-            disabled={loading}
-          >
-            Vincular
-          </Button>
-        </div>
+            <Label className="text-xs">Cotizaciones</Label>
+            <div className="flex flex-wrap gap-2">
+              {(deal.quotes || []).length === 0 && (
+                <span className="text-xs text-muted-foreground">
+                  Sin cotizaciones vinculadas.
+                </span>
+              )}
+              {(deal.quotes || []).map((quote) => {
+                const quoteInfo = quotesById[quote.quoteId];
+                return (
+                  <Badge key={quote.id} variant="outline">
+                    {quoteInfo?.code || "CPQ"}
+                  </Badge>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex gap-2">
+              <select
+                className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                value={selectedQuoteId}
+                onChange={(event) => onSelectQuote(event.target.value)}
+                disabled={isLinking}
+              >
+                <option value="">Selecciona cotización</option>
+                {quotes.map((quote) => (
+                  <option key={quote.id} value={quote.id}>
+                    {quote.code} · {quote.clientName || "Sin cliente"}
+                  </option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onLinkQuote}
+                disabled={isLinking}
+              >
+                {isLinking ? <Loader2 className="h-3 w-3 animate-spin" /> : "Vincular"}
+              </Button>
+            </div>
           </div>
         </>
       )}
@@ -250,7 +252,7 @@ export function CrmDealsClient({
 }) {
   const [deals, setDeals] = useState<CrmDeal[]>(initialDeals);
   const [form, setForm] = useState<DealFormState>(DEFAULT_FORM);
-  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [selectedQuotes, setSelectedQuotes] = useState<Record<string, string>>({});
   const [open, setOpen] = useState(false);
   const [activeDealId, setActiveDealId] = useState<string | null>(null);
@@ -259,6 +261,10 @@ export function CrmDealsClient({
     stageId: "",
     accountId: "",
   });
+  // Per-deal loading states
+  const [linkingDealId, setLinkingDealId] = useState<string | null>(null);
+  const [changingStageId, setChangingStageId] = useState<string | null>(null);
+
   const inputClassName =
     "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
   const selectClassName =
@@ -273,7 +279,7 @@ export function CrmDealsClient({
       toast.error("Selecciona un cliente.");
       return;
     }
-    setLoading(true);
+    setCreating(true);
     try {
       const response = await fetch("/api/crm/deals", {
         method: "POST",
@@ -294,11 +300,12 @@ export function CrmDealsClient({
       setDeals((prev) => [payload.data, ...prev]);
       setForm(DEFAULT_FORM);
       setOpen(false);
+      toast.success("Negocio creado exitosamente");
     } catch (error) {
       console.error(error);
       toast.error("No se pudo crear el negocio.");
     } finally {
-      setLoading(false);
+      setCreating(false);
     }
   };
 
@@ -308,8 +315,10 @@ export function CrmDealsClient({
     if (!current || current.stage?.id === stageId) return;
 
     const nextStage = stages.find((stage) => stage.id === stageId);
-    const previous = current;
+    // Deep copy for safe rollback
+    const snapshot = JSON.parse(JSON.stringify(current)) as CrmDeal;
 
+    // Optimistic update
     setDeals((prev) =>
       prev.map((deal) =>
         deal.id === dealId && nextStage
@@ -318,7 +327,7 @@ export function CrmDealsClient({
       )
     );
 
-    setLoading(true);
+    setChangingStageId(dealId);
     try {
       const response = await fetch(`/api/crm/deals/${dealId}/stage`, {
         method: "POST",
@@ -332,10 +341,11 @@ export function CrmDealsClient({
       setDeals((prev) => prev.map((deal) => (deal.id === dealId ? payload.data : deal)));
     } catch (error) {
       console.error(error);
-      setDeals((prev) => prev.map((deal) => (deal.id === dealId ? previous : deal)));
+      // Rollback with deep copy
+      setDeals((prev) => prev.map((deal) => (deal.id === dealId ? snapshot : deal)));
       toast.error("No se pudo actualizar la etapa.");
     } finally {
-      setLoading(false);
+      setChangingStageId(null);
     }
   };
 
@@ -345,7 +355,7 @@ export function CrmDealsClient({
       toast.error("Selecciona una cotización.");
       return;
     }
-    setLoading(true);
+    setLinkingDealId(dealId);
     try {
       const response = await fetch(`/api/crm/deals/${dealId}/quotes`, {
         method: "POST",
@@ -364,11 +374,12 @@ export function CrmDealsClient({
         )
       );
       setSelectedQuotes((prev) => ({ ...prev, [dealId]: "" }));
+      toast.success("Cotización vinculada exitosamente");
     } catch (error) {
       console.error(error);
       toast.error("No se pudo vincular la cotización.");
     } finally {
-      setLoading(false);
+      setLinkingDealId(null);
     }
   };
 
@@ -410,7 +421,10 @@ export function CrmDealsClient({
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over) return;
+    if (!over) {
+      setActiveDealId(null);
+      return;
+    }
 
     const dealId = String(active.id).replace("deal-", "");
     const overId = String(over.id);
@@ -418,8 +432,9 @@ export function CrmDealsClient({
       ? overId.replace("stage-", "")
       : deals.find((deal) => `deal-${deal.id}` === overId)?.stage?.id;
 
-    if (!stageId) return;
-    updateStage(dealId, stageId);
+    if (stageId) {
+      updateStage(dealId, stageId);
+    }
     setActiveDealId(null);
   };
 
@@ -551,7 +566,8 @@ export function CrmDealsClient({
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={createDeal} disabled={loading}>
+                <Button onClick={createDeal} disabled={creating}>
+                  {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Guardar negocio
                 </Button>
               </DialogFooter>
@@ -612,7 +628,8 @@ export function CrmDealsClient({
                             }
                             onLinkQuote={() => linkQuote(deal.id)}
                             onStageChange={(stageId) => updateStage(deal.id, stageId)}
-                            loading={loading}
+                            isLinking={linkingDealId === deal.id}
+                            isChangingStage={changingStageId === deal.id}
                           />
                         ))}
                       </div>
@@ -631,7 +648,8 @@ export function CrmDealsClient({
                     onSelectQuote={() => {}}
                     onLinkQuote={() => {}}
                     onStageChange={() => {}}
-                    loading={false}
+                    isLinking={false}
+                    isChangingStage={false}
                     isOverlay
                   />
                 ) : null}

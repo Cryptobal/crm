@@ -5,25 +5,22 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getDefaultTenantId } from "@/lib/tenant";
+import { requireAuth, unauthorized } from "@/lib/api-auth";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
-    }
-    const tenantId = session.user?.tenantId ?? (await getDefaultTenantId());
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
     const { id } = await params;
     const body = await request.json();
 
     const stage = await prisma.crmPipelineStage.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: ctx.tenantId },
     });
     if (!stage) {
       return NextResponse.json({ success: false, error: "Etapa no encontrada" }, { status: 404 });
@@ -56,15 +53,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
-    }
-    const tenantId = session.user?.tenantId ?? (await getDefaultTenantId());
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
     const { id } = await params;
 
     const stage = await prisma.crmPipelineStage.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: ctx.tenantId },
     });
     if (!stage) {
       return NextResponse.json({ success: false, error: "Etapa no encontrada" }, { status: 404 });

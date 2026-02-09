@@ -4,9 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getDefaultTenantId } from "@/lib/tenant";
+import { requireAuth, unauthorized } from "@/lib/api-auth";
 import { decryptText } from "@/lib/crypto";
 import { getGmailClient } from "@/lib/gmail";
 
@@ -48,15 +47,9 @@ function buildRawEmail({
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json(
-        { success: false, error: "No autorizado" },
-        { status: 401 }
-      );
-    }
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
 
-    const tenantId = session.user?.tenantId ?? (await getDefaultTenantId());
     const body = await request.json();
 
     const { to, cc = [], bcc = [], subject, html, text, dealId, accountId, contactId } = body;
@@ -70,8 +63,8 @@ export async function POST(request: NextRequest) {
 
     const emailAccount = await prisma.crmEmailAccount.findFirst({
       where: {
-        tenantId,
-        userId: session.user.id,
+        tenantId: ctx.tenantId,
+        userId: ctx.userId,
         provider: "gmail",
         status: "active",
       },
@@ -110,7 +103,7 @@ export async function POST(request: NextRequest) {
 
     const thread = await prisma.crmEmailThread.findFirst({
       where: {
-        tenantId,
+        tenantId: ctx.tenantId,
         subject,
         accountId: accountId || null,
         contactId: contactId || null,
@@ -122,7 +115,7 @@ export async function POST(request: NextRequest) {
       ? thread
       : await prisma.crmEmailThread.create({
           data: {
-            tenantId,
+            tenantId: ctx.tenantId,
             subject,
             accountId: accountId || null,
             contactId: contactId || null,
@@ -133,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     const message = await prisma.crmEmailMessage.create({
       data: {
-        tenantId,
+        tenantId: ctx.tenantId,
         threadId: threadRecord.id,
         providerMessageId: messageId || null,
         direction: "out",
@@ -145,7 +138,7 @@ export async function POST(request: NextRequest) {
         htmlBody: html || null,
         textBody: text || null,
         sentAt: new Date(),
-        createdBy: session.user.id,
+        createdBy: ctx.userId,
       },
     });
 

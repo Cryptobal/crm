@@ -32,8 +32,8 @@ export default async function CrmAccountsPage() {
   return (
     <>
       <PageHeader
-        title="Clientes"
-        description="Cuentas activas y sus contactos"
+        title="Cuentas"
+        description="Prospectos y clientes"
         className="mb-6"
       />
       <CrmSubnav />

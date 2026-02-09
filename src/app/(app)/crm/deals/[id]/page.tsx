@@ -3,12 +3,11 @@
  */
 
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { hasAppAccess } from "@/lib/app-access";
 import { prisma } from "@/lib/prisma";
 import { getDefaultTenantId } from "@/lib/tenant";
-import { PageHeader } from "@/components/opai";
+import { PageHeader, Breadcrumb } from "@/components/opai";
 import { CrmDealDetailClient } from "@/components/crm";
 
 export default async function CrmDealDetailPage({
@@ -75,20 +74,20 @@ export default async function CrmDealDetailPage({
 
   return (
     <>
+      <Breadcrumb
+        items={[
+          { label: "CRM", href: "/crm" },
+          { label: "Negocios", href: "/crm/deals" },
+          { label: deal.title },
+        ]}
+        className="mb-4"
+      />
       <PageHeader
         title={deal.title}
-        description="Detalle del negocio y cotizaciones"
+        description={`${deal.account?.name || "Sin cliente"} · ${deal.stage?.name || "Sin etapa"}`}
         className="mb-6"
       />
       <div className="space-y-4">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/crm/deals" className="hover:text-foreground">
-            Negocios
-          </Link>
-          <span>/</span>
-          <span>{deal.title}</span>
-        </div>
-
         <CrmDealDetailClient
           deal={initialDeal}
           quotes={initialQuotes}

@@ -5,17 +5,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getDefaultTenantId } from "@/lib/tenant";
+import { requireAuth, unauthorized, parseBody } from "@/lib/api-auth";
+import { createContactSchema } from "@/lib/validations/crm";
 
 export async function GET() {
   try {
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
 
     const contacts = await prisma.crmContact.findMany({
-      where: { tenantId },
+      where: { tenantId: ctx.tenantId },
       include: { account: true },
       orderBy: { createdAt: "desc" },
     });
@@ -32,33 +32,22 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
-    const body = await request.json();
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
 
-    if (!body?.accountId) {
-      return NextResponse.json(
-        { success: false, error: "accountId es requerido" },
-        { status: 400 }
-      );
-    }
-
-    if (!body?.name?.trim()) {
-      return NextResponse.json(
-        { success: false, error: "Nombre es requerido" },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseBody(request, createContactSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
     const contact = await prisma.crmContact.create({
       data: {
-        tenantId,
+        tenantId: ctx.tenantId,
         accountId: body.accountId,
-        name: body.name.trim(),
-        email: body?.email?.trim() || null,
-        phone: body?.phone?.trim() || null,
-        roleTitle: body?.roleTitle?.trim() || null,
-        isPrimary: Boolean(body?.isPrimary),
+        name: body.name,
+        email: body.email || null,
+        phone: body.phone || null,
+        roleTitle: body.roleTitle || null,
+        isPrimary: body.isPrimary,
       },
       include: { account: true },
     });

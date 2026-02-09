@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 type QuoteOption = {
@@ -73,8 +74,9 @@ export function CrmDealDetailClient({
   const [open, setOpen] = useState(false);
   const [selectedQuoteId, setSelectedQuoteId] = useState("");
   const [linkedQuotes, setLinkedQuotes] = useState<DealQuote[]>(deal.quotes || []);
-  const [loading, setLoading] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
+  const [sending, setSending] = useState(false);
   const [emailTo, setEmailTo] = useState(deal.primaryContact?.email || "");
   const [emailSubject, setEmailSubject] = useState(
     `Propuesta para ${deal.account?.name || "cliente"}`
@@ -86,6 +88,7 @@ export function CrmDealDetailClient({
     "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
   const inputClassName =
     "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
+
   const applyPlaceholders = (value: string) => {
     const replacements: Record<string, string> = {
       "{cliente}": deal.account?.name || "",
@@ -105,8 +108,8 @@ export function CrmDealDetailClient({
     setSelectedTemplateId(templateId);
     const template = templates.find((item) => item.id === templateId);
     if (!template) return;
-    setEmailSubject(template.subject);
-    setEmailBody(template.body);
+    setEmailSubject(applyPlaceholders(template.subject));
+    setEmailBody(applyPlaceholders(template.body));
   };
 
   const quotesById = useMemo(() => {
@@ -121,7 +124,7 @@ export function CrmDealDetailClient({
       toast.error("Selecciona una cotización.");
       return;
     }
-    setLoading(true);
+    setLinking(true);
     try {
       const response = await fetch(`/api/crm/deals/${deal.id}/quotes`, {
         method: "POST",
@@ -135,11 +138,12 @@ export function CrmDealDetailClient({
       setLinkedQuotes((prev) => [...prev, payload.data]);
       setSelectedQuoteId("");
       setOpen(false);
+      toast.success("Cotización vinculada exitosamente");
     } catch (error) {
       console.error(error);
       toast.error("No se pudo vincular la cotización.");
     } finally {
-      setLoading(false);
+      setLinking(false);
     }
   };
 
@@ -152,15 +156,15 @@ export function CrmDealDetailClient({
       toast.error("Completa destinatario y asunto.");
       return;
     }
-    setLoading(true);
+    setSending(true);
     try {
       const response = await fetch("/api/crm/gmail/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: emailTo,
-          subject: applyPlaceholders(emailSubject),
-          html: applyPlaceholders(emailBody),
+          subject: emailSubject,
+          html: emailBody,
           dealId: deal.id,
         }),
       });
@@ -170,11 +174,12 @@ export function CrmDealDetailClient({
       }
       setEmailOpen(false);
       setEmailBody("");
+      toast.success("Correo enviado exitosamente");
     } catch (error) {
       console.error(error);
       toast.error("No se pudo enviar el correo.");
     } finally {
-      setLoading(false);
+      setSending(false);
     }
   };
 
@@ -230,6 +235,7 @@ export function CrmDealDetailClient({
                   className={selectClassName}
                   value={selectedQuoteId}
                   onChange={(event) => setSelectedQuoteId(event.target.value)}
+                  disabled={linking}
                 >
                   <option value="">Selecciona cotización</option>
                   {quotes.map((quote) => (
@@ -240,7 +246,8 @@ export function CrmDealDetailClient({
                 </select>
               </div>
               <DialogFooter>
-                <Button onClick={linkQuote} disabled={loading}>
+                <Button onClick={linkQuote} disabled={linking}>
+                  {linking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Guardar vínculo
                 </Button>
               </DialogFooter>
@@ -291,28 +298,30 @@ export function CrmDealDetailClient({
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
-              <div className="space-y-2">
-                <Label>Template</Label>
-                <select
-                  className={selectClassName}
-                  value={selectedTemplateId}
-                  onChange={(event) => selectTemplate(event.target.value)}
-                >
-                  <option value="">Selecciona un template</option>
-                  {templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
+                  <div className="space-y-2">
+                    <Label>Template</Label>
+                    <select
+                      className={selectClassName}
+                      value={selectedTemplateId}
+                      onChange={(event) => selectTemplate(event.target.value)}
+                      disabled={sending}
+                    >
+                      <option value="">Selecciona un template</option>
+                      {templates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Para</Label>
                     <input
                       value={emailTo}
                       onChange={(event) => setEmailTo(event.target.value)}
                       className={`h-9 w-full rounded-md border px-3 text-sm ${inputClassName}`}
                       placeholder="correo@cliente.com"
+                      disabled={sending}
                     />
                   </div>
                   <div className="space-y-2">
@@ -322,6 +331,7 @@ export function CrmDealDetailClient({
                       onChange={(event) => setEmailSubject(event.target.value)}
                       className={`h-9 w-full rounded-md border px-3 text-sm ${inputClassName}`}
                       placeholder="Asunto"
+                      disabled={sending}
                     />
                   </div>
                   <div className="space-y-2">
@@ -331,11 +341,13 @@ export function CrmDealDetailClient({
                       onChange={(event) => setEmailBody(event.target.value)}
                       className={`min-h-[120px] w-full rounded-md border px-3 py-2 text-sm ${inputClassName}`}
                       placeholder="Escribe tu mensaje..."
+                      disabled={sending}
                     />
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button onClick={sendEmail} disabled={loading}>
+                  <Button onClick={sendEmail} disabled={sending}>
+                    {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Enviar correo
                   </Button>
                 </DialogFooter>

@@ -4,32 +4,26 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getDefaultTenantId } from "@/lib/tenant";
+import { requireAuth, unauthorized, parseBody } from "@/lib/api-auth";
+import { updateDealStageSchema } from "@/lib/validations/crm";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
-    const userId = session?.user?.id || null;
-    const body = await request.json();
-    const stageId = body?.stageId;
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
 
-    if (!stageId) {
-      return NextResponse.json(
-        { success: false, error: "stageId es requerido" },
-        { status: 400 }
-      );
-    }
+    const { id } = await params;
+    const parsed = await parseBody(request, updateDealStageSchema);
+    if (parsed.error) return parsed.error;
+    const { stageId } = parsed.data;
 
     const [deal, stage] = await Promise.all([
-      prisma.crmDeal.findFirst({ where: { id, tenantId } }),
-      prisma.crmPipelineStage.findFirst({ where: { id: stageId, tenantId } }),
+      prisma.crmDeal.findFirst({ where: { id, tenantId: ctx.tenantId } }),
+      prisma.crmPipelineStage.findFirst({ where: { id: stageId, tenantId: ctx.tenantId } }),
     ]);
 
     if (!deal) {
@@ -65,17 +59,17 @@ export async function POST(
 
       await tx.crmDealStageHistory.create({
         data: {
-          tenantId,
+          tenantId: ctx.tenantId,
           dealId: deal.id,
           fromStageId: deal.stageId,
           toStageId: stage.id,
-          changedBy: userId,
+          changedBy: ctx.userId,
         },
       });
 
       await tx.crmHistoryLog.create({
         data: {
-          tenantId,
+          tenantId: ctx.tenantId,
           entityType: "deal",
           entityId: deal.id,
           action: "deal_stage_changed",
@@ -83,7 +77,7 @@ export async function POST(
             fromStageId: deal.stageId,
             toStageId: stage.id,
           },
-          createdBy: userId,
+          createdBy: ctx.userId,
         },
       });
 

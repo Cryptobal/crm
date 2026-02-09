@@ -5,43 +5,42 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getDefaultTenantId } from "@/lib/tenant";
+import { requireAuth, unauthorized } from "@/lib/api-auth";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json(
-        { success: false, error: "No autorizado" },
-        { status: 401 }
-      );
-    }
-    const tenantId = session.user?.tenantId ?? (await getDefaultTenantId());
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
     const { id } = await params;
     const body = await request.json();
+
+    // Verify ownership BEFORE updating
+    const existing = await prisma.crmEmailTemplate.findFirst({
+      where: { id, tenantId: ctx.tenantId },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Template no encontrado" },
+        { status: 404 }
+      );
+    }
 
     const template = await prisma.crmEmailTemplate.update({
       where: { id },
       data: {
-        name: body?.name?.trim(),
-        subject: body?.subject?.trim(),
-        body: body?.body?.trim(),
-        scope: body?.scope?.trim(),
-        stageId: body?.stageId || null,
+        name: body?.name?.trim() ?? existing.name,
+        subject: body?.subject?.trim() ?? existing.subject,
+        body: body?.body?.trim() ?? existing.body,
+        scope: body?.scope?.trim() ?? existing.scope,
+        stageId: body?.stageId ?? existing.stageId,
       },
     });
-
-    if (template.tenantId !== tenantId) {
-      return NextResponse.json(
-        { success: false, error: "No autorizado" },
-        { status: 403 }
-      );
-    }
 
     return NextResponse.json({ success: true, data: template });
   } catch (error) {
@@ -58,18 +57,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json(
-        { success: false, error: "No autorizado" },
-        { status: 401 }
-      );
-    }
-    const tenantId = session.user?.tenantId ?? (await getDefaultTenantId());
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
     const { id } = await params;
 
     const template = await prisma.crmEmailTemplate.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: ctx.tenantId },
     });
 
     if (!template) {

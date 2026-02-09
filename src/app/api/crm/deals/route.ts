@@ -5,17 +5,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getDefaultTenantId } from "@/lib/tenant";
+import { requireAuth, unauthorized, parseBody } from "@/lib/api-auth";
+import { createDealSchema } from "@/lib/validations/crm";
 
 export async function GET() {
   try {
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
 
     const deals = await prisma.crmDeal.findMany({
-      where: { tenantId },
+      where: { tenantId: ctx.tenantId },
       include: {
         account: true,
         stage: true,
@@ -36,21 +36,17 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
-    const body = await request.json();
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
 
-    if (!body?.accountId) {
-      return NextResponse.json(
-        { success: false, error: "accountId es requerido" },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseBody(request, createDealSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
     const stage =
-      body?.stageId ||
+      body.stageId ||
       (await prisma.crmPipelineStage.findFirst({
-        where: { tenantId, isActive: true },
+        where: { tenantId: ctx.tenantId, isActive: true },
         orderBy: { order: "asc" },
         select: { id: true },
       }))?.id;
@@ -64,14 +60,14 @@ export async function POST(request: NextRequest) {
 
     const deal = await prisma.crmDeal.create({
       data: {
-        tenantId,
+        tenantId: ctx.tenantId,
         accountId: body.accountId,
-        primaryContactId: body?.primaryContactId || null,
-        title: body?.title?.trim() || "Negocio sin título",
-        amount: body?.amount ? Number(body.amount) : 0,
+        primaryContactId: body.primaryContactId || null,
+        title: body.title || "Negocio sin título",
+        amount: body.amount,
         stageId: stage,
-        probability: body?.probability ? Number(body.probability) : 0,
-        expectedCloseDate: body?.expectedCloseDate
+        probability: body.probability,
+        expectedCloseDate: body.expectedCloseDate
           ? new Date(body.expectedCloseDate)
           : null,
         status: "open",
@@ -85,11 +81,11 @@ export async function POST(request: NextRequest) {
 
     await prisma.crmDealStageHistory.create({
       data: {
-        tenantId,
+        tenantId: ctx.tenantId,
         dealId: deal.id,
         fromStageId: null,
         toStageId: stage,
-        changedBy: session?.user?.id || null,
+        changedBy: ctx.userId,
       },
     });
 

@@ -5,17 +5,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getDefaultTenantId } from "@/lib/tenant";
+import { requireAuth, unauthorized } from "@/lib/api-auth";
 
 export async function GET() {
   try {
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
 
     const templates = await prisma.crmEmailTemplate.findMany({
-      where: { tenantId },
+      where: { tenantId: ctx.tenantId },
       orderBy: { createdAt: "desc" },
     });
 
@@ -31,14 +30,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json(
-        { success: false, error: "No autorizado" },
-        { status: 401 }
-      );
-    }
-    const tenantId = session.user?.tenantId ?? (await getDefaultTenantId());
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
     const body = await request.json();
 
     if (!body?.name?.trim() || !body?.subject?.trim() || !body?.body?.trim()) {
@@ -50,13 +44,13 @@ export async function POST(request: NextRequest) {
 
     const template = await prisma.crmEmailTemplate.create({
       data: {
-        tenantId,
+        tenantId: ctx.tenantId,
         name: body.name.trim(),
         subject: body.subject.trim(),
         body: body.body.trim(),
         scope: body?.scope?.trim() || "global",
         stageId: body?.stageId || null,
-        createdBy: session.user.id,
+        createdBy: ctx.userId,
       },
     });
 

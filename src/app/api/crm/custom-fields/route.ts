@@ -6,6 +6,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { requireAuth, unauthorized } from "@/lib/api-auth";
 
 function parseFieldOptions(
   type: string,
@@ -27,17 +29,14 @@ function parseFieldOptions(
   }
   return null;
 }
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { getDefaultTenantId } from "@/lib/tenant";
 
 export async function GET() {
   try {
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
 
     const fields = await prisma.crmCustomField.findMany({
-      where: { tenantId },
+      where: { tenantId: ctx.tenantId },
       orderBy: { createdAt: "desc" },
     });
 
@@ -53,14 +52,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json(
-        { success: false, error: "No autorizado" },
-        { status: 401 }
-      );
-    }
-    const tenantId = session.user?.tenantId ?? (await getDefaultTenantId());
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
     const body = await request.json();
 
     if (!body?.name?.trim() || !body?.entityType?.trim() || !body?.type?.trim()) {
@@ -73,7 +67,7 @@ export async function POST(request: NextRequest) {
     const options = parseFieldOptions(body.type, body.options, body.urlLabel);
     const field = await prisma.crmCustomField.create({
       data: {
-        tenantId,
+        tenantId: ctx.tenantId,
         name: body.name.trim(),
         entityType: body.entityType.trim(),
         type: body.type.trim(),

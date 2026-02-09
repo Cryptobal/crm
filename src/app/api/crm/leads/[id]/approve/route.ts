@@ -4,23 +4,22 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getDefaultTenantId } from "@/lib/tenant";
+import { requireAuth, unauthorized } from "@/lib/api-auth";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
-    const userId = session?.user?.id;
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
     const { id } = await params;
     const body = await request.json();
 
     const lead = await prisma.crmLead.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId: ctx.tenantId },
     });
 
     if (!lead) {
@@ -49,7 +48,7 @@ export async function POST(
       "Contacto principal";
 
     const pipelineStage = await prisma.crmPipelineStage.findFirst({
-      where: { tenantId, isActive: true },
+      where: { tenantId: ctx.tenantId, isActive: true },
       orderBy: { order: "asc" },
     });
 
@@ -66,8 +65,9 @@ export async function POST(
     const result = await prisma.$transaction(async (tx) => {
       const account = await tx.crmAccount.create({
         data: {
-          tenantId,
+          tenantId: ctx.tenantId,
           name: accountName,
+          type: "prospect",
           rut: body?.rut?.trim() || null,
           industry: body?.industry?.trim() || null,
           size: body?.size?.trim() || null,
@@ -75,13 +75,13 @@ export async function POST(
           website: body?.website?.trim() || null,
           address: body?.address?.trim() || null,
           notes: body?.accountNotes?.trim() || lead.notes || null,
-          ownerId: userId || null,
+          ownerId: ctx.userId,
         },
       });
 
       const contact = await tx.crmContact.create({
         data: {
-          tenantId,
+          tenantId: ctx.tenantId,
           accountId: account.id,
           name: contactName,
           email: body?.email?.trim() || lead.email || null,
@@ -93,7 +93,7 @@ export async function POST(
 
       const deal = await tx.crmDeal.create({
         data: {
-          tenantId,
+          tenantId: ctx.tenantId,
           accountId: account.id,
           primaryContactId: contact.id,
           title: dealTitle,
@@ -109,11 +109,11 @@ export async function POST(
 
       await tx.crmDealStageHistory.create({
         data: {
-          tenantId,
+          tenantId: ctx.tenantId,
           dealId: deal.id,
           fromStageId: null,
           toStageId: pipelineStage.id,
-          changedBy: userId || null,
+          changedBy: ctx.userId,
         },
       });
 
@@ -122,7 +122,7 @@ export async function POST(
         data: {
           status: "approved",
           approvedAt: new Date(),
-          approvedBy: userId || null,
+          approvedBy: ctx.userId,
           convertedAccountId: account.id,
           convertedContactId: contact.id,
           convertedDealId: deal.id,
@@ -131,7 +131,7 @@ export async function POST(
 
       await tx.crmHistoryLog.create({
         data: {
-          tenantId,
+          tenantId: ctx.tenantId,
           entityType: "lead",
           entityId: lead.id,
           action: "lead_approved",
@@ -140,7 +140,7 @@ export async function POST(
             contactId: contact.id,
             dealId: deal.id,
           },
-          createdBy: userId || null,
+          createdBy: ctx.userId,
         },
       });
 

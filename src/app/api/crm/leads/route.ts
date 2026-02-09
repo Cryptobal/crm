@@ -5,19 +5,20 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getDefaultTenantId } from "@/lib/tenant";
+import { requireAuth, unauthorized, parseBody } from "@/lib/api-auth";
+import { createLeadSchema } from "@/lib/validations/crm";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
     const status = request.nextUrl.searchParams.get("status") || undefined;
 
     const leads = await prisma.crmLead.findMany({
       where: {
-        tenantId,
+        tenantId: ctx.tenantId,
         ...(status ? { status } : {}),
       },
       orderBy: { createdAt: "desc" },
@@ -35,20 +36,23 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    const tenantId = session?.user?.tenantId ?? (await getDefaultTenantId());
-    const body = await request.json();
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
+    const parsed = await parseBody(request, createLeadSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
     const lead = await prisma.crmLead.create({
       data: {
-        tenantId,
+        tenantId: ctx.tenantId,
         status: "pending",
-        source: body?.source?.trim() || null,
-        name: body?.name?.trim() || null,
-        email: body?.email?.trim() || null,
-        phone: body?.phone?.trim() || null,
-        companyName: body?.companyName?.trim() || null,
-        notes: body?.notes?.trim() || null,
+        source: body.source || null,
+        name: body.name || null,
+        email: body.email || null,
+        phone: body.phone || null,
+        companyName: body.companyName || null,
+        notes: body.notes || null,
       },
     });
 

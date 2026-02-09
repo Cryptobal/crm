@@ -689,6 +689,7 @@ model CrmAccount {
   size      String?
   segment   String?
   ownerId   String?  @map("owner_id")
+  type      String   @default("prospect") // "prospect" | "client"
   status    String   @default("active")
   website   String?
   address   String?
@@ -701,6 +702,7 @@ model CrmAccount {
 
   @@index([tenantId], map: "idx_crm_accounts_tenant")
   @@index([status], map: "idx_crm_accounts_status")
+  @@index([tenantId, type], map: "idx_crm_accounts_type")
   @@index([createdAt(sort: Desc)], map: "idx_crm_accounts_created_desc")
   @@map("accounts")
   @@schema("crm")

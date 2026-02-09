@@ -10,6 +10,8 @@ export interface CrmLead {
   createdAt: string;
 }
 
+export type CrmAccountType = "prospect" | "client";
+
 export interface CrmAccount {
   id: string;
   name: string;
@@ -17,6 +19,7 @@ export interface CrmAccount {
   industry?: string | null;
   size?: string | null;
   segment?: string | null;
+  type: CrmAccountType;
   status: string;
   createdAt: string;
 }
