@@ -1,9 +1,9 @@
+/* eslint-disable @typescript-eslint/no-misused-promises */
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/opai/EmptyState";
+import { CollapsibleSection } from "./CollapsibleSection";
+import { RecordActions } from "./RecordActions";
+import { EmailHistoryList } from "./EmailHistoryList";
+import { ContractEditor } from "@/components/docs/ContractEditor";
 import {
   ArrowLeft,
   Users,
@@ -32,8 +36,6 @@ import {
   Send,
   MessageSquare,
 } from "lucide-react";
-import { EmailHistoryList } from "@/components/crm/EmailHistoryList";
-import { ContractEditor } from "@/components/docs/ContractEditor";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
@@ -44,10 +46,7 @@ function tiptapToEmailHtml(doc: any): string {
     if (!node) return "";
     switch (node.type) {
       case "doc": return (node.content || []).map(renderNode).join("");
-      case "paragraph": {
-        const inner = (node.content || []).map(renderNode).join("");
-        return inner ? `<p style="margin:0 0 8px;">${inner}</p>` : `<p style="margin:0 0 8px;">&nbsp;</p>`;
-      }
+      case "paragraph": { const inner = (node.content || []).map(renderNode).join(""); return inner ? `<p style="margin:0 0 8px;">${inner}</p>` : `<p style="margin:0 0 8px;">&nbsp;</p>`; }
       case "heading": { const lvl = node.attrs?.level || 2; return `<h${lvl} style="margin:0 0 8px;">${(node.content || []).map(renderNode).join("")}</h${lvl}>`; }
       case "bulletList": return `<ul style="margin:0 0 8px;padding-left:24px;">${(node.content || []).map(renderNode).join("")}</ul>`;
       case "orderedList": return `<ol style="margin:0 0 8px;padding-left:24px;">${(node.content || []).map(renderNode).join("")}</ol>`;
@@ -105,8 +104,6 @@ type EmailTemplate = {
   scope: string;
 };
 
-type Tab = "info" | "deals" | "emails";
-
 export function CrmContactDetailClient({
   contact: initialContact,
   deals,
@@ -120,7 +117,9 @@ export function CrmContactDetailClient({
 }) {
   const router = useRouter();
   const [contact, setContact] = useState(initialContact);
-  const [activeTab, setActiveTab] = useState<Tab>("info");
+  const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(" ");
+
+  // ── Edit state ──
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -134,7 +133,7 @@ export function CrmContactDetailClient({
 
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
-  // Email compose state
+  // ── Email compose state ──
   const [emailOpen, setEmailOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [emailSubject, setEmailSubject] = useState("");
@@ -158,16 +157,52 @@ export function CrmContactDetailClient({
       .catch(() => {});
   }, []);
 
+  const inputCn = "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
+  const selectCn = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+
+  // ── Handlers ──
+  const openEdit = () => {
+    setEditForm({
+      firstName: contact.firstName, lastName: contact.lastName,
+      email: contact.email || "", phone: contact.phone || "",
+      roleTitle: contact.roleTitle || "", isPrimary: contact.isPrimary || false,
+    });
+    setEditOpen(true);
+  };
+
+  const deleteContact = async () => {
+    try {
+      const res = await fetch(`/api/crm/contacts/${contact.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      toast.success("Contacto eliminado");
+      router.push("/crm/contacts");
+    } catch { toast.error("No se pudo eliminar"); }
+  };
+
+  const saveEdit = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/crm/contacts/${contact.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload?.error);
+      setContact((prev) => ({ ...prev, ...editForm }));
+      setEditOpen(false);
+      toast.success("Contacto actualizado");
+    } catch { toast.error("No se pudo actualizar"); }
+    finally { setSaving(false); }
+  };
+
   const applyPlaceholders = (value: string) => {
     const replacements: Record<string, string> = {
       "{cliente}": contact.account?.name || "",
       "{contacto}": fullName,
       "{correo}": contact.email || "",
     };
-    return Object.entries(replacements).reduce(
-      (acc, [key, val]) => acc.split(key).join(val),
-      value
-    );
+    return Object.entries(replacements).reduce((acc, [key, val]) => acc.split(key).join(val), value);
   };
 
   const selectTemplate = (templateId: string) => {
@@ -175,7 +210,6 @@ export function CrmContactDetailClient({
     const tpl = templates.find((t) => t.id === templateId);
     if (!tpl) return;
     setEmailSubject(applyPlaceholders(tpl.subject));
-    setEmailBody(applyPlaceholders(tpl.body));
   };
 
   const handleTiptapChange = useCallback((content: any) => {
@@ -193,451 +227,212 @@ export function CrmContactDetailClient({
       const res = await fetch("/api/crm/gmail/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: contact.email,
-          cc,
-          bcc,
-          subject: emailSubject,
-          html: emailBody,
-          contactId: contact.id,
-          accountId: contact.account?.id || undefined,
-        }),
+        body: JSON.stringify({ to: contact.email, cc, bcc, subject: emailSubject, html: emailBody, contactId: contact.id, accountId: contact.account?.id || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Error enviando email");
       setEmailOpen(false);
-      setEmailBody("");
-      setEmailTiptapContent(null);
-      setEmailSubject("");
-      setEmailCc("");
-      setEmailBcc("");
-      setShowCcBcc(false);
-      setSelectedTemplateId("");
+      setEmailBody(""); setEmailTiptapContent(null); setEmailSubject(""); setEmailCc(""); setEmailBcc(""); setShowCcBcc(false); setSelectedTemplateId("");
       toast.success("Correo enviado exitosamente");
-    } catch (error) {
-      console.error(error);
-      toast.error("No se pudo enviar el correo.");
-    } finally {
-      setSending(false);
-    }
+    } catch (error) { console.error(error); toast.error("No se pudo enviar el correo."); }
+    finally { setSending(false); }
   };
 
-  const inputCn = "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
-  const selectCn = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
-
-  const deleteContact = async () => {
-    try {
-      const res = await fetch(`/api/crm/contacts/${contact.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-      toast.success("Contacto eliminado");
-      router.push("/crm/contacts");
-    } catch {
-      toast.error("No se pudo eliminar");
-    }
-  };
-
-  const saveEdit = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/crm/contacts/${contact.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firstName: editForm.firstName,
-          lastName: editForm.lastName,
-          email: editForm.email,
-          phone: editForm.phone || null,
-          roleTitle: editForm.roleTitle || null,
-          isPrimary: editForm.isPrimary,
-        }),
-      });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload?.error);
-      setContact((prev) => ({ ...prev, ...editForm }));
-      setEditOpen(false);
-      toast.success("Contacto actualizado");
-    } catch {
-      toast.error("No se pudo actualizar");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(" ");
-
-  const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: "info", label: "Información" },
-    { key: "deals", label: "Negocios", count: deals.length },
-    { key: "emails", label: "Correos" },
-  ];
+  // ── WhatsApp URL ──
+  const whatsappUrl = contact.phone
+    ? `https://wa.me/${contact.phone.replace(/\s/g, "").replace(/^\+/, "")}?text=${encodeURIComponent(`Hola ${contact.firstName}, `)}`
+    : null;
 
   return (
     <div className="space-y-4">
-      {/* ── Detail toolbar: Back + Actions ── */}
+      {/* ── Toolbar ── */}
       <div className="flex items-center justify-between">
-        <Link
-          href="/crm/contacts"
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
+        <Link href="/crm/contacts" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="h-4 w-4" />
           Volver a contactos
         </Link>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => {
-              setEditForm({
-                firstName: contact.firstName,
-                lastName: contact.lastName,
-                email: contact.email || "",
-                phone: contact.phone || "",
-                roleTitle: contact.roleTitle || "",
-                isPrimary: contact.isPrimary || false,
-              });
-              setEditOpen(true);
-            }}
-          >
-            <Pencil className="h-3.5 w-3.5 mr-1.5" />
+        <RecordActions
+          actions={[
+            { label: "Editar contacto", icon: Pencil, onClick: openEdit },
+            { label: "Enviar correo", icon: Mail, onClick: () => setEmailOpen(true), hidden: !gmailConnected || !contact.email },
+            { label: "WhatsApp", icon: MessageSquare, onClick: () => whatsappUrl && window.open(whatsappUrl, "_blank"), hidden: !whatsappUrl },
+            { label: "Eliminar contacto", icon: Trash2, onClick: () => setDeleteConfirm(true), variant: "destructive" },
+          ]}
+        />
+      </div>
+
+      {/* ── Section 1: Datos del contacto ── */}
+      <CollapsibleSection
+        icon={<Users className="h-4 w-4" />}
+        title="Datos del contacto"
+        action={
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={openEdit}>
+            <Pencil className="h-3 w-3 mr-1" />
             Editar
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={() => setDeleteConfirm(true)}
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-            Eliminar
-          </Button>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-3 text-sm">
+            <InfoRow label="Nombre completo"><span className="font-medium">{fullName}</span></InfoRow>
+            <InfoRow label="Email">
+              {contact.email ? (
+                <a href={`mailto:${contact.email}`} className="flex items-center gap-1 text-primary hover:underline"><Mail className="h-3 w-3" />{contact.email}</a>
+              ) : <span className="text-muted-foreground">Sin email</span>}
+            </InfoRow>
+            <InfoRow label="Teléfono">
+              {contact.phone ? (
+                <a href={`tel:${contact.phone}`} className="flex items-center gap-1 text-primary hover:underline"><Phone className="h-3 w-3" />{contact.phone}</a>
+              ) : <span className="text-muted-foreground">Sin teléfono</span>}
+            </InfoRow>
+          </div>
+          <div className="space-y-3 text-sm">
+            <InfoRow label="Cargo">
+              {contact.roleTitle ? (
+                <span className="flex items-center gap-1"><Briefcase className="h-3 w-3" />{contact.roleTitle}</span>
+              ) : <span className="text-muted-foreground">Sin cargo</span>}
+            </InfoRow>
+            <InfoRow label="Tipo">
+              {contact.isPrimary ? (
+                <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">Principal</Badge>
+              ) : <span className="text-muted-foreground">Secundario</span>}
+            </InfoRow>
+          </div>
         </div>
-      </div>
+      </CollapsibleSection>
 
-      {/* ── Tab pills ── */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors shrink-0 ${
-              activeTab === tab.key
-                ? "bg-primary/15 text-primary border border-primary/30"
-                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground border border-transparent"
-            }`}
+      {/* ── Section 2: Cuenta ── */}
+      <CollapsibleSection icon={<Building2 className="h-4 w-4" />} title="Cuenta">
+        {contact.account ? (
+          <Link
+            href={`/crm/accounts/${contact.account.id}`}
+            className="flex items-center justify-between rounded-lg border p-3 sm:p-4 transition-colors hover:bg-accent/30 group"
           >
-            {tab.label}
-            {tab.count !== undefined && (
-              <span className="ml-1.5 text-[10px] opacity-70">({tab.count})</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Info Tab ── */}
-      {activeTab === "info" && (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Users className="h-4 w-4" />
-                Datos del contacto
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <InfoRow label="Nombre completo">
-                <span className="font-medium">{fullName}</span>
-              </InfoRow>
-              <InfoRow label="Email">
-                {contact.email ? (
-                  <a href={`mailto:${contact.email}`} className="flex items-center gap-1 text-primary hover:underline">
-                    <Mail className="h-3 w-3" />
-                    {contact.email}
-                  </a>
-                ) : (
-                  <span className="text-muted-foreground">Sin email</span>
-                )}
-              </InfoRow>
-              <InfoRow label="Teléfono">
-                {contact.phone ? (
-                  <a href={`tel:${contact.phone}`} className="flex items-center gap-1 text-primary hover:underline">
-                    <Phone className="h-3 w-3" />
-                    {contact.phone}
-                  </a>
-                ) : (
-                  <span className="text-muted-foreground">Sin teléfono</span>
-                )}
-              </InfoRow>
-              <InfoRow label="Cargo">
-                {contact.roleTitle ? (
-                  <span className="flex items-center gap-1">
-                    <Briefcase className="h-3 w-3" />
-                    {contact.roleTitle}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">Sin cargo</span>
-                )}
-              </InfoRow>
-              <InfoRow label="Tipo">
-                {contact.isPrimary ? (
-                  <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-                    Principal
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary" />
+                <p className="font-medium text-sm">{contact.account.name}</p>
+                {contact.account.type && (
+                  <Badge variant="outline" className={contact.account.type === "client" ? "border-emerald-500/30 text-emerald-400" : "border-amber-500/30 text-amber-400"}>
+                    {contact.account.type === "client" ? "Cliente" : "Prospecto"}
                   </Badge>
-                ) : (
-                  <span className="text-muted-foreground">Secundario</span>
                 )}
-              </InfoRow>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Building2 className="h-4 w-4" />
-                Cuenta
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {contact.account ? (
-                <Link
-                  href={`/crm/accounts/${contact.account.id}`}
-                  className="flex items-center justify-between rounded-lg border p-3 sm:p-4 transition-colors hover:bg-accent/30 group"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-primary" />
-                      <p className="font-medium text-sm">{contact.account.name}</p>
-                      {contact.account.type && (
-                        <Badge
-                          variant="outline"
-                          className={
-                            contact.account.type === "client"
-                              ? "border-emerald-500/30 text-emerald-400"
-                              : "border-amber-500/30 text-amber-400"
-                          }
-                        >
-                          {contact.account.type === "client" ? "Cliente" : "Prospecto"}
-                        </Badge>
-                      )}
-                    </div>
-                    {contact.account.industry && (
-                      <p className="mt-0.5 text-xs text-muted-foreground">{contact.account.industry}</p>
-                    )}
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 shrink-0" />
-                </Link>
-              ) : (
-                <EmptyState
-                  icon={<Building2 className="h-8 w-8" />}
-                  title="Sin cuenta"
-                  description="Este contacto no está asociado a una cuenta."
-                  compact
-                />
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* ── Deals Tab ── */}
-      {activeTab === "deals" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <TrendingUp className="h-4 w-4" />
-              Negocios de la cuenta
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {deals.length === 0 ? (
-              <EmptyState
-                icon={<TrendingUp className="h-8 w-8" />}
-                title="Sin negocios"
-                description="No hay negocios vinculados a la cuenta de este contacto."
-                compact
-              />
-            ) : (
-              <div className="space-y-2">
-                {deals.map((deal) => (
-                  <Link
-                    key={deal.id}
-                    href={`/crm/deals/${deal.id}`}
-                    className="flex items-center justify-between rounded-lg border p-3 sm:p-4 transition-colors hover:bg-accent/30 group"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">{deal.title}</p>
-                        <Badge variant="outline">{deal.stage?.name}</Badge>
-                        {deal.status === "won" && (
-                          <Badge variant="outline" className="border-emerald-500/30 text-emerald-400">
-                            Ganado
-                          </Badge>
-                        )}
-                        {deal.status === "lost" && (
-                          <Badge variant="outline" className="border-red-500/30 text-red-400">
-                            Perdido
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        ${Number(deal.amount).toLocaleString("es-CL")}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 shrink-0 hidden sm:block" />
-                  </Link>
-                ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── Emails Tab ── */}
-      {activeTab === "emails" && (
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <Mail className="h-4 w-4" />
-              Correos enviados
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              {contact.phone && (
-                <a
-                  href={`https://wa.me/${contact.phone.replace(/\s/g, "").replace(/^\+/, "")}?text=${encodeURIComponent(`Hola ${contact.firstName}, `)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-500/20 transition-colors"
-                >
-                  <MessageSquare className="h-3 w-3" />
-                  WhatsApp
-                </a>
-              )}
-              {gmailConnected && contact.email ? (
-                <Button size="sm" variant="secondary" onClick={() => setEmailOpen(true)}>
-                  <Send className="h-3.5 w-3.5 mr-1.5" />
-                  Enviar correo
-                </Button>
-              ) : !gmailConnected ? (
-                <Button asChild size="sm" variant="secondary">
-                  <Link href="/opai/configuracion/integraciones">Conectar Gmail</Link>
-                </Button>
-              ) : null}
+              {contact.account.industry && <p className="mt-0.5 text-xs text-muted-foreground">{contact.account.industry}</p>}
             </div>
-          </CardHeader>
-          <CardContent>
-            <EmailHistoryList contactId={contact.id} compact />
-          </CardContent>
-        </Card>
-      )}
+            <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:translate-x-0.5 transition-transform shrink-0" />
+          </Link>
+        ) : (
+          <EmptyState icon={<Building2 className="h-8 w-8" />} title="Sin cuenta" description="Este contacto no está asociado a una cuenta." compact />
+        )}
+      </CollapsibleSection>
+
+      {/* ── Section 3: Negocios ── */}
+      <CollapsibleSection
+        icon={<TrendingUp className="h-4 w-4" />}
+        title="Negocios"
+        count={deals.length}
+        defaultOpen={deals.length > 0}
+      >
+        {deals.length === 0 ? (
+          <EmptyState icon={<TrendingUp className="h-8 w-8" />} title="Sin negocios" description="No hay negocios vinculados a la cuenta de este contacto." compact />
+        ) : (
+          <div className="space-y-2">
+            {deals.map((deal) => (
+              <Link key={deal.id} href={`/crm/deals/${deal.id}`} className="flex items-center justify-between rounded-lg border p-3 sm:p-4 transition-colors hover:bg-accent/30 group">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">{deal.title}</p>
+                    <Badge variant="outline">{deal.stage?.name}</Badge>
+                    {deal.status === "won" && <Badge variant="outline" className="border-emerald-500/30 text-emerald-400">Ganado</Badge>}
+                    {deal.status === "lost" && <Badge variant="outline" className="border-red-500/30 text-red-400">Perdido</Badge>}
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">${Number(deal.amount).toLocaleString("es-CL")}</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:translate-x-0.5 transition-transform shrink-0 hidden sm:block" />
+              </Link>
+            ))}
+          </div>
+        )}
+      </CollapsibleSection>
+
+      {/* ── Section 4: Correos ── */}
+      <CollapsibleSection
+        icon={<Mail className="h-4 w-4" />}
+        title="Correos"
+        defaultOpen={false}
+        action={
+          <div className="flex items-center gap-2">
+            {whatsappUrl && (
+              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 text-[10px] font-medium text-emerald-600 hover:bg-emerald-500/20 transition-colors">
+                <MessageSquare className="h-3 w-3" />
+                WhatsApp
+              </a>
+            )}
+            {gmailConnected && contact.email && (
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEmailOpen(true)}>
+                <Send className="h-3 w-3 mr-1" />
+                Enviar correo
+              </Button>
+            )}
+          </div>
+        }
+      >
+        <EmailHistoryList contactId={contact.id} compact />
+      </CollapsibleSection>
 
       {/* ── Email Compose Modal ── */}
       <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
         <DialogContent className="sm:max-w-4xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Enviar correo a {contact.firstName}</DialogTitle>
-            <DialogDescription>
-              Se enviará desde tu cuenta Gmail conectada. Tu firma se adjuntará automáticamente.
-            </DialogDescription>
+            <DialogDescription>Se enviará desde tu cuenta Gmail conectada. Tu firma se adjuntará automáticamente.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            {/* Template */}
             <div className="space-y-1.5">
               <Label className="text-xs">Template</Label>
-              <select
-                className={selectCn}
-                value={selectedTemplateId}
-                onChange={(e) => selectTemplate(e.target.value)}
-                disabled={sending}
-              >
+              <select className={selectCn} value={selectedTemplateId} onChange={(e) => selectTemplate(e.target.value)} disabled={sending}>
                 <option value="">Sin template</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
+                {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
-
-            {/* Para + CC/BCC toggle */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label className="text-xs">Para</Label>
-                {!showCcBcc && (
-                  <button type="button" onClick={() => setShowCcBcc(true)} className="text-[11px] text-primary hover:underline">
-                    CC / BCC
-                  </button>
-                )}
+                {!showCcBcc && <button type="button" onClick={() => setShowCcBcc(true)} className="text-[11px] text-primary hover:underline">CC / BCC</button>}
               </div>
-              <input
-                value={contact.email || ""}
-                disabled
-                className={`h-9 w-full rounded-md border px-3 text-sm ${inputCn} opacity-70`}
-              />
+              <input value={contact.email || ""} disabled className={`h-9 w-full rounded-md border px-3 text-sm ${inputCn} opacity-70`} />
             </div>
-
             {showCcBcc && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">CC (separados por coma)</Label>
-                  <input
-                    value={emailCc}
-                    onChange={(e) => setEmailCc(e.target.value)}
-                    className={`h-9 w-full rounded-md border px-3 text-sm ${inputCn}`}
-                    placeholder="copia@empresa.com"
-                    disabled={sending}
-                  />
+                  <Label className="text-xs">CC</Label>
+                  <input value={emailCc} onChange={(e) => setEmailCc(e.target.value)} className={`h-9 w-full rounded-md border px-3 text-sm ${inputCn}`} placeholder="copia@empresa.com" disabled={sending} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">BCC (copia oculta)</Label>
-                  <input
-                    value={emailBcc}
-                    onChange={(e) => setEmailBcc(e.target.value)}
-                    className={`h-9 w-full rounded-md border px-3 text-sm ${inputCn}`}
-                    placeholder="oculto@empresa.com"
-                    disabled={sending}
-                  />
+                  <Label className="text-xs">BCC</Label>
+                  <input value={emailBcc} onChange={(e) => setEmailBcc(e.target.value)} className={`h-9 w-full rounded-md border px-3 text-sm ${inputCn}`} placeholder="oculto@empresa.com" disabled={sending} />
                 </div>
               </div>
             )}
-
-            {/* Asunto */}
             <div className="space-y-1.5">
               <Label className="text-xs">Asunto</Label>
-              <input
-                value={emailSubject}
-                onChange={(e) => setEmailSubject(e.target.value)}
-                className={`h-9 w-full rounded-md border px-3 text-sm ${inputCn}`}
-                placeholder="Asunto del correo"
-                disabled={sending}
-              />
+              <input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} className={`h-9 w-full rounded-md border px-3 text-sm ${inputCn}`} placeholder="Asunto" disabled={sending} />
             </div>
-
-            {/* Editor Tiptap */}
             <div className="space-y-1.5">
               <Label className="text-xs">Mensaje</Label>
-              <ContractEditor
-                content={emailTiptapContent}
-                onChange={handleTiptapChange}
-                editable={!sending}
-                placeholder="Escribe tu mensaje aquí..."
-                filterModules={["system"]}
-              />
+              <ContractEditor content={emailTiptapContent} onChange={handleTiptapChange} editable={!sending} placeholder="Escribe tu mensaje aquí..." filterModules={["system"]} />
             </div>
-
-            {/* Firma preview */}
             {signatureHtml && (
               <div className="rounded-md border border-border/50 bg-muted/20 p-3">
-                <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider font-medium">
-                  Firma (se agrega automáticamente)
-                </p>
+                <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider font-medium">Firma (se agrega automáticamente)</p>
                 <div className="text-xs opacity-70" dangerouslySetInnerHTML={{ __html: signatureHtml }} />
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEmailOpen(false)}>Cancelar</Button>
-            <Button onClick={sendEmail} disabled={sending}>
-              {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Enviar correo
-            </Button>
+            <Button onClick={sendEmail} disabled={sending}>{sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enviar correo</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -645,9 +440,7 @@ export function CrmContactDetailClient({
       {/* ── Edit Modal ── */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Editar contacto</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Editar contacto</DialogTitle></DialogHeader>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs">Nombre *</Label>
@@ -678,21 +471,12 @@ export function CrmContactDetailClient({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
-            <Button onClick={saveEdit} disabled={saving}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Guardar
-            </Button>
+            <Button onClick={saveEdit} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <ConfirmDialog
-        open={deleteConfirm}
-        onOpenChange={setDeleteConfirm}
-        title="Eliminar contacto"
-        description="El contacto será eliminado permanentemente. Esta acción no se puede deshacer."
-        onConfirm={deleteContact}
-      />
+      <ConfirmDialog open={deleteConfirm} onOpenChange={setDeleteConfirm} title="Eliminar contacto" description="El contacto será eliminado permanentemente." onConfirm={deleteContact} />
     </div>
   );
 }
