@@ -620,6 +620,7 @@ export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps
       return sum + price * meal.mealsPerDay * meal.daysOfService;
     }, 0);
   }, [meals, mealCatalog]);
+  const financialTotal = summary ? summary.monthlyFinancial + summary.monthlyPolicy : 0;
 
   const costForm = loading ? (
     <div className="text-sm text-muted-foreground">Cargando...</div>
@@ -1295,7 +1296,7 @@ export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps
               Costos financieros
             </h3>
             <span className="text-xs text-muted-foreground">
-              Total: {formatCurrency(sumCostItemsByType(["financial", "policy"]))}
+              Total mensual: {formatCurrency(financialTotal)}
             </span>
             <div className="flex items-center gap-2">
               <select
@@ -2172,7 +2173,7 @@ export function CpqQuoteCosts({ quoteId, variant = "modal" }: CpqQuoteCostsProps
                         Costos financieros
                       </h3>
                       <span className="text-xs text-muted-foreground">
-                        Total: {formatCurrency(sumCostItemsByType(["financial", "policy"]))}
+                        Total mensual: {formatCurrency(financialTotal)}
                       </span>
                       <div className="flex items-center gap-2">
                         <select
