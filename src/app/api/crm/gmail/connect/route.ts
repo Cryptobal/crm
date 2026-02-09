@@ -3,7 +3,7 @@
  * GET - Inicia OAuth con Gmail
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getDefaultTenantId } from "@/lib/tenant";
 import { getGmailOAuthClient, GMAIL_SCOPES } from "@/lib/gmail";
@@ -15,10 +15,12 @@ function signState(payload: string) {
   return createHmac("sha256", STATE_SECRET).update(payload).digest("hex");
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const origin = new URL(request.url).origin;
+
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.redirect("/opai/login?callbackUrl=/crm/deals");
+    return NextResponse.redirect(`${origin}/opai/login?callbackUrl=/crm/deals`);
   }
 
   const tenantId = session.user?.tenantId ?? (await getDefaultTenantId());
