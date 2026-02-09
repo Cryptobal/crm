@@ -41,6 +41,7 @@ import {
 import { cn } from "@/lib/utils";
 import { CrmAccount, CrmDeal, CrmPipelineStage } from "@/types";
 import { GripVertical, Plus } from "lucide-react";
+import { toast } from "sonner";
 
 type DealFormState = {
   title: string;
@@ -268,7 +269,7 @@ export function CrmDealsClient({
 
   const createDeal = async () => {
     if (!form.accountId) {
-      alert("Selecciona un cliente.");
+      toast.error("Selecciona un cliente.");
       return;
     }
     setLoading(true);
@@ -294,7 +295,7 @@ export function CrmDealsClient({
       setOpen(false);
     } catch (error) {
       console.error(error);
-      alert("No se pudo crear el negocio.");
+      toast.error("No se pudo crear el negocio.");
     } finally {
       setLoading(false);
     }
@@ -331,7 +332,7 @@ export function CrmDealsClient({
     } catch (error) {
       console.error(error);
       setDeals((prev) => prev.map((deal) => (deal.id === dealId ? previous : deal)));
-      alert("No se pudo actualizar la etapa.");
+      toast.error("No se pudo actualizar la etapa.");
     } finally {
       setLoading(false);
     }
@@ -340,7 +341,7 @@ export function CrmDealsClient({
   const linkQuote = async (dealId: string) => {
     const quoteId = selectedQuotes[dealId];
     if (!quoteId) {
-      alert("Selecciona una cotización.");
+      toast.error("Selecciona una cotización.");
       return;
     }
     setLoading(true);
@@ -364,7 +365,7 @@ export function CrmDealsClient({
       setSelectedQuotes((prev) => ({ ...prev, [dealId]: "" }));
     } catch (error) {
       console.error(error);
-      alert("No se pudo vincular la cotización.");
+      toast.error("No se pudo vincular la cotización.");
     } finally {
       setLoading(false);
     }

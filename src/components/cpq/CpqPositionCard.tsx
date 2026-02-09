@@ -19,6 +19,7 @@ import { CostBreakdownModal } from "@/components/cpq/CostBreakdownModal";
 import { formatCurrency, sortWeekdays } from "@/components/cpq/utils";
 import type { CpqPosition } from "@/types/cpq";
 import { ChevronDown, MoreVertical } from "lucide-react";
+import { toast } from "sonner";
 
 interface CpqPositionCardProps {
   quoteId: string;
@@ -73,7 +74,7 @@ export function CpqPositionCard({
   };
 
   const handleDelete = async () => {
-    if (!confirm("¿Eliminar este puesto?")) return;
+    if (!window.confirm("¿Eliminar este puesto?")) return;
     setLoading(true);
     try {
       await fetch(`/api/cpq/quotes/${quoteId}/positions/${position.id}`, {

@@ -1,47 +1,33 @@
 'use client';
 
 import { cloneElement, isValidElement, ReactElement, ReactNode, useEffect, useState } from 'react';
-import { Menu, PanelLeftOpen } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BottomNav } from './BottomNav';
 
 export interface AppShellProps {
   sidebar?: ReactNode;
   topbar?: ReactNode;
   children: ReactNode;
+  userName?: string;
   className?: string;
 }
 
 /**
- * AppShell - Layout principal de la aplicación
- * 
- * Estructura de 3 zonas:
- * - Sidebar fijo (240px) a la izquierda
- * - Topbar sticky (64px) arriba
- * - Content area con scroll independiente
- * 
- * El sidebar se oculta en mobile (TODO: implementar drawer/toggle)
- * 
- * @example
- * ```tsx
- * <AppShell
- *   sidebar={<AppSidebar navItems={items} />}
- *   topbar={<AppTopbar userMenu={<UserMenu />} />}
- * >
- *   <PageContent />
- * </AppShell>
- * ```
+ * AppShell - Layout principal
+ *
+ * Desktop: sidebar izquierdo + content
+ * Mobile: topbar con hamburger + content + bottom nav
  */
-export function AppShell({ sidebar, topbar, children, className }: AppShellProps) {
+export function AppShell({ sidebar, topbar, children, userName, className }: AppShellProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   useEffect(() => {
     if (!isMobileOpen) return;
-    const previousOverflow = document.body.style.overflow;
+    const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
+    return () => { document.body.style.overflow = prev; };
   }, [isMobileOpen]);
 
   const mobileSidebar = isValidElement(sidebar)
@@ -55,11 +41,11 @@ export function AppShell({ sidebar, topbar, children, className }: AppShellProps
         {
           className: cn(
             (sidebar as ReactElement<{ className?: string }>).props.className,
-            "z-50 transition-transform duration-300 ease-out",
-            isMobileOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
+            'z-50 transition-transform duration-300 ease-out',
+            isMobileOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none'
           ),
           onNavigate: () => setIsMobileOpen(false),
-          onToggleSidebar: () => setIsSidebarOpen((open) => !open),
+          onToggleSidebar: () => setIsSidebarOpen((o) => !o),
           isSidebarOpen,
         }
       )
@@ -67,23 +53,24 @@ export function AppShell({ sidebar, topbar, children, className }: AppShellProps
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
-      {/* Mobile menu button */}
+      {/* ── Mobile topbar ── */}
       {sidebar && (
-        <button
-          type="button"
-          className="fixed right-4 top-4 z-40 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card/95 text-foreground shadow-lg backdrop-blur lg:hidden"
-          onClick={() => setIsMobileOpen(true)}
-          aria-label="Abrir navegación"
-          aria-controls="app-sidebar-mobile"
-          aria-expanded={isMobileOpen}
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        <header className="sticky top-0 z-30 flex h-12 items-center justify-between border-b border-border bg-card/95 px-4 backdrop-blur lg:hidden">
+          <span className="text-sm font-semibold tracking-tight">OPAI</span>
+          <button
+            type="button"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            onClick={() => setIsMobileOpen(true)}
+            aria-label="Abrir menú"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </header>
       )}
 
-      {/* Sidebar */}
+      {/* ── Desktop sidebar ── */}
       {sidebar && (
-        <div className={cn("hidden lg:block", !isSidebarOpen && "lg:hidden")}>
+        <div className={cn('hidden lg:block', !isSidebarOpen && 'lg:hidden')}>
           {isValidElement(sidebar)
             ? cloneElement(
                 sidebar as ReactElement<{
@@ -91,7 +78,7 @@ export function AppShell({ sidebar, topbar, children, className }: AppShellProps
                   isSidebarOpen?: boolean;
                 }>,
                 {
-                  onToggleSidebar: () => setIsSidebarOpen((open) => !open),
+                  onToggleSidebar: () => setIsSidebarOpen((o) => !o),
                   isSidebarOpen,
                 }
               )
@@ -99,48 +86,59 @@ export function AppShell({ sidebar, topbar, children, className }: AppShellProps
         </div>
       )}
 
-      {/* Desktop reopen toggle (when sidebar closed) */}
+      {/* ── Desktop reopen button ── */}
       {sidebar && !isSidebarOpen && (
         <button
           type="button"
-          className="fixed bottom-6 left-6 z-40 hidden h-10 w-10 items-center justify-center rounded-lg border border-border bg-card/95 text-foreground shadow-lg backdrop-blur lg:inline-flex"
+          className="fixed bottom-6 left-6 z-40 hidden h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-lg transition-colors hover:bg-accent hover:text-foreground lg:inline-flex"
           onClick={() => setIsSidebarOpen(true)}
           aria-label="Abrir navegación"
-          aria-expanded={false}
         >
-          <PanelLeftOpen className="h-5 w-5" />
+          <Menu className="h-4 w-4" />
         </button>
       )}
 
-      {/* Mobile sidebar drawer */}
+      {/* ── Mobile drawer overlay ── */}
       {sidebar && (
-        <div className={cn("lg:hidden", isMobileOpen ? "pointer-events-auto" : "pointer-events-none")}>
+        <div className={cn('lg:hidden', isMobileOpen ? 'pointer-events-auto' : 'pointer-events-none')}>
           <div
             className={cn(
-              "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity",
-              isMobileOpen ? "opacity-100" : "opacity-0"
+              'fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300',
+              isMobileOpen ? 'opacity-100' : 'opacity-0'
             )}
             onClick={() => setIsMobileOpen(false)}
             aria-hidden="true"
           />
-          <div id="app-sidebar-mobile" className="fixed left-0 top-0 z-50 h-screen w-60 max-w-[85vw]">
+          {/* Close button */}
+          <button
+            type="button"
+            className={cn(
+              "fixed right-4 top-3 z-[60] h-8 w-8 items-center justify-center rounded-md bg-card/90 text-foreground shadow-lg transition-opacity duration-300",
+              isMobileOpen ? "inline-flex opacity-100" : "hidden opacity-0"
+            )}
+            onClick={() => setIsMobileOpen(false)}
+            aria-label="Cerrar menú"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <div className="fixed left-0 top-0 z-50 h-screen w-60 max-w-[85vw]">
             {mobileSidebar}
           </div>
         </div>
       )}
 
-      {/* Main content area (offset por sidebar) */}
-      <div className={cn(isSidebarOpen ? "lg:pl-60" : "lg:pl-0", className)}>
-        {/* Topbar (opcional) */}
+      {/* ── Main content ── */}
+      <div className={cn(isSidebarOpen ? 'lg:pl-60' : 'lg:pl-0', className)}>
         {topbar}
-
-        {/* Page content */}
         <main className="flex-1">
-          <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 pb-20 lg:pb-6 animate-in-page">
             {children}
           </div>
         </main>
       </div>
+
+      {/* ── Mobile bottom nav ── */}
+      <BottomNav />
     </div>
   );
 }

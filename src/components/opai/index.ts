@@ -39,6 +39,7 @@ export { ReloadButton } from './ReloadButton';
 // Navigation
 export { SubNav } from './SubNav';
 export type { SubNavItem } from './SubNav';
+export { BottomNav } from './BottomNav';
 
 // Page Components
 export { DocumentosContent } from './DocumentosContent';

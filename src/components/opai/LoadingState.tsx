@@ -11,76 +11,49 @@ export interface LoadingStateProps {
 }
 
 /**
- * LoadingState - Estados de carga consistentes
- * 
- * Tres variantes:
- * - spinner: Loader centrado con texto opcional
- * - skeleton: Cards skeleton para listados (rows controla cantidad)
- * - overlay: Overlay con blur para acciones en progreso
- * 
- * @example
- * ```tsx
- * // Spinner simple
- * <LoadingState type="spinner" text="Cargando..." />
- * 
- * // Skeleton para tabla
- * <LoadingState type="skeleton" rows={5} />
- * 
- * // Overlay para acciones
- * <LoadingState type="overlay" text="Guardando..." />
- * ```
+ * LoadingState - Estados de carga estandarizados
+ *
+ * - spinner: centrado con texto opcional
+ * - skeleton: pulse cards para listas
+ * - overlay: full-screen para acciones
  */
-export function LoadingState({ 
-  type = 'spinner', 
+export function LoadingState({
+  type = 'spinner',
   text,
   rows = 3,
-  className 
+  className,
 }: LoadingStateProps) {
-  // Spinner centrado
   if (type === 'spinner') {
     return (
-      <div 
-        className={cn(
-          "flex min-h-[400px] flex-col items-center justify-center gap-4",
-          className
-        )}
-      >
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        {text && (
-          <p className="text-sm text-muted-foreground">{text}</p>
-        )}
+      <div className={cn('flex min-h-[200px] flex-col items-center justify-center gap-3', className)}>
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        {text && <p className="text-xs text-muted-foreground">{text}</p>}
       </div>
     );
   }
 
-  // Skeleton cards
   if (type === 'skeleton') {
     return (
-      <div className={cn("space-y-4", className)}>
+      <div className={cn('space-y-3', className)}>
         {Array.from({ length: rows }).map((_, i) => (
-          <div 
-            key={i}
-            className="h-24 rounded-lg border border-border bg-muted/20 animate-pulse"
-          />
+          <div key={i} className="flex items-center gap-3 rounded-lg border border-border p-4">
+            <div className="h-9 w-9 rounded-lg bg-muted animate-pulse" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-1/3 rounded bg-muted animate-pulse" />
+              <div className="h-2.5 w-2/3 rounded bg-muted/60 animate-pulse" />
+            </div>
+          </div>
         ))}
       </div>
     );
   }
 
-  // Overlay con blur
   if (type === 'overlay') {
     return (
-      <div 
-        className={cn(
-          "fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm",
-          className
-        )}
-      >
-        <div className="flex flex-col items-center gap-4 rounded-lg bg-card p-8 shadow-lg">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          {text && (
-            <p className="text-sm font-medium">{text}</p>
-          )}
+      <div className={cn('fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm', className)}>
+        <div className="flex flex-col items-center gap-3 rounded-lg bg-card border border-border p-6 shadow-xl">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          {text && <p className="text-sm font-medium">{text}</p>}
         </div>
       </div>
     );

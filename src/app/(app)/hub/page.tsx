@@ -108,48 +108,44 @@ export default async function HubPage() {
     : null;
 
   return (
-    <>
+    <div className="space-y-8">
       {/* Page Header + Indicadores */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <PageHeader
           title="Inicio"
           description="Centro de control OPAI Suite"
+          actions={
+            <div className="flex items-center gap-2">
+              {ufValue && (
+                <div className="hidden sm:block rounded-md border border-border bg-card px-2.5 py-1 text-center">
+                  <p className="text-xs uppercase text-muted-foreground">UF</p>
+                  <p className="text-xs font-mono font-semibold">{formatCLP(ufValue)}</p>
+                </div>
+              )}
+              <NotificationBell presentations={presentations} />
+            </div>
+          }
         />
-        <div className="flex items-center gap-3">
-          {ufValue && (
-            <div className="rounded-lg border border-border/40 bg-card/50 px-3 py-1.5 text-center">
-              <p className="text-xs uppercase text-muted-foreground">UF {ufDate}</p>
-              <p className="text-sm font-mono font-semibold">{formatCLP(ufValue)}</p>
-            </div>
-          )}
-          {utmValue && (
-            <div className="rounded-lg border border-border/40 bg-card/50 px-3 py-1.5 text-center">
-              <p className="text-xs uppercase text-muted-foreground">UTM {utmMonth}</p>
-              <p className="text-sm font-mono font-semibold">{formatCLP(utmValue)}</p>
-            </div>
-          )}
-          <NotificationBell presentations={presentations} />
-        </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="mb-6 flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2">
         <Link href="/opai/templates">
-          <Button size="default" className="gap-2">
+          <Button size="sm" className="gap-2">
             <Plus className="h-4 w-4" />
             Nueva Propuesta
           </Button>
         </Link>
         <Link href="/opai/configuracion/usuarios">
-          <Button variant="outline" size="default" className="gap-2">
+          <Button variant="outline" size="sm" className="gap-2">
             <UserPlus className="h-4 w-4" />
             Invitar Usuario
           </Button>
         </Link>
       </div>
 
-      {/* KPIs Grid - Minimalista */}
-      <div className="mb-5 grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* KPIs Grid */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard
           title="Total"
           value={total}
@@ -179,90 +175,37 @@ export default async function HubPage() {
       </div>
 
       {/* Apps Launcher */}
-      <div className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold">Aplicaciones</h2>
-        <div className="grid auto-rows-fr gap-3 md:grid-cols-2 lg:grid-cols-5">
-          {/* Docs - Operativo */}
-          <Link href="/opai/inicio">
-            <Card className="flex h-full cursor-pointer flex-col transition-all hover:border-primary hover:shadow-md">
-              <CardHeader className="pb-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
-                    <FileText className="h-4 w-4" />
-                  </div>
-                  <Badge variant="default" className="text-xs">Activo</Badge>
+      <div>
+        <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">Aplicaciones</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { href: '/opai/inicio', icon: FileText, title: 'Docs', desc: 'Presentaciones', color: 'text-blue-400 bg-blue-400/10' },
+            { href: '/crm', icon: Users, title: 'CRM', desc: 'Clientes', color: 'text-emerald-400 bg-emerald-400/10' },
+            { href: '/payroll', icon: Calculator, title: 'Payroll', desc: 'Liquidaciones', color: 'text-purple-400 bg-purple-400/10' },
+            { href: '/opai/configuracion/usuarios', icon: Settings, title: 'Config', desc: 'Ajustes', color: 'text-amber-400 bg-amber-400/10' },
+          ].map((app) => (
+            <Link key={app.href} href={app.href}>
+              <div className="group flex items-center gap-3 rounded-lg border border-border bg-card p-3 transition-all hover:bg-accent/40 hover:shadow-md cursor-pointer">
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${app.color}`}>
+                  <app.icon className="h-4 w-4" />
                 </div>
-                <CardTitle className="text-sm">Docs</CardTitle>
-                <CardDescription className="text-xs">
-                  Presentaciones comerciales
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-
-          {/* CRM - Activo */}
-          <Link href="/crm">
-            <Card className="flex h-full cursor-pointer flex-col transition-all hover:border-primary hover:shadow-md">
-              <CardHeader className="pb-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-500/10 text-green-500">
-                    <Users className="h-4 w-4" />
-                  </div>
-                  <Badge variant="default" className="text-xs">Activo</Badge>
+                <div>
+                  <p className="text-sm font-medium">{app.title}</p>
+                  <p className="text-xs text-muted-foreground">{app.desc}</p>
                 </div>
-                <CardTitle className="text-sm">CRM</CardTitle>
-                <CardDescription className="text-xs">
-                  Clientes y cotizaciones
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-
-          {/* Payroll - Operativo */}
-          <Link href="/payroll">
-            <Card className="flex h-full cursor-pointer flex-col transition-all hover:border-primary hover:shadow-md">
-              <CardHeader className="pb-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
-                    <Calculator className="h-4 w-4" />
-                  </div>
-                  <Badge variant="default" className="text-xs">Activo</Badge>
-                </div>
-                <CardTitle className="text-sm">Payroll</CardTitle>
-                <CardDescription className="text-xs">
-                  Liquidaciones Chile
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-
-          {/* Admin - Operativo */}
-          <Link href="/opai/configuracion/usuarios">
-            <Card className="flex h-full cursor-pointer flex-col transition-all hover:border-primary hover:shadow-md">
-              <CardHeader className="pb-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500">
-                    <Settings className="h-4 w-4" />
-                  </div>
-                  <Badge variant="default" className="text-xs">Activo</Badge>
-                </div>
-                <CardTitle className="text-sm">Configuración</CardTitle>
-                <CardDescription className="text-xs">
-                  Usuarios, integraciones, templates
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
 
       {/* Two Column Layout: Work Queue + Activity Feed */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {/* Work Queue */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
+              <Clock className="h-4 w-4 text-muted-foreground" />
               Cola de Trabajo
             </CardTitle>
             <CardDescription>Propuestas pendientes de lectura</CardDescription>
@@ -310,7 +253,7 @@ export default async function HubPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
               Actividad Reciente
             </CardTitle>
             <CardDescription>Últimas visualizaciones</CardDescription>
@@ -359,6 +302,6 @@ export default async function HubPage() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </div>
   );
 }

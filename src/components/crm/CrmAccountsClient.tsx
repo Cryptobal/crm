@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 
 type AccountFormState = {
   name: string;
@@ -60,7 +61,7 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
 
   const createAccount = async () => {
     if (!form.name.trim()) {
-      alert("El nombre del cliente es obligatorio.");
+      toast.error("El nombre del cliente es obligatorio.");
       return;
     }
     setLoading(true);
@@ -82,7 +83,7 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
       setOpen(false);
     } catch (error) {
       console.error(error);
-      alert("No se pudo crear el cliente.");
+      toast.error("No se pudo crear el cliente.");
     } finally {
       setLoading(false);
     }

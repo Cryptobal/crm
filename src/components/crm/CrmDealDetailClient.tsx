@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 type QuoteOption = {
   id: string;
@@ -117,7 +118,7 @@ export function CrmDealDetailClient({
 
   const linkQuote = async () => {
     if (!selectedQuoteId) {
-      alert("Selecciona una cotización.");
+      toast.error("Selecciona una cotización.");
       return;
     }
     setLoading(true);
@@ -136,7 +137,7 @@ export function CrmDealDetailClient({
       setOpen(false);
     } catch (error) {
       console.error(error);
-      alert("No se pudo vincular la cotización.");
+      toast.error("No se pudo vincular la cotización.");
     } finally {
       setLoading(false);
     }
@@ -144,11 +145,11 @@ export function CrmDealDetailClient({
 
   const sendEmail = async () => {
     if (!gmailConnected) {
-      alert("Conecta Gmail antes de enviar.");
+      toast.error("Conecta Gmail antes de enviar.");
       return;
     }
     if (!emailTo || !emailSubject) {
-      alert("Completa destinatario y asunto.");
+      toast.error("Completa destinatario y asunto.");
       return;
     }
     setLoading(true);
@@ -171,7 +172,7 @@ export function CrmDealDetailClient({
       setEmailBody("");
     } catch (error) {
       console.error(error);
-      alert("No se pudo enviar el correo.");
+      toast.error("No se pudo enviar el correo.");
     } finally {
       setLoading(false);
     }

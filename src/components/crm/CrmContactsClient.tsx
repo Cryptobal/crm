@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 
 type ContactRow = {
   id: string;
@@ -76,11 +77,11 @@ export function CrmContactsClient({
 
   const createContact = async () => {
     if (!form.accountId) {
-      alert("Selecciona un cliente.");
+      toast.error("Selecciona un cliente.");
       return;
     }
     if (!form.name.trim()) {
-      alert("El nombre del contacto es obligatorio.");
+      toast.error("El nombre del contacto es obligatorio.");
       return;
     }
     setLoading(true);
@@ -99,7 +100,7 @@ export function CrmContactsClient({
       setOpen(false);
     } catch (error) {
       console.error(error);
-      alert("No se pudo crear el contacto.");
+      toast.error("No se pudo crear el contacto.");
     } finally {
       setLoading(false);
     }

@@ -6,6 +6,7 @@ import { revokeInvitation } from '@/app/(app)/opai/actions/users';
 import { X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { toast } from "sonner";
 
 interface Invitation {
   id: string;
@@ -23,7 +24,7 @@ export default function InvitationsTable({ invitations }: Props) {
   const [loading, setLoading] = useState<string | null>(null);
 
   const handleRevoke = async (id: string) => {
-    if (!confirm('¿Seguro que deseas revocar esta invitación?')) return;
+    if (!window.confirm('¿Seguro que deseas revocar esta invitación?')) return;
     setLoading(id);
     await revokeInvitation(id);
     setLoading(null);

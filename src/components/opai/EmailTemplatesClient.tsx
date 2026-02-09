@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 type EmailTemplate = {
   id: string;
@@ -75,7 +76,7 @@ export function EmailTemplatesClient({ initialTemplates }: { initialTemplates: E
 
   const saveTemplate = async () => {
     if (!name.trim() || !subject.trim() || !body.trim()) {
-      alert("Completa nombre, asunto y cuerpo.");
+      toast.error("Completa nombre, asunto y cuerpo.");
       return;
     }
     setLoading(true);
@@ -100,14 +101,14 @@ export function EmailTemplatesClient({ initialTemplates }: { initialTemplates: E
       resetForm();
     } catch (error) {
       console.error(error);
-      alert("No se pudo guardar el template.");
+      toast.error("No se pudo guardar el template.");
     } finally {
       setLoading(false);
     }
   };
 
   const deleteTemplate = async (templateId: string) => {
-    if (!confirm("¿Eliminar este template?")) return;
+    if (!window.confirm("¿Eliminar este template?")) return;
     setLoading(true);
     try {
       const response = await fetch(`/api/crm/email-templates/${templateId}`, {
@@ -118,7 +119,7 @@ export function EmailTemplatesClient({ initialTemplates }: { initialTemplates: E
       setTemplates((prev) => prev.filter((t) => t.id !== templateId));
     } catch (error) {
       console.error(error);
-      alert("No se pudo eliminar el template.");
+      toast.error("No se pudo eliminar el template.");
     } finally {
       setLoading(false);
     }

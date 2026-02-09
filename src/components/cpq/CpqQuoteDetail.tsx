@@ -150,7 +150,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
   };
 
   const handleDelete = async () => {
-    if (!confirm("¿Eliminar esta cotización? Esta acción no se puede deshacer.")) return;
+    if (!window.confirm("¿Eliminar esta cotización? Esta acción no se puede deshacer.")) return;
     setDeleting(true);
     try {
       const response = await fetch(`/api/cpq/quotes/${quoteId}`, {

@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { Inbox } from 'lucide-react';
 
 export interface EmptyStateProps {
   icon?: ReactNode;
@@ -7,61 +8,41 @@ export interface EmptyStateProps {
   description?: string;
   action?: ReactNode;
   className?: string;
+  compact?: boolean;
 }
 
 /**
  * EmptyState - Estado vacío estándar
- * 
- * Muestra un mensaje centrado cuando no hay datos para mostrar.
- * 
- * Características:
- * - Icono opcional (grande, muted)
- * - Título claro
- * - Descripción opcional
- * - CTA/acción opcional
- * 
- * @example
- * ```tsx
- * <EmptyState
- *   icon={<Inbox className="h-16 w-16" />}
- *   title="No hay presentaciones"
- *   description="Crea tu primera presentación para comenzar"
- *   action={<Button>Crear Presentación</Button>}
- * />
- * ```
+ *
+ * compact=true: para inline dentro de cards (menos alto)
+ * compact=false: para páginas completas
  */
-export function EmptyState({ 
-  icon, 
-  title, 
-  description, 
+export function EmptyState({
+  icon,
+  title,
+  description,
   action,
-  className 
+  className,
+  compact = false,
 }: EmptyStateProps) {
   return (
-    <div 
+    <div
       className={cn(
-        "flex min-h-[400px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 px-6 py-12 text-center",
+        "flex flex-col items-center justify-center text-center",
+        compact
+          ? "py-8 px-4"
+          : "min-h-[280px] rounded-lg border border-dashed border-border bg-muted/10 px-6 py-12",
         className
       )}
     >
-      {icon && (
-        <div className="mb-4 text-muted-foreground/50">
-          {icon}
-        </div>
-      )}
-      <h3 className="mb-2 text-xl font-semibold">
-        {title}
-      </h3>
+      <div className="mb-3 text-muted-foreground/40">
+        {icon || <Inbox className="h-10 w-10" />}
+      </div>
+      <h3 className="mb-1 text-sm font-medium text-foreground">{title}</h3>
       {description && (
-        <p className="mb-6 max-w-md text-sm text-muted-foreground">
-          {description}
-        </p>
+        <p className="mb-4 max-w-sm text-xs text-muted-foreground">{description}</p>
       )}
-      {action && (
-        <div>
-          {action}
-        </div>
-      )}
+      {action && <div>{action}</div>}
     </div>
   );
 }

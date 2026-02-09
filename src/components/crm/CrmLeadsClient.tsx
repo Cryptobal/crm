@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { CrmLead } from "@/types";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 
 type LeadFormState = {
   companyName: string;
@@ -74,7 +75,7 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
       setOpen(false);
     } catch (error) {
       console.error(error);
-      alert("No se pudo crear el prospecto.");
+      toast.error("No se pudo crear el prospecto.");
     } finally {
       setLoading(false);
     }
@@ -99,7 +100,7 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
       );
     } catch (error) {
       console.error(error);
-      alert("No se pudo aprobar el prospecto.");
+      toast.error("No se pudo aprobar el prospecto.");
     } finally {
       setLoading(false);
     }

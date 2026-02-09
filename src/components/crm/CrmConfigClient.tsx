@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 type PipelineStage = {
   id: string;
@@ -87,7 +88,7 @@ export function CrmConfigClient({
       setStages((prev) => prev.map((item) => (item.id === stage.id ? data.data : item)));
     } catch (error) {
       console.error(error);
-      alert("No se pudo guardar la etapa.");
+      toast.error("No se pudo guardar la etapa.");
     } finally {
       setLoadingId(null);
     }
@@ -95,7 +96,7 @@ export function CrmConfigClient({
 
   const addStage = async () => {
     if (!newStage.name.trim()) {
-      alert("Escribe el nombre de la etapa.");
+      toast.error("Escribe el nombre de la etapa.");
       return;
     }
     setLoadingId("new-stage");
@@ -117,14 +118,14 @@ export function CrmConfigClient({
       setNewStage({ name: "", order: "1", color: "#3b82f6", isClosedWon: false, isClosedLost: false });
     } catch (error) {
       console.error(error);
-      alert("No se pudo crear la etapa.");
+      toast.error("No se pudo crear la etapa.");
     } finally {
       setLoadingId(null);
     }
   };
 
   const deleteStage = async (stageId: string) => {
-    if (!confirm("¿Desactivar esta etapa?")) return;
+    if (!window.confirm("¿Desactivar esta etapa?")) return;
     setLoadingId(stageId);
     try {
       const response = await fetch(`/api/crm/pipeline/${stageId}`, { method: "DELETE" });
@@ -133,7 +134,7 @@ export function CrmConfigClient({
       setStages((prev) => prev.filter((item) => item.id !== stageId));
     } catch (error) {
       console.error(error);
-      alert("No se pudo desactivar la etapa.");
+      toast.error("No se pudo desactivar la etapa.");
     } finally {
       setLoadingId(null);
     }
@@ -141,7 +142,7 @@ export function CrmConfigClient({
 
   const addField = async () => {
     if (!newField.name.trim()) {
-      alert("Escribe el nombre del campo.");
+      toast.error("Escribe el nombre del campo.");
       return;
     }
     setLoadingId("new-field");
@@ -164,14 +165,14 @@ export function CrmConfigClient({
       setNewField({ name: "", entityType: "deal", type: "text", options: "" });
     } catch (error) {
       console.error(error);
-      alert("No se pudo crear el campo.");
+      toast.error("No se pudo crear el campo.");
     } finally {
       setLoadingId(null);
     }
   };
 
   const deleteField = async (fieldId: string) => {
-    if (!confirm("¿Eliminar este campo personalizado?")) return;
+    if (!window.confirm("¿Eliminar este campo personalizado?")) return;
     setLoadingId(fieldId);
     try {
       const response = await fetch(`/api/crm/custom-fields/${fieldId}`, { method: "DELETE" });
@@ -180,7 +181,7 @@ export function CrmConfigClient({
       setFields((prev) => prev.filter((item) => item.id !== fieldId));
     } catch (error) {
       console.error(error);
-      alert("No se pudo eliminar el campo.");
+      toast.error("No se pudo eliminar el campo.");
     } finally {
       setLoadingId(null);
     }
