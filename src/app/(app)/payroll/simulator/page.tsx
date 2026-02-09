@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { LoadingState } from "@/components/opai/LoadingState";
 import { formatCLP, formatNumber, parseLocalizedNumber } from "@/lib/utils";
 import {
   Dialog,
@@ -22,9 +23,12 @@ import {
 } from "@/components/ui/dialog";
 import { ArrowLeft, Calculator, Info, Settings } from "lucide-react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
+
+const selectClass =
+  "flex h-10 w-full appearance-none rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 export default function PayrollSimulator() {
-  // Estados
   const [baseSalary, setBaseSalary] = useState("550000");
   const [includeGrat, setIncludeGrat] = useState(true);
   const [overtimeHours, setOvertimeHours] = useState("");
@@ -44,7 +48,6 @@ export default function PayrollSimulator() {
   const [parameters, setParameters] = useState<any>(null);
   const [mobileSection, setMobileSection] = useState<'haberes' | 'descuentos' | 'resultado'>('haberes');
 
-  // Cargar parámetros al iniciar (para UF/UTM y modal)
   useEffect(() => {
     fetchParameters();
   }, []);
@@ -53,9 +56,7 @@ export default function PayrollSimulator() {
     try {
       const response = await fetch("/api/payroll/parameters?active_only=true");
       const data = await response.json();
-      if (data.success) {
-        setParameters(data.data.current_version);
-      }
+      if (data.success) setParameters(data.data.current_version);
     } catch (err) {
       console.error("Error loading parameters:", err);
     }
@@ -73,7 +74,7 @@ export default function PayrollSimulator() {
         : 0;
       const baseForGratification = base + overtime;
       const gratification = includeGrat ? Math.round(baseForGratification * 0.25) : 0;
-      
+
       const totalIncome =
         base +
         gratification +
@@ -118,6 +119,7 @@ export default function PayrollSimulator() {
       const data = await response.json();
       if (!data.success) throw new Error(data.error?.message || "Error");
       setResult(data.data);
+      setMobileSection('resultado');
     } catch (err: any) {
       setError(err.message);
       setResult(null);
@@ -135,69 +137,63 @@ export default function PayrollSimulator() {
     : 0;
   const gratPreview = includeGrat ? Math.round((baseNum + overtimeNum) * 0.25) : 0;
 
-  // UF/UTM desde parámetros
   const ufValue = parameters?.parameters_snapshot?.references_at_calculation?.uf_clp || 39703.50;
   const utmValue = parameters?.parameters_snapshot?.references_at_calculation?.utm_clp || 69611;
   const ufDate = parameters?.parameters_snapshot?.references_at_calculation?.uf_date || "2026-02-01";
 
+  const mobileTabs = [
+    { key: 'haberes' as const, label: 'Haberes' },
+    { key: 'descuentos' as const, label: 'Descuentos' },
+    { key: 'resultado' as const, label: 'Resultado' },
+  ];
+
   return (
-    <div className="space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
           <Link href="/payroll">
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
           <PageHeader title="Simulador de Liquidación" description="Cálculo completo según ley chilena" />
         </div>
 
-        {/* Botón Modal Parámetros + UF/UTM */}
         <div className="flex items-center gap-2">
-          {/* UF/UTM Badge */}
-          <div className="rounded-lg border border-border bg-card px-3 py-1.5">
-            <div className="flex items-center gap-3 text-xs sm:text-sm">
-              <div>
-                <span className="text-muted-foreground">UF:</span>
-                <span className="ml-1 font-mono font-medium">{formatCLP(ufValue)}</span>
-              </div>
-              <div className="h-3 w-px bg-border" />
-              <div>
-                <span className="text-muted-foreground">UTM:</span>
-                <span className="ml-1 font-mono font-medium">{formatCLP(utmValue)}</span>
-              </div>
-            </div>
+          <div className="hidden sm:flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1 text-xs">
+            <span className="text-muted-foreground">UF</span>
+            <span className="font-mono font-medium">{formatCLP(ufValue)}</span>
+            <span className="text-border">|</span>
+            <span className="text-muted-foreground">UTM</span>
+            <span className="font-mono font-medium">{formatCLP(utmValue)}</span>
           </div>
 
-          {/* Modal Parámetros */}
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
                 <Settings className="h-4 w-4" />
-                Parámetros
+                <span className="hidden sm:inline">Parámetros</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[95vw] sm:max-w-2xl lg:max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Parámetros Legales Vigentes</DialogTitle>
               </DialogHeader>
-              
+
               {parameters && (
                 <div className="space-y-4">
-                  <Badge variant="default" className="text-xs">
-                    {parameters.effective_from}
-                  </Badge>
+                  <Badge variant="default">{parameters.effective_from}</Badge>
 
-                  <div className="grid gap-3 md:grid-cols-3">
-                    {/* AFP */}
-                    <div className="rounded-lg border bg-card p-3">
-                      <h4 className="mb-2 text-xs sm:text-sm font-semibold">AFP</h4>
-                      <div className="space-y-1 text-xs sm:text-sm">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-lg border border-border bg-card p-3">
+                      <h4 className="mb-2 text-sm font-medium">AFP</h4>
+                      <div className="space-y-1 text-xs">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Base:</span>
                           <span className="font-mono">10%</span>
                         </div>
-                        <div className="mt-2 space-y-0.5 border-t pt-1">
+                        <div className="mt-2 space-y-0.5 border-t border-border pt-1">
                           {Object.entries(parameters.data.afp.commissions).map(([name, config]: any) => (
                             <div key={name} className="flex justify-between">
                               <span className="capitalize text-muted-foreground">{name}</span>
@@ -208,35 +204,26 @@ export default function PayrollSimulator() {
                       </div>
                     </div>
 
-                    {/* SIS */}
-                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-                      <h4 className="mb-2 text-xs sm:text-sm font-semibold">SIS (Empleador)</h4>
-                      <div className="text-xs sm:text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-emerald-400">Tasa:</span>
-                          <span className="font-mono font-semibold text-emerald-400">
-                            {fmtPct(parameters.data.sis.employer_rate)}
-                          </span>
-                        </div>
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                      <h4 className="mb-2 text-sm font-medium">SIS (Empleador)</h4>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-primary">Tasa:</span>
+                        <span className="font-mono font-semibold text-primary">{fmtPct(parameters.data.sis.employer_rate)}</span>
                       </div>
                     </div>
 
-                    {/* Mutual */}
-                    <div className="rounded-lg border bg-card p-3">
-                      <h4 className="mb-2 text-xs sm:text-sm font-semibold">Mutual</h4>
-                      <div className="text-xs sm:text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Base legal:</span>
-                          <span className="font-mono">{fmtPct(parameters.data.work_injury.base_rate)}</span>
-                        </div>
+                    <div className="rounded-lg border border-border bg-card p-3">
+                      <h4 className="mb-2 text-sm font-medium">Mutual</h4>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Base legal:</span>
+                        <span className="font-mono">{fmtPct(parameters.data.work_injury.base_rate)}</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Topes */}
-                  <div className="rounded-lg border bg-card p-3">
-                    <h4 className="mb-2 text-xs sm:text-sm font-semibold">Topes Imponibles 2026</h4>
-                    <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
+                  <div className="rounded-lg border border-border bg-card p-3">
+                    <h4 className="mb-2 text-sm font-medium">Topes Imponibles</h4>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Pensiones:</span>
                         <span className="font-mono">{parameters.data.caps.pension_uf} UF</span>
@@ -248,13 +235,12 @@ export default function PayrollSimulator() {
                     </div>
                   </div>
 
-                  {/* Referencias */}
                   <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-                    <h4 className="mb-2 flex items-center gap-2 text-xs sm:text-sm font-semibold text-blue-400">
-                      <Info className="h-3 w-3" />
+                    <h4 className="mb-2 flex items-center gap-2 text-sm font-medium text-blue-400">
+                      <Info className="h-3.5 w-3.5" />
                       Referencias Vigentes
                     </h4>
-                    <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm">
+                    <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">UF ({ufDate}):</span>
                         <span className="font-mono">{formatCLP(ufValue)}</span>
@@ -265,8 +251,7 @@ export default function PayrollSimulator() {
                       </div>
                     </div>
                     <p className="mt-2 text-xs text-muted-foreground">
-                      💡 UF se actualiza diariamente (SBIF). UTM mensualmente (SII). 
-                      Valores capturados en snapshot inmutable.
+                      UF se actualiza diariamente. UTM mensualmente. Valores capturados en snapshot inmutable.
                     </p>
                   </div>
                 </div>
@@ -276,122 +261,104 @@ export default function PayrollSimulator() {
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        {/* FORMULARIO */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* ── FORMULARIO ── */}
         <Card className="p-4">
           {/* Mobile tabs */}
-          <div className="mb-3 flex gap-2 lg:hidden">
-            <button
-              type="button"
-              onClick={() => setMobileSection('haberes')}
-              className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold ${
-                mobileSection === 'haberes'
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                  : 'bg-card border-border text-muted-foreground'
-              }`}
-            >
-              Haberes
-            </button>
-            <button
-              type="button"
-              onClick={() => setMobileSection('descuentos')}
-              className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold ${
-                mobileSection === 'descuentos'
-                  ? 'bg-red-500/15 border-red-500/40 text-red-300'
-                  : 'bg-card border-border text-muted-foreground'
-              }`}
-            >
-              Descuentos
-            </button>
-            <button
-              type="button"
-              onClick={() => setMobileSection('resultado')}
-              className={`flex-1 rounded-md border px-3 py-2 text-sm font-semibold ${
-                mobileSection === 'resultado'
-                  ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
-                  : 'bg-card border-border text-muted-foreground'
-              }`}
-            >
-              Resultado
-            </button>
+          <div className="mb-4 flex gap-1 rounded-md border border-border bg-muted/30 p-1 lg:hidden">
+            {mobileTabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setMobileSection(tab.key)}
+                className={cn(
+                  "flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+                  mobileSection === tab.key
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {/* HABERES */}
-            <div className={`${mobileSection !== 'haberes' ? 'hidden lg:block' : ''} space-y-2`}>
-              <h3 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-emerald-400">+ Haberes</h3>
-              
-              <div className="space-y-1">
-                <Label className="text-xs sm:text-sm">Sueldo Base</Label>
-                <Input type="text" inputMode="numeric" value={baseSalary} onChange={(e) => setBaseSalary(e.target.value)} className="h-11 sm:h-9 bg-background font-mono text-sm" required />
+            <div className={cn(mobileSection !== 'haberes' && 'hidden lg:block', 'space-y-3')}>
+              <h3 className="text-xs font-medium uppercase tracking-wide text-emerald-400">+ Haberes</h3>
+
+              <div className="space-y-1.5">
+                <Label>Sueldo Base</Label>
+                <Input type="text" inputMode="numeric" value={baseSalary} onChange={(e) => setBaseSalary(e.target.value)} className="font-mono" required />
               </div>
 
-              <div className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2">
-                <Label className="flex cursor-pointer items-center gap-2 text-xs sm:text-sm">
-                  <input type="checkbox" checked={includeGrat} onChange={(e) => setIncludeGrat(e.target.checked)} className="h-4 w-4" />
+              <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input type="checkbox" checked={includeGrat} onChange={(e) => setIncludeGrat(e.target.checked)} className="h-4 w-4 rounded border-input accent-primary" />
                   Gratificación 25%
-                </Label>
-                {includeGrat && <span className="font-mono text-xs sm:text-sm text-emerald-400">+{fmt(gratPreview)}</span>}
+                </label>
+                {includeGrat && <span className="font-mono text-xs text-emerald-400">+{fmt(gratPreview)}</span>}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs sm:text-sm">Horas Extra 50%</Label>
-                  <Input type="text" inputMode="numeric" value={overtimeHours} onChange={(e) => setOvertimeHours(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Horas Extra 50%</Label>
+                  <Input type="text" inputMode="numeric" value={overtimeHours} onChange={(e) => setOvertimeHours(e.target.value)} placeholder="0" className="font-mono" />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs sm:text-sm">Comisiones</Label>
-                  <Input type="text" inputMode="numeric" value={commissions} onChange={(e) => setCommissions(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs sm:text-sm">Bonos</Label>
-                  <Input type="text" inputMode="numeric" value={bonuses} onChange={(e) => setBonuses(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs sm:text-sm">Asig. Familiar (cargas)</Label>
-                  <Input type="text" inputMode="numeric" value={numDependents} onChange={(e) => setNumDependents(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
+                <div className="space-y-1.5">
+                  <Label>Comisiones</Label>
+                  <Input type="text" inputMode="numeric" value={commissions} onChange={(e) => setCommissions(e.target.value)} placeholder="0" className="font-mono" />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs sm:text-sm">Colación</Label>
-                  <Input type="text" inputMode="numeric" value={meal} onChange={(e) => setMeal(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Bonos</Label>
+                  <Input type="text" inputMode="numeric" value={bonuses} onChange={(e) => setBonuses(e.target.value)} placeholder="0" className="font-mono" />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs sm:text-sm">Movilización</Label>
-                  <Input type="text" inputMode="numeric" value={transport} onChange={(e) => setTransport(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
+                <div className="space-y-1.5">
+                  <Label>Cargas familiares</Label>
+                  <Input type="text" inputMode="numeric" value={numDependents} onChange={(e) => setNumDependents(e.target.value)} placeholder="0" className="font-mono" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Colación</Label>
+                  <Input type="text" inputMode="numeric" value={meal} onChange={(e) => setMeal(e.target.value)} placeholder="0" className="font-mono" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Movilización</Label>
+                  <Input type="text" inputMode="numeric" value={transport} onChange={(e) => setTransport(e.target.value)} placeholder="0" className="font-mono" />
                 </div>
               </div>
             </div>
 
             {/* DESCUENTOS */}
-            <div className={`${mobileSection !== 'descuentos' ? 'hidden lg:block' : ''} space-y-2 border-t pt-2`}>
-              <h3 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-red-400">− Descuentos</h3>
+            <div className={cn(mobileSection !== 'descuentos' && 'hidden lg:block', 'space-y-3 border-t border-border pt-4')}>
+              <h3 className="text-xs font-medium uppercase tracking-wide text-red-400">- Descuentos</h3>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs sm:text-sm">Contrato</Label>
-                  <select value={contractType} onChange={(e) => setContractType(e.target.value as any)} className="flex h-11 sm:h-9 w-full appearance-none rounded-md border border-input bg-card px-3 text-sm text-foreground">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Contrato</Label>
+                  <select value={contractType} onChange={(e) => setContractType(e.target.value as any)} className={selectClass}>
                     <option value="indefinite">Indefinido</option>
                     <option value="fixed_term">Plazo Fijo</option>
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs sm:text-sm">Salud</Label>
-                  <select value={healthSystem} onChange={(e) => setHealthSystem(e.target.value as any)} className="flex h-11 sm:h-9 w-full appearance-none rounded-md border border-input bg-card px-3 text-sm text-foreground">
+                <div className="space-y-1.5">
+                  <Label>Salud</Label>
+                  <select value={healthSystem} onChange={(e) => setHealthSystem(e.target.value as any)} className={selectClass}>
                     <option value="fonasa">Fonasa 7%</option>
                     <option value="isapre">Isapre</option>
                   </select>
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs sm:text-sm">AFP</Label>
-                <select value={afpName} onChange={(e) => setAfpName(e.target.value)} className="flex h-11 sm:h-9 w-full appearance-none rounded-md border border-input bg-card px-3 text-sm text-foreground">
+              <div className="space-y-1.5">
+                <Label>AFP</Label>
+                <select value={afpName} onChange={(e) => setAfpName(e.target.value)} className={selectClass}>
                   <option value="capital">Capital (11,44%)</option>
                   <option value="cuprum">Cuprum (11,44%)</option>
                   <option value="habitat">Habitat (11,27%)</option>
@@ -403,106 +370,119 @@ export default function PayrollSimulator() {
               </div>
 
               {healthSystem === "isapre" && (
-                <div className="space-y-1">
-                  <Label className="text-xs sm:text-sm">Isapre Adicional (%)</Label>
-                  <Input type="text" inputMode="decimal" value={isapre_additional} onChange={(e) => setIsapreAdditional(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
+                <div className="space-y-1.5">
+                  <Label>Isapre Adicional (%)</Label>
+                  <Input type="text" inputMode="decimal" value={isapre_additional} onChange={(e) => setIsapreAdditional(e.target.value)} placeholder="0" className="font-mono" />
                 </div>
               )}
 
-              <div className="space-y-1">
-                <Label className="text-xs sm:text-sm">APV (opcional)</Label>
-                <Input type="text" inputMode="numeric" value={apv} onChange={(e) => setApv(e.target.value)} placeholder="0" className="h-11 sm:h-9 bg-background font-mono text-sm" />
+              <div className="space-y-1.5">
+                <Label>APV (opcional)</Label>
+                <Input type="text" inputMode="numeric" value={apv} onChange={(e) => setApv(e.target.value)} placeholder="0" className="font-mono" />
               </div>
             </div>
 
             <Button
               type="submit"
               disabled={loading}
-              className={`${mobileSection === 'resultado' ? 'hidden lg:flex' : 'w-full'} gap-2`}
-              size="sm"
+              className={cn("w-full gap-2", mobileSection === 'resultado' && 'hidden lg:flex')}
             >
-              {loading ? "..." : <><Calculator className="h-3 w-3" />Calcular</>}
+              {loading ? (
+                "Calculando..."
+              ) : (
+                <>
+                  <Calculator className="h-4 w-4" />
+                  Calcular Liquidación
+                </>
+              )}
             </Button>
           </form>
 
-          {error && <div className="mt-2 rounded-md border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400">{error}</div>}
+          {error && (
+            <div className="mt-3 rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-red-400">{error}</div>
+          )}
         </Card>
 
-        {/* RESULTADOS */}
-        <div className={`${mobileSection !== 'resultado' ? 'hidden lg:block' : ''} space-y-3`}>
+        {/* ── RESULTADOS ── */}
+        <div className={cn(mobileSection !== 'resultado' && 'hidden lg:block', 'space-y-4')}>
           {!result ? (
-            <Card className="flex h-full min-h-[400px] items-center justify-center">
-              <p className="text-sm text-muted-foreground">Completa el formulario</p>
+            <Card className="flex min-h-[300px] items-center justify-center">
+              <p className="text-sm text-muted-foreground">Completa el formulario y presiona Calcular</p>
             </Card>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-2">
+              {/* KPI resumen */}
+              <div className="grid grid-cols-2 gap-3">
                 <Card className="border-emerald-500/20 bg-emerald-500/5 p-3">
-                  <p className="text-xs sm:text-sm uppercase text-emerald-400/70">Líquido</p>
+                  <p className="text-xs uppercase text-muted-foreground">Líquido</p>
                   <p className="mt-1 font-mono text-xl font-bold text-emerald-400">{fmt(result.net_salary)}</p>
                 </Card>
                 <Card className="border-blue-500/20 bg-blue-500/5 p-3">
-                  <p className="text-xs sm:text-sm uppercase text-blue-400/70">Costo Empresa</p>
+                  <p className="text-xs uppercase text-muted-foreground">Costo Empresa</p>
                   <p className="mt-1 font-mono text-xl font-bold text-blue-400">{fmt(result.total_employer_cost)}</p>
                 </Card>
               </div>
 
-              <Card className="p-4">
-                <div className="space-y-3">
-                  <div>
-                    <h4 className="mb-2 text-xs sm:text-sm font-semibold uppercase text-emerald-400">+ Haberes</h4>
-                    <div className="space-y-0.5 text-xs sm:text-sm">
-                      <div className="flex justify-between"><span className="text-muted-foreground">Base</span><span className="font-mono">{fmt(baseNum)}</span></div>
-                      {overtimeHours && Number(overtimeHours) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">HE 50% ({overtimeHours}h)</span><span className="font-mono text-emerald-400">+{fmt(overtimeNum)}</span></div>}
-                      {includeGrat && <div className="flex justify-between"><span className="text-muted-foreground">Gratif. 25%</span><span className="font-mono text-emerald-400">+{fmt(gratPreview)}</span></div>}
-                      {commissions && Number(commissions) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Comisiones</span><span className="font-mono text-emerald-400">+{fmt(Number(commissions))}</span></div>}
-                      {bonuses && Number(bonuses) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Bonos</span><span className="font-mono text-emerald-400">+{fmt(Number(bonuses))}</span></div>}
-                      <div className="flex justify-between border-t pt-1 font-medium"><span>Imponible</span><span className="font-mono">{fmt(result.total_taxable_income)}</span></div>
-                      {(transport || meal || numDependents) && (
-                        <>
-                          {transport && Number(transport) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Movilización</span><span className="font-mono">+{fmt(Number(transport))}</span></div>}
-                          {meal && Number(meal) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Colación</span><span className="font-mono">+{fmt(Number(meal))}</span></div>}
-                          {numDependents && Number(numDependents) > 0 && result.total_non_taxable_income > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Asig. Familiar</span><span className="font-mono">+{fmt(result.total_non_taxable_income - (transport ? Number(transport) : 0) - (meal ? Number(meal) : 0))}</span></div>}
-                          <div className="flex justify-between border-t pt-1 font-medium"><span>Bruto Total</span><span className="font-mono">{fmt(result.gross_salary)}</span></div>
-                        </>
-                      )}
-                    </div>
+              {/* Desglose */}
+              <Card className="p-4 space-y-4">
+                {/* Haberes */}
+                <div>
+                  <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-emerald-400">+ Haberes</h4>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Base</span><span className="font-mono">{fmt(baseNum)}</span></div>
+                    {overtimeHours && Number(overtimeHours) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">HE 50% ({overtimeHours}h)</span><span className="font-mono text-emerald-400">+{fmt(overtimeNum)}</span></div>}
+                    {includeGrat && <div className="flex justify-between"><span className="text-muted-foreground">Gratif. 25%</span><span className="font-mono text-emerald-400">+{fmt(gratPreview)}</span></div>}
+                    {commissions && Number(commissions) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Comisiones</span><span className="font-mono text-emerald-400">+{fmt(Number(commissions))}</span></div>}
+                    {bonuses && Number(bonuses) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Bonos</span><span className="font-mono text-emerald-400">+{fmt(Number(bonuses))}</span></div>}
+                    <div className="flex justify-between border-t border-border pt-1 font-medium"><span>Imponible</span><span className="font-mono">{fmt(result.total_taxable_income)}</span></div>
+                    {(transport || meal || numDependents) && (
+                      <>
+                        {transport && Number(transport) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Movilización</span><span className="font-mono">+{fmt(Number(transport))}</span></div>}
+                        {meal && Number(meal) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Colación</span><span className="font-mono">+{fmt(Number(meal))}</span></div>}
+                        {numDependents && Number(numDependents) > 0 && result.total_non_taxable_income > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Asig. Familiar</span><span className="font-mono">+{fmt(result.total_non_taxable_income - (transport ? Number(transport) : 0) - (meal ? Number(meal) : 0))}</span></div>}
+                        <div className="flex justify-between border-t border-border pt-1 font-medium"><span>Bruto Total</span><span className="font-mono">{fmt(result.gross_salary)}</span></div>
+                      </>
+                    )}
                   </div>
-
-                  <div>
-                    <h4 className="mb-2 text-xs sm:text-sm font-semibold uppercase text-red-400">− Descuentos</h4>
-                    <div className="space-y-0.5 text-xs sm:text-sm">
-                      <div className="flex justify-between"><span className="text-muted-foreground">AFP {fmtPct(result.deductions.afp.total_rate)}</span><span className="font-mono text-red-400">-{fmt(result.deductions.afp.amount)}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Salud {fmtPct(result.deductions.health.rate, 1)}</span><span className="font-mono text-red-400">-{fmt(result.deductions.health.amount)}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">AFC {fmtPct(result.deductions.afc.total_rate, 1)}</span><span className="font-mono text-red-400">-{fmt(result.deductions.afc.amount)}</span></div>
-                      {apv && Number(apv) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">APV</span><span className="font-mono text-red-400">-{fmt(Number(apv))}</span></div>}
-                      <div className="flex justify-between"><span className="text-muted-foreground">Impuesto</span><span className="font-mono text-red-400">{result.deductions.tax.amount > 0 ? '-' : ''}{fmt(result.deductions.tax.amount)}</span></div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border-2 border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-xs sm:text-sm font-semibold uppercase text-emerald-300">Líquido</span>
-                      <span className="font-mono text-2xl font-bold text-emerald-400">{fmt(result.net_salary)}</span>
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-2">
-                    <h4 className="mb-1.5 text-xs sm:text-sm font-semibold uppercase text-blue-400">Aportes Empleador</h4>
-                    <div className="space-y-0.5 text-xs sm:text-sm">
-                      <div className="flex justify-between"><span className="text-muted-foreground">SIS {fmtPct(result.employer_cost.sis.rate)}</span><span className="font-mono text-blue-400">+{fmt(result.employer_cost.sis.amount)}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">AFC {fmtPct(result.employer_cost.afc.total_rate, 1)}</span><span className="font-mono text-blue-400">+{fmt(result.employer_cost.afc.total_amount)}</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Mutual {fmtPct(result.employer_cost.work_injury.rate)}</span><span className="font-mono text-blue-400">+{fmt(result.employer_cost.work_injury.amount)}</span></div>
-                      <div className="flex justify-between border-t pt-1 font-semibold"><span>Total Empresa</span><span className="font-mono text-blue-400">{fmt(result.total_employer_cost)}</span></div>
-                    </div>
-                  </div>
-
-                  {result.simulation_id && (
-                    <div className="rounded-md bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground">
-                      ID: {result.simulation_id.slice(0, 8)} <Badge variant="outline" className="ml-2 h-4 text-xs">Inmutable</Badge>
-                    </div>
-                  )}
                 </div>
+
+                {/* Descuentos */}
+                <div>
+                  <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-red-400">- Descuentos</h4>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between"><span className="text-muted-foreground">AFP {fmtPct(result.deductions.afp.total_rate)}</span><span className="font-mono text-red-400">-{fmt(result.deductions.afp.amount)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Salud {fmtPct(result.deductions.health.rate, 1)}</span><span className="font-mono text-red-400">-{fmt(result.deductions.health.amount)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">AFC {fmtPct(result.deductions.afc.total_rate, 1)}</span><span className="font-mono text-red-400">-{fmt(result.deductions.afc.amount)}</span></div>
+                    {apv && Number(apv) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">APV</span><span className="font-mono text-red-400">-{fmt(Number(apv))}</span></div>}
+                    <div className="flex justify-between"><span className="text-muted-foreground">Impuesto</span><span className="font-mono text-red-400">{result.deductions.tax.amount > 0 ? '-' : ''}{fmt(result.deductions.tax.amount)}</span></div>
+                  </div>
+                </div>
+
+                {/* Líquido destacado */}
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs font-medium uppercase text-emerald-400">Líquido a Pagar</span>
+                    <span className="font-mono text-2xl font-bold text-emerald-400">{fmt(result.net_salary)}</span>
+                  </div>
+                </div>
+
+                {/* Empleador */}
+                <div className="border-t border-border pt-3">
+                  <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-blue-400">Aportes Empleador</h4>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between"><span className="text-muted-foreground">SIS {fmtPct(result.employer_cost.sis.rate)}</span><span className="font-mono text-blue-400">+{fmt(result.employer_cost.sis.amount)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">AFC {fmtPct(result.employer_cost.afc.total_rate, 1)}</span><span className="font-mono text-blue-400">+{fmt(result.employer_cost.afc.total_amount)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Mutual {fmtPct(result.employer_cost.work_injury.rate)}</span><span className="font-mono text-blue-400">+{fmt(result.employer_cost.work_injury.amount)}</span></div>
+                    <div className="flex justify-between border-t border-border pt-1 font-medium"><span>Total Empresa</span><span className="font-mono text-blue-400">{fmt(result.total_employer_cost)}</span></div>
+                  </div>
+                </div>
+
+                {result.simulation_id && (
+                  <div className="rounded-md bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    ID: {result.simulation_id.slice(0, 8)}
+                    <Badge variant="outline" className="ml-2">Inmutable</Badge>
+                  </div>
+                )}
               </Card>
             </>
           )}

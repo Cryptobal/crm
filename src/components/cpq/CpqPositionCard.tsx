@@ -144,25 +144,25 @@ export function CpqPositionCard({
 
       <div className={`${detailsOpen ? 'grid' : 'hidden'} sm:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 p-3`}>
         <div className="rounded-md bg-gradient-to-br from-blue-600/40 to-blue-800/30 p-2 text-foreground">
-          <p className="text-xs sm:text-[9px] uppercase text-foreground/70">Cargo</p>
+          <p className="text-xs uppercase text-muted-foreground">Cargo</p>
           <p className="text-sm sm:text-xs font-semibold">{position.cargo?.name || "—"}</p>
         </div>
         <div className="rounded-md bg-gradient-to-br from-purple-600/40 to-purple-800/30 p-2 text-foreground">
-          <p className="text-xs sm:text-[9px] uppercase text-foreground/70">Rol</p>
+          <p className="text-xs uppercase text-muted-foreground">Rol</p>
           <p className="text-sm sm:text-xs font-semibold">{position.rol?.name || "—"}</p>
         </div>
         <div className="rounded-md bg-gradient-to-br from-indigo-600/40 to-indigo-800/30 p-2 text-foreground">
-          <p className="text-xs sm:text-[9px] uppercase text-foreground/70">Base c/u</p>
+          <p className="text-xs uppercase text-muted-foreground">Base c/u</p>
           <p className="text-sm sm:text-xs font-semibold">{formatCurrency(Number(position.baseSalary))}</p>
         </div>
         <div className="rounded-md bg-gradient-to-br from-emerald-600/40 to-emerald-800/30 p-2 text-foreground">
-          <p className="text-xs sm:text-[9px] uppercase text-foreground/70">Líquido c/u</p>
+          <p className="text-xs uppercase text-muted-foreground">Líquido c/u</p>
           <p className="text-sm sm:text-xs font-semibold">
             {formatCurrency(Number(position.netSalary || 0))}
           </p>
         </div>
         <div className="rounded-md bg-gradient-to-br from-cyan-600/40 to-cyan-800/30 p-2 text-foreground">
-          <p className="text-xs sm:text-[9px] uppercase text-foreground/70">Empresa c/u</p>
+          <p className="text-xs uppercase text-muted-foreground">Empresa c/u</p>
           <p className="text-sm sm:text-xs font-semibold">
             {formatCurrency(Number(position.employerCost))}
           </p>

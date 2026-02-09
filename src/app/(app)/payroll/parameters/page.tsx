@@ -38,8 +38,8 @@ export default function PayrollParameters() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="text-sm text-muted-foreground">Cargando...</div>
+      <div className="flex min-h-[200px] items-center justify-center">
+        <div className="text-sm text-muted-foreground">Cargando parámetros...</div>
       </div>
     );
   }
@@ -63,13 +63,12 @@ export default function PayrollParameters() {
   const data = parameters.data;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Link href="/payroll">
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
-              Volver
             </Button>
           </Link>
           <PageHeader title="Parámetros Legales Chile" />
@@ -176,7 +175,7 @@ export default function PayrollParameters() {
                   </span>
                 </div>
               </div>
-              <p className="mt-1.5 text-[9px] text-muted-foreground">
+              <p className="mt-1.5 text-xs text-muted-foreground">
                 Base legal + adicional según siniestralidad empresa
               </p>
             </div>
