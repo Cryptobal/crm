@@ -54,6 +54,13 @@ export async function POST(request: NextRequest) {
         phone: body.phone || null,
         companyName: body.companyName || null,
         notes: body.notes || null,
+        industry: body.industry || null,
+        address: body.address || null,
+        commune: body.commune || null,
+        city: body.city || null,
+        website: body.website || null,
+        serviceType: body.serviceType || null,
+        metadata: body.metadata || null,
       },
     });
 

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,8 +107,19 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
     roleTitle: "",
   });
 
+  const [industries, setIndustries] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/crm/industries?active=true")
+      .then((r) => r.json())
+      .then((res) => res.success && setIndustries(res.data || []))
+      .catch(() => {});
+  }, []);
+
   const inputClassName =
     "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
+  const selectClassName =
+    "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
   const pendingLeads = useMemo(
     () => leads.filter((lead) => lead.status === "pending"),
@@ -169,7 +180,7 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
       phone: lead.phone || "",
       dealTitle: `Oportunidad ${lead.companyName || fullName || ""}`.trim(),
       rut: "",
-      industry: "",
+      industry: lead.industry || "",
       segment: "",
       roleTitle: "",
     });
@@ -378,12 +389,18 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Industria</Label>
-                  <Input
+                  <select
+                    className={selectClassName}
                     value={approveForm.industry}
                     onChange={(e) => updateApproveForm("industry", e.target.value)}
-                    placeholder="Retail, minería..."
-                    className={inputClassName}
-                  />
+                  >
+                    <option value="">Seleccionar industria</option>
+                    {industries.map((i) => (
+                      <option key={i.id} value={i.name}>
+                        {i.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
                   <Label className="text-xs">Segmento</Label>
@@ -497,37 +514,114 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
               No hay leads pendientes.
             </p>
           )}
-          {pendingLeads.map((lead) => (
-            <div
-              key={lead.id}
-              className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
-            >
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="font-medium">
-                    {lead.companyName || "Empresa sin nombre"}
-                  </p>
-                  <StatusBadge status={lead.status} />
+          {pendingLeads.map((lead) => {
+            const meta = lead.metadata as any;
+            const dotacion = meta?.dotacion as { puesto: string; cantidad: number; dias?: string[]; horaInicio?: string; horaFin?: string }[] | undefined;
+            const totalGuards = meta?.totalGuards || 0;
+            return (
+              <div
+                key={lead.id}
+                className="rounded-lg border p-4 space-y-2"
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium">
+                        {lead.companyName || "Empresa sin nombre"}
+                      </p>
+                      <StatusBadge status={lead.status} />
+                      {lead.source === "web_cotizador" && (
+                        <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-400">
+                          Web
+                        </span>
+                      )}
+                      {lead.source === "web_cotizador_inteligente" && (
+                        <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[10px] font-medium text-teal-400">
+                          Cotizador Inteligente
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {leadDisplayName(lead)} · {lead.email || "Sin email"}{" "}
+                      {lead.phone ? `· ${lead.phone}` : ""}
+                    </p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                      {lead.source && lead.source !== "web_cotizador" && lead.source !== "web_cotizador_inteligente" && (
+                        <p className="text-xs text-muted-foreground">
+                          Fuente: {lead.source}
+                        </p>
+                      )}
+                      {lead.industry && (
+                        <p className="text-xs text-muted-foreground">
+                          Industria: {lead.industry}
+                        </p>
+                      )}
+                      {lead.serviceType && (
+                        <p className="text-xs text-muted-foreground">
+                          Servicio: {lead.serviceType}
+                        </p>
+                      )}
+                      {totalGuards > 0 && (
+                        <p className="text-xs text-emerald-400 font-medium">
+                          {totalGuards} guardia{totalGuards > 1 ? "s" : ""}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => openApproveModal(lead)}
+                    size="sm"
+                    className="shrink-0"
+                  >
+                    Revisar y aprobar
+                  </Button>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {leadDisplayName(lead)} · {lead.email || "Sin email"}{" "}
-                  {lead.phone ? `· ${lead.phone}` : ""}
-                </p>
-                {lead.source && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Fuente: {lead.source}
+
+                {/* Dotación summary */}
+                {dotacion && dotacion.length > 0 && (
+                  <div className="rounded-md bg-muted/30 p-2 mt-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                      Dotación solicitada
+                    </p>
+                    <div className="space-y-1">
+                      {dotacion.map((d, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">{d.puesto}</span>
+                          <span>·</span>
+                          <span>{d.cantidad} guardia{d.cantidad > 1 ? "s" : ""}</span>
+                          {d.horaInicio && d.horaFin && (
+                            <>
+                              <span>·</span>
+                              <span>{d.horaInicio} - {d.horaFin}</span>
+                            </>
+                          )}
+                          {d.dias && d.dias.length > 0 && d.dias.length < 7 && (
+                            <>
+                              <span>·</span>
+                              <span>{d.dias.join(", ")}</span>
+                            </>
+                          )}
+                          {d.dias && d.dias.length === 7 && (
+                            <>
+                              <span>·</span>
+                              <span>Todos los días</span>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes preview */}
+                {lead.notes && !dotacion && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                    {lead.notes}
                   </p>
                 )}
               </div>
-              <Button
-                onClick={() => openApproveModal(lead)}
-                size="sm"
-                className="shrink-0"
-              >
-                Revisar y aprobar
-              </Button>
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 

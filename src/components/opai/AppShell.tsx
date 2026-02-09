@@ -5,6 +5,7 @@ import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BottomNav } from './BottomNav';
 import { CommandPalette } from './CommandPalette';
+import { GlobalIndicators } from './GlobalIndicators';
 
 export interface AppShellProps {
   sidebar?: ReactNode;
@@ -56,16 +57,19 @@ export function AppShell({ sidebar, topbar, children, userName, className }: App
     <div className="relative min-h-screen overflow-x-hidden">
       {/* ── Mobile topbar ── */}
       {sidebar && (
-        <header className="sticky top-0 z-30 flex h-12 items-center justify-between border-b border-border bg-card/95 px-4 backdrop-blur lg:hidden">
+        <header className="sticky top-0 z-30 flex min-h-12 items-center justify-between border-b border-border bg-card/95 px-4 py-2 backdrop-blur lg:hidden">
           <span className="text-sm font-semibold tracking-tight">OPAI</span>
-          <button
-            type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            onClick={() => setIsMobileOpen(true)}
-            aria-label="Abrir menú"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <GlobalIndicators compact />
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              onClick={() => setIsMobileOpen(true)}
+              aria-label="Abrir menú"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          </div>
         </header>
       )}
 
@@ -124,6 +128,10 @@ export function AppShell({ sidebar, topbar, children, userName, className }: App
           className
         )}
       >
+        {/* Barra global: UF + UTM + campana — siempre visible a la derecha */}
+        <div className="hidden lg:flex sticky top-0 z-20 min-h-12 items-center justify-end gap-4 border-b border-border/50 bg-background/95 backdrop-blur px-6 py-3">
+          <GlobalIndicators />
+        </div>
         {topbar}
         <main className="flex-1">
           <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 pb-20 lg:pb-6 animate-in-page">

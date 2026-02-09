@@ -679,6 +679,13 @@ model CrmLead {
   phone              String?
   companyName        String?   @map("company_name")
   notes              String?
+  industry           String?
+  address            String?
+  commune            String?
+  city               String?
+  website            String?
+  serviceType        String?   @map("service_type")
+  metadata           Json?     @db.JsonB
   approvedAt         DateTime? @map("approved_at") @db.Timestamptz(6)
   approvedBy         String?   @map("approved_by")
   convertedAccountId String?   @map("converted_account_id") @db.Uuid
@@ -687,10 +694,43 @@ model CrmLead {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  leadInstallations CrmInstallation[]
+
   @@index([tenantId], map: "idx_crm_leads_tenant")
   @@index([status], map: "idx_crm_leads_status")
   @@index([createdAt(sort: Desc)], map: "idx_crm_leads_created_desc")
   @@map("leads")
+  @@schema("crm")
+}
+
+model Notification {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId  String   @map("tenant_id")
+  type      String   // "new_lead", "lead_approved", "quote_sent", etc.
+  title     String
+  message   String?
+  data      Json?    @db.JsonB
+  read      Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId], map: "idx_notifications_tenant")
+  @@index([tenantId, read], map: "idx_notifications_tenant_read")
+  @@index([createdAt(sort: Desc)], map: "idx_notifications_created_desc")
+  @@map("notifications")
+  @@schema("crm")
+}
+
+model CrmIndustry {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name      String   @unique
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([active], map: "idx_crm_industries_active")
+  @@map("industries")
   @@schema("crm")
 }
 
@@ -726,7 +766,8 @@ model CrmAccount {
 model CrmInstallation {
   id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   tenantId  String   @map("tenant_id")
-  accountId String   @map("account_id") @db.Uuid
+  accountId String?  @map("account_id") @db.Uuid
+  leadId    String?  @map("lead_id") @db.Uuid
   name      String
   address   String?
   city      String?
@@ -737,11 +778,13 @@ model CrmInstallation {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  account CrmAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account CrmAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  lead    CrmLead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
   quotes  CpqQuote[]
 
   @@index([tenantId], map: "idx_crm_installations_tenant")
   @@index([accountId], map: "idx_crm_installations_account")
+  @@index([leadId], map: "idx_crm_installations_lead")
   @@map("installations")
   @@schema("crm")
 }

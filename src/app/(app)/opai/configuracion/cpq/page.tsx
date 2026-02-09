@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/opai";
 import { ConfigSubnav } from "@/components/opai";
-import { CpqCatalogConfig } from "@/components/cpq/CpqCatalogConfig";
+import { CpqConfigTabs } from "@/components/cpq/CpqConfigTabs";
 
 export default async function CpqConfigPage() {
   const session = await auth();
@@ -19,13 +19,11 @@ export default async function CpqConfigPage() {
     <>
       <PageHeader
         title="Configuración CPQ"
-        description="Catálogo y parámetros de pricing"
+        description="Catálogo, puestos, cargos, roles y parámetros de pricing"
         className="mb-6"
       />
       <ConfigSubnav />
-      <div className="grid gap-4">
-        <CpqCatalogConfig showHeader={false} />
-      </div>
+      <CpqConfigTabs />
     </>
   );
 }

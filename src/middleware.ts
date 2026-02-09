@@ -27,6 +27,7 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith('/api/debug')) return true;
   if (pathname.startsWith('/api/email-preview')) return true;
   if (pathname.startsWith('/api/pdf')) return true;
+  if (pathname.startsWith('/api/public')) return true;
 
   // Páginas públicas (raíz / y /opai se manejan abajo para redirigir siempre a login/inicio)
   if (pathname === '/opai/login' || pathname.startsWith('/activate')) return true;

@@ -8,6 +8,25 @@ export interface CrmLead {
   phone?: string | null;
   companyName?: string | null;
   notes?: string | null;
+  industry?: string | null;
+  address?: string | null;
+  commune?: string | null;
+  city?: string | null;
+  website?: string | null;
+  serviceType?: string | null;
+  metadata?: any;
+  createdAt: string;
+}
+
+export interface Notification {
+  id: string;
+  tenantId: string;
+  type: string;
+  title: string;
+  message?: string | null;
+  data?: any;
+  read: boolean;
+  link?: string | null;
   createdAt: string;
 }
 
@@ -27,7 +46,8 @@ export interface CrmAccount {
 
 export interface CrmInstallation {
   id: string;
-  accountId: string;
+  accountId?: string | null;
+  leadId?: string | null;
   name: string;
   address?: string | null;
   city?: string | null;

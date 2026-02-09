@@ -1,10 +1,12 @@
 /**
  * API Route: /api/cpq/puestos
- * GET - Listar puestos de trabajo CPQ
+ * GET  - Listar puestos de trabajo CPQ
+ * POST - Crear puesto de trabajo
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, unauthorized } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,6 +23,42 @@ export async function GET(request: NextRequest) {
     console.error("Error fetching CPQ puestos:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch puestos" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
+    const body = await request.json();
+    if (!body.name?.trim()) {
+      return NextResponse.json(
+        { success: false, error: "Nombre es requerido" },
+        { status: 400 }
+      );
+    }
+
+    const puesto = await prisma.cpqPuestoTrabajo.create({
+      data: {
+        name: body.name.trim(),
+        active: body.active ?? true,
+      },
+    });
+
+    return NextResponse.json({ success: true, data: puesto }, { status: 201 });
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return NextResponse.json(
+        { success: false, error: "Ya existe un puesto con ese nombre" },
+        { status: 409 }
+      );
+    }
+    console.error("Error creating puesto:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to create puesto" },
       { status: 500 }
     );
   }

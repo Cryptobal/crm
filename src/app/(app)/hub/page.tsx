@@ -23,7 +23,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { NotificationBell } from '@/components/opai/NotificationBell';
 import { 
   Plus, 
   UserPlus, 
@@ -56,12 +55,6 @@ export default async function HubPage() {
   }
 
   const tenantId = session.user.tenantId;
-
-  // Obtener UF y UTM del día
-  const [latestUf, latestUtm] = await Promise.all([
-    prisma.fxUfRate.findFirst({ orderBy: { date: "desc" } }),
-    prisma.fxUtmRate.findFirst({ orderBy: { month: "desc" } }),
-  ]);
 
   // Obtener métricas reales de Docs
   const presentations = await prisma.presentation.findMany({
@@ -96,18 +89,6 @@ export default async function HubPage() {
     })
     .slice(0, 5);
 
-  const formatCLP = (n: number) =>
-    new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 2 }).format(n);
-
-  const ufValue = latestUf ? Number(latestUf.value) : null;
-  const utmValue = latestUtm ? Number(latestUtm.value) : null;
-  const ufDate = latestUf?.date
-    ? new Date(latestUf.date).toLocaleDateString("es-CL", { day: "2-digit", month: "short" })
-    : null;
-  const utmMonth = latestUtm?.month
-    ? new Date(latestUtm.month).toLocaleDateString("es-CL", { month: "long", year: "numeric" })
-    : null;
-
   // Saludo personalizado
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Buenos días' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
@@ -122,23 +103,6 @@ export default async function HubPage() {
       <PageHeader
         title={`${greeting}, ${firstName}`}
         description={subtitle}
-        actions={
-          <div className="flex items-center gap-2">
-            {ufValue && (
-              <div className="rounded-md border border-border bg-card px-2.5 py-1 text-center">
-                <p className="text-xs uppercase text-muted-foreground">UF {ufDate}</p>
-                <p className="text-xs font-mono font-semibold">{formatCLP(ufValue)}</p>
-              </div>
-            )}
-            {utmValue && (
-              <div className="hidden sm:block rounded-md border border-border bg-card px-2.5 py-1 text-center">
-                <p className="text-xs uppercase text-muted-foreground">UTM</p>
-                <p className="text-xs font-mono font-semibold">{formatCLP(utmValue)}</p>
-              </div>
-            )}
-            <NotificationBell presentations={presentations} />
-          </div>
-        }
       />
 
       {/* Quick Actions */}

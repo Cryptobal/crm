@@ -74,7 +74,9 @@ export async function PATCH(
 
     revalidatePath(`/crm/installations`);
     revalidatePath(`/crm/installations/${id}`);
-    revalidatePath(`/crm/accounts/${installation.accountId}`);
+    if (installation.accountId) {
+      revalidatePath(`/crm/accounts/${installation.accountId}`);
+    }
 
     return NextResponse.json({ success: true, data: installation });
   } catch (error) {

@@ -1,10 +1,12 @@
 /**
  * API Route: /api/cpq/roles
- * GET - Listar roles CPQ
+ * GET  - Listar roles CPQ
+ * POST - Crear rol
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, unauthorized } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,6 +23,43 @@ export async function GET(request: NextRequest) {
     console.error("Error fetching CPQ roles:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch roles" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
+    const body = await request.json();
+    if (!body.name?.trim()) {
+      return NextResponse.json(
+        { success: false, error: "Nombre es requerido" },
+        { status: 400 }
+      );
+    }
+
+    const rol = await prisma.cpqRol.create({
+      data: {
+        name: body.name.trim(),
+        description: body.description?.trim() || null,
+        active: body.active ?? true,
+      },
+    });
+
+    return NextResponse.json({ success: true, data: rol }, { status: 201 });
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return NextResponse.json(
+        { success: false, error: "Ya existe un rol con ese nombre" },
+        { status: 409 }
+      );
+    }
+    console.error("Error creating rol:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to create rol" },
       { status: 500 }
     );
   }

@@ -1,10 +1,12 @@
 /**
  * API Route: /api/cpq/cargos
- * GET - Listar cargos CPQ
+ * GET  - Listar cargos CPQ
+ * POST - Crear cargo
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, unauthorized } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,6 +23,43 @@ export async function GET(request: NextRequest) {
     console.error("Error fetching CPQ cargos:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch cargos" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const ctx = await requireAuth();
+    if (!ctx) return unauthorized();
+
+    const body = await request.json();
+    if (!body.name?.trim()) {
+      return NextResponse.json(
+        { success: false, error: "Nombre es requerido" },
+        { status: 400 }
+      );
+    }
+
+    const cargo = await prisma.cpqCargo.create({
+      data: {
+        name: body.name.trim(),
+        description: body.description?.trim() || null,
+        active: body.active ?? true,
+      },
+    });
+
+    return NextResponse.json({ success: true, data: cargo }, { status: 201 });
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return NextResponse.json(
+        { success: false, error: "Ya existe un cargo con ese nombre" },
+        { status: 409 }
+      );
+    }
+    console.error("Error creating cargo:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to create cargo" },
       { status: 500 }
     );
   }

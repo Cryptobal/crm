@@ -75,7 +75,6 @@ export default async function DashboardPage() {
           <>
             <ReloadButton />
             <TemplatesDropdown />
-            <NotificationBell presentations={presentationsForBell} />
           </>
         }
         className="mb-4"

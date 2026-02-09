@@ -42,3 +42,6 @@ prisma/dev.db-journal
 
 # terminals (Cursor)
 terminals/
+
+# nested repo (cotizador inteligente - proyecto separado)
+gard-docs/

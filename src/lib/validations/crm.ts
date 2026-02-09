@@ -12,7 +12,14 @@ export const createLeadSchema = z.object({
   email: z.string().trim().email("Email inválido").max(200).optional().nullable().or(z.literal("")),
   phone: z.string().trim().max(30).optional().nullable(),
   source: z.string().trim().max(200).optional().nullable(),
-  notes: z.string().trim().max(2000).optional().nullable(),
+  notes: z.string().trim().max(5000).optional().nullable(),
+  industry: z.string().trim().max(100).optional().nullable(),
+  address: z.string().trim().max(500).optional().nullable(),
+  commune: z.string().trim().max(100).optional().nullable(),
+  city: z.string().trim().max(100).optional().nullable(),
+  website: z.string().trim().max(500).optional().nullable(),
+  serviceType: z.string().trim().max(100).optional().nullable(),
+  metadata: z.any().optional().nullable(),
 });
 
 export const approveLeadSchema = z.object({

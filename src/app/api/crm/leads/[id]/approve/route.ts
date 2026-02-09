@@ -155,6 +155,15 @@ export async function POST(
         },
       });
 
+      // Vincular instalación tentativa del lead a la cuenta aprobada
+      await tx.crmInstallation.updateMany({
+        where: { leadId: lead.id },
+        data: {
+          accountId: account.id,
+          leadId: null,
+        },
+      });
+
       await tx.crmHistoryLog.create({
         data: {
           tenantId: ctx.tenantId,

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +58,15 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
   const [open, setOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | "prospect" | "client">("all");
   const [search, setSearch] = useState("");
+  const [industries, setIndustries] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/crm/industries?active=true")
+      .then((r) => r.json())
+      .then((res) => res.success && setIndustries(res.data || []))
+      .catch(() => {});
+  }, []);
+
   const inputClassName =
     "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
   const selectClassName =
@@ -178,12 +187,18 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Industria</Label>
-                <Input
+                <select
+                  className={selectClassName}
                   value={form.industry}
                   onChange={(event) => updateForm("industry", event.target.value)}
-                  placeholder="Retail, minería, logística..."
-                  className={inputClassName}
-                />
+                >
+                  <option value="">Seleccionar industria</option>
+                  {industries.map((i) => (
+                    <option key={i.id} value={i.name}>
+                      {i.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
             <DialogFooter>
