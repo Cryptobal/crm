@@ -55,8 +55,20 @@ export default async function CrmContactDetailPage({
       })
     : [];
 
+  // Check Gmail connection & load email templates
+  const [gmailAccount, emailTemplates] = await Promise.all([
+    prisma.crmEmailAccount.findFirst({
+      where: { tenantId, userId: session.user.id, provider: "gmail", status: "active" },
+    }),
+    prisma.crmEmailTemplate.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+
   const data = JSON.parse(JSON.stringify(contact));
   const initialDeals = JSON.parse(JSON.stringify(deals));
+  const initialTemplates = JSON.parse(JSON.stringify(emailTemplates));
 
   const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(" ");
 
@@ -75,7 +87,12 @@ export default async function CrmContactDetailPage({
         description={`${contact.account?.name || "Sin cuenta"} · ${contact.roleTitle || "Sin cargo"}`}
       />
       <CrmSubnav />
-      <CrmContactDetailClient contact={data} deals={initialDeals} />
+      <CrmContactDetailClient
+        contact={data}
+        deals={initialDeals}
+        gmailConnected={!!gmailAccount}
+        templates={initialTemplates}
+      />
     </>
   );
 }

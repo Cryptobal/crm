@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -28,6 +29,8 @@ import {
   Trash2,
   Loader2,
   ChevronRight,
+  Send,
+  MessageSquare,
 } from "lucide-react";
 import { EmailHistoryList } from "@/components/crm/EmailHistoryList";
 import { toast } from "sonner";
@@ -59,14 +62,26 @@ type ContactDetail = {
   } | null;
 };
 
+type EmailTemplate = {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+  scope: string;
+};
+
 type Tab = "info" | "deals" | "emails";
 
 export function CrmContactDetailClient({
   contact: initialContact,
   deals,
+  gmailConnected = false,
+  templates = [],
 }: {
   contact: ContactDetail;
   deals: DealRow[];
+  gmailConnected?: boolean;
+  templates?: EmailTemplate[];
 }) {
   const router = useRouter();
   const [contact, setContact] = useState(initialContact);
@@ -84,7 +99,79 @@ export function CrmContactDetailClient({
 
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
+  // Email compose state
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [signatureHtml, setSignatureHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/crm/signatures?mine=true")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.data?.length > 0) {
+          const sig = data.data.find((s: any) => s.isDefault) || data.data[0];
+          if (sig?.htmlContent) setSignatureHtml(sig.htmlContent);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const applyPlaceholders = (value: string) => {
+    const replacements: Record<string, string> = {
+      "{cliente}": contact.account?.name || "",
+      "{contacto}": fullName,
+      "{correo}": contact.email || "",
+    };
+    return Object.entries(replacements).reduce(
+      (acc, [key, val]) => acc.split(key).join(val),
+      value
+    );
+  };
+
+  const selectTemplate = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    const tpl = templates.find((t) => t.id === templateId);
+    if (!tpl) return;
+    setEmailSubject(applyPlaceholders(tpl.subject));
+    setEmailBody(applyPlaceholders(tpl.body));
+  };
+
+  const sendEmail = async () => {
+    if (!contact.email) { toast.error("El contacto no tiene email."); return; }
+    if (!emailSubject) { toast.error("Escribe un asunto."); return; }
+    setSending(true);
+    try {
+      const res = await fetch("/api/crm/gmail/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: contact.email,
+          subject: emailSubject,
+          html: emailBody,
+          contactId: contact.id,
+          accountId: contact.account?.id || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Error enviando email");
+      setEmailOpen(false);
+      setEmailBody("");
+      setEmailSubject("");
+      setSelectedTemplateId("");
+      toast.success("Correo enviado exitosamente");
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo enviar el correo.");
+    } finally {
+      setSending(false);
+    }
+  };
+
   const inputCn = "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
+  const selectCn = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
   const deleteContact = async () => {
     try {
@@ -369,18 +456,20 @@ export function CrmContactDetailClient({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-500/20 transition-colors"
                 >
+                  <MessageSquare className="h-3 w-3" />
                   WhatsApp
                 </a>
               )}
-              {contact.email && (
-                <a
-                  href={`mailto:${contact.email}`}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 border border-primary/20 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
-                >
-                  <Mail className="h-3 w-3" />
-                  Enviar email
-                </a>
-              )}
+              {gmailConnected && contact.email ? (
+                <Button size="sm" variant="secondary" onClick={() => setEmailOpen(true)}>
+                  <Send className="h-3.5 w-3.5 mr-1.5" />
+                  Enviar correo
+                </Button>
+              ) : !gmailConnected ? (
+                <Button asChild size="sm" variant="secondary">
+                  <Link href="/opai/configuracion/integraciones">Conectar Gmail</Link>
+                </Button>
+              ) : null}
             </div>
           </CardHeader>
           <CardContent>
@@ -388,6 +477,79 @@ export function CrmContactDetailClient({
           </CardContent>
         </Card>
       )}
+
+      {/* ── Email Compose Modal ── */}
+      <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Enviar correo a {contact.firstName}</DialogTitle>
+            <DialogDescription>
+              Se enviará desde tu cuenta Gmail conectada. Tu firma se adjuntará automáticamente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Template</Label>
+              <select
+                className={selectCn}
+                value={selectedTemplateId}
+                onChange={(e) => selectTemplate(e.target.value)}
+                disabled={sending}
+              >
+                <option value="">Sin template</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Para</Label>
+                <input
+                  value={contact.email || ""}
+                  disabled
+                  className={`h-9 w-full rounded-md border px-3 text-sm ${inputCn} opacity-70`}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Asunto</Label>
+                <input
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  className={`h-9 w-full rounded-md border px-3 text-sm ${inputCn}`}
+                  placeholder="Asunto del correo"
+                  disabled={sending}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Mensaje</Label>
+              <div className="min-h-[200px] w-full rounded-md border border-input bg-background px-4 py-3 text-sm text-foreground focus-within:ring-1 focus-within:ring-ring">
+                <div
+                  contentEditable={!sending}
+                  suppressContentEditableWarning
+                  className="min-h-[160px] outline-none prose prose-sm prose-invert max-w-none"
+                  onInput={(e) => setEmailBody((e.target as HTMLDivElement).innerHTML)}
+                  dangerouslySetInnerHTML={{ __html: emailBody || "" }}
+                />
+              </div>
+            </div>
+            {signatureHtml && (
+              <div className="rounded-md border border-border/50 bg-muted/20 p-3">
+                <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider font-medium">Firma (se agrega automáticamente)</p>
+                <div className="text-xs opacity-70" dangerouslySetInnerHTML={{ __html: signatureHtml }} />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailOpen(false)}>Cancelar</Button>
+            <Button onClick={sendEmail} disabled={sending}>
+              {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Enviar correo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Edit Modal ── */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
