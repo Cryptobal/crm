@@ -17,7 +17,7 @@ export default async function LoginPage({
   searchParams: Promise<{ callbackUrl?: string; error?: string; success?: string }>;
 }) {
   const params = await searchParams;
-  const callbackUrl = params.callbackUrl || '/opai/inicio';
+  const callbackUrl = params.callbackUrl || '/hub';
   const error = params.error;
   const success = params.success;
 

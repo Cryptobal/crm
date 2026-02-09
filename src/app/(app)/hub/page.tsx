@@ -55,6 +55,12 @@ export default async function HubPage() {
 
   const tenantId = session.user.tenantId;
 
+  // Obtener UF y UTM del día
+  const [latestUf, latestUtm] = await Promise.all([
+    prisma.fxUfRate.findFirst({ orderBy: { date: "desc" } }),
+    prisma.fxUtmRate.findFirst({ orderBy: { month: "desc" } }),
+  ]);
+
   // Obtener métricas reales de Docs
   const presentations = await prisma.presentation.findMany({
     where: { tenantId },
@@ -88,14 +94,41 @@ export default async function HubPage() {
     })
     .slice(0, 5);
 
+  const formatCLP = (n: number) =>
+    new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 2 }).format(n);
+
+  const ufValue = latestUf ? Number(latestUf.value) : null;
+  const utmValue = latestUtm ? Number(latestUtm.value) : null;
+  const ufDate = latestUf?.date
+    ? new Date(latestUf.date).toLocaleDateString("es-CL", { day: "2-digit", month: "short" })
+    : null;
+  const utmMonth = latestUtm?.month
+    ? new Date(latestUtm.month).toLocaleDateString("es-CL", { month: "long", year: "numeric" })
+    : null;
+
   return (
     <>
-      {/* Page Header */}
-      <PageHeader
-        title="Inicio"
-        description="Centro de control OPAI Suite"
-        className="mb-6"
-      />
+      {/* Page Header + Indicadores */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <PageHeader
+          title="Inicio"
+          description="Centro de control OPAI Suite"
+        />
+        <div className="flex items-center gap-3">
+          {ufValue && (
+            <div className="rounded-lg border border-border/40 bg-card/50 px-3 py-1.5 text-center">
+              <p className="text-[10px] uppercase text-muted-foreground">UF {ufDate}</p>
+              <p className="text-sm font-mono font-semibold">{formatCLP(ufValue)}</p>
+            </div>
+          )}
+          {utmValue && (
+            <div className="rounded-lg border border-border/40 bg-card/50 px-3 py-1.5 text-center">
+              <p className="text-[10px] uppercase text-muted-foreground">UTM {utmMonth}</p>
+              <p className="text-sm font-mono font-semibold">{formatCLP(utmValue)}</p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Quick Actions */}
       <div className="mb-6 flex flex-wrap gap-3">
@@ -165,15 +198,15 @@ export default async function HubPage() {
             </Card>
           </Link>
 
-          {/* CRM - Placeholder */}
+          {/* CRM - Activo */}
           <Link href="/crm">
-            <Card className="flex h-full cursor-pointer flex-col opacity-75 transition-all hover:border-muted-foreground hover:opacity-100">
+            <Card className="flex h-full cursor-pointer flex-col transition-all hover:border-primary hover:shadow-md">
               <CardHeader className="pb-3">
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-500/10 text-green-500">
                     <Users className="h-4 w-4" />
                   </div>
-                  <Badge variant="outline" className="text-xs">Próximamente</Badge>
+                  <Badge variant="default" className="text-xs">Activo</Badge>
                 </div>
                 <CardTitle className="text-sm">CRM</CardTitle>
                 <CardDescription className="text-xs">
