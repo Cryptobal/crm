@@ -73,6 +73,14 @@ export interface CpqQuote {
   createdAt: string;
   updatedAt: string;
   positions?: CpqPosition[];
+  /** CRM link */
+  accountId?: string | null;
+  installationId?: string | null;
+  contactId?: string | null;
+  dealId?: string | null;
+  currency?: string;
+  /** AI-generated description */
+  aiDescription?: string | null;
 }
 
 export interface CpqCatalogItem {

@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getDefaultTenantId } from "@/lib/tenant";
@@ -39,12 +40,16 @@ export async function POST(
       );
     }
 
-    // Clone the position
+    // Clone the position (Prisma JSON fields need JsonNull for null, not literal null)
     const { id: _id, createdAt: _ca, updatedAt: _ua, ...posData } = original;
     const cloned = await prisma.cpqPosition.create({
       data: {
         ...posData,
         customName: `${posData.customName || "Puesto"} (copia)`,
+        payrollSnapshot:
+          posData.payrollSnapshot === null
+            ? Prisma.JsonNull
+            : posData.payrollSnapshot,
       },
       include: {
         puestoTrabajo: true,

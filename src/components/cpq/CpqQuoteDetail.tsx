@@ -301,11 +301,11 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       status: quote.status,
     });
     setCrmContext({
-      accountId: (quote as Record<string, unknown>).accountId as string || "",
-      installationId: (quote as Record<string, unknown>).installationId as string || "",
-      contactId: (quote as Record<string, unknown>).contactId as string || "",
-      dealId: (quote as Record<string, unknown>).dealId as string || "",
-      currency: (quote as Record<string, unknown>).currency as string || "CLP",
+      accountId: quote.accountId ?? "",
+      installationId: quote.installationId ?? "",
+      contactId: quote.contactId ?? "",
+      dealId: quote.dealId ?? "",
+      currency: quote.currency ?? "CLP",
     });
     setQuoteDirty(false);
   }, [quote]);
@@ -390,8 +390,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
       if (quote) {
-        (quote as Record<string, unknown>).aiDescription = data.data.description;
-        setQuote({ ...quote });
+        setQuote({ ...quote, aiDescription: data.data.description });
       }
       toast.success(aiCustomInstruction.trim() ? "Descripción refinada con AI" : "Descripción generada con AI");
     } catch (error) {
@@ -813,7 +812,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       </div>
 
       {activeStep === 0 && (
-        <Card className="p-3 sm:p-4 space-y-3" inert={isLocked ? "inert" : undefined}>
+        <Card className="p-3 sm:p-4 space-y-3" inert={isLocked}>
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold">Datos básicos</h2>
@@ -1089,7 +1088,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       )}
 
       {activeStep === 1 && (
-        <Card className="p-3 sm:p-4" inert={isLocked ? "inert" : undefined}>
+        <Card className="p-3 sm:p-4" inert={isLocked}>
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold">Puestos de trabajo</h2>
@@ -1133,13 +1132,13 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       )}
 
       {activeStep === 2 && (
-        <div inert={isLocked ? "inert" : undefined}>
+        <div inert={isLocked}>
           <CpqQuoteCosts quoteId={quoteId} variant="inline" showFinancial={false} readOnly={isLocked} />
         </div>
       )}
 
       {activeStep === 3 && (
-        <div className="space-y-3" inert={isLocked ? "inert" : undefined}>
+        <div className="space-y-3" inert={isLocked}>
           <Card className="p-3 sm:p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -1441,7 +1440,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
 
       {/* ── Step 5: Documento ── */}
       {activeStep === 4 && (
-        <div className="space-y-4" inert={isLocked ? "inert" : undefined}>
+        <div className="space-y-4" inert={isLocked}>
           <Card className="p-4 space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -1482,7 +1481,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                 className="h-9 text-sm"
               />
               <textarea
-                value={(quote as Record<string, unknown>).aiDescription as string || ""}
+                value={quote.aiDescription ?? ""}
                 onChange={(e) => {
                   // Save AI description directly
                   fetch(`/api/cpq/quotes/${quoteId}`, {
@@ -1520,9 +1519,9 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                   </div>
                 </div>
 
-                {(quote as Record<string, unknown>).aiDescription && (
+                {quote.aiDescription && (
                   <p className="text-xs text-gray-600 bg-blue-50 rounded p-2 italic">
-                    {(quote as Record<string, unknown>).aiDescription as string}
+                    {quote.aiDescription}
                   </p>
                 )}
 

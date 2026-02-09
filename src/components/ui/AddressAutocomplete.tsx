@@ -4,6 +4,30 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { MapPin } from "lucide-react";
 
+/** Minimal types for Google Places API (no @types/google.maps dependency) */
+interface PlaceResult {
+  formatted_address?: string;
+  geometry?: { location?: { lat(): number; lng(): number } };
+  address_components?: Array<{ long_name: string; types: string[] }>;
+}
+
+interface GoogleMapsAutocomplete {
+  getPlace(): PlaceResult;
+  addListener(event: string, callback: () => void): void;
+}
+
+declare global {
+  interface Window {
+    google?: {
+      maps?: {
+        places?: {
+          Autocomplete: new (input: HTMLInputElement, opts?: unknown) => GoogleMapsAutocomplete;
+        };
+      };
+    };
+  }
+}
+
 export type AddressResult = {
   address: string;
   city: string;
@@ -65,7 +89,7 @@ function parseComunaFromFormattedAddress(formatted: string): string {
   return "";
 }
 
-function extractComponents(place: google.maps.places.PlaceResult): Partial<AddressResult> {
+function extractComponents(place: PlaceResult): Partial<AddressResult> {
   const formatted = place.formatted_address || "";
   const result: Partial<AddressResult> = {
     address: formatted,
@@ -117,7 +141,7 @@ export function AddressAutocomplete({
   showMap = true,
 }: AddressAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const autocompleteRef = useRef<GoogleMapsAutocomplete | null>(null);
   const [inputValue, setInputValue] = useState(value || "");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
@@ -173,7 +197,10 @@ export function AddressAutocomplete({
 
       if (autocompleteRef.current) return; // already initialized
 
-      autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
+      const g = typeof window !== "undefined" ? window.google : undefined;
+      if (!g?.maps?.places?.Autocomplete) return;
+
+      autocompleteRef.current = new g.maps.places.Autocomplete(inputRef.current, {
         componentRestrictions: { country: "cl" },
         fields: ["formatted_address", "geometry", "address_components"],
         types: ["address"],
