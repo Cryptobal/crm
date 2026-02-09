@@ -10,6 +10,10 @@
  * - email.bounced
  * - email.complained
  * 
+ * Busca en dos entidades:
+ * 1. Presentation (emailMessageId) - presentaciones CPQ
+ * 2. CrmEmailMessage (resendId) - correos CRM / follow-ups
+ * 
  * Documentación: https://resend.com/docs/webhooks
  */
 
@@ -23,7 +27,6 @@ export async function POST(req: NextRequest) {
 
     console.log('📧 Resend webhook recibido:', { type, emailId: data?.email_id });
 
-    // Validar que tenemos el email_id (messageId de Resend)
     const emailId = data?.email_id;
     if (!emailId) {
       console.error('❌ Webhook sin email_id');
@@ -33,44 +36,62 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Buscar presentación por emailMessageId
+    // ── 1. Buscar en Presentations ──
     const presentation = await prisma.presentation.findFirst({
       where: { emailMessageId: emailId },
     });
 
-    if (!presentation) {
-      console.warn('⚠️ Presentación no encontrada para emailId:', emailId);
-      // No retornar error, puede ser un email de prueba
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Presentación no encontrada (posiblemente email de prueba)' 
-      });
+    if (presentation) {
+      switch (type) {
+        case 'email.delivered':
+          await handleEmailDelivered(presentation.id, data);
+          break;
+        case 'email.opened':
+          await handleEmailOpened(presentation.id, data);
+          break;
+        case 'email.clicked':
+          await handleEmailClicked(presentation.id, data);
+          break;
+        case 'email.bounced':
+          await handleEmailBounced(presentation.id, data);
+          break;
+        case 'email.complained':
+          await handleEmailComplained(presentation.id, data);
+          break;
+        default:
+          console.log(`ℹ️ Evento no manejado (presentation): ${type}`);
+      }
     }
 
-    // Procesar según tipo de evento
-    switch (type) {
-      case 'email.delivered':
-        await handleEmailDelivered(presentation.id, data);
-        break;
+    // ── 2. Buscar en CRM Email Messages ──
+    const crmMessage = await prisma.crmEmailMessage.findFirst({
+      where: { resendId: emailId },
+    });
 
-      case 'email.opened':
-        await handleEmailOpened(presentation.id, data);
-        break;
+    if (crmMessage) {
+      switch (type) {
+        case 'email.delivered':
+          await handleCrmEmailDelivered(crmMessage.id, data);
+          break;
+        case 'email.opened':
+          await handleCrmEmailOpened(crmMessage.id, crmMessage.tenantId, data);
+          break;
+        case 'email.clicked':
+          await handleCrmEmailClicked(crmMessage.id, data);
+          break;
+        case 'email.bounced':
+          await handleCrmEmailBounced(crmMessage.id, data);
+          break;
+        case 'email.complained':
+          await handleCrmEmailComplained(crmMessage.id, data);
+          break;
+        default:
+          console.log(`ℹ️ Evento no manejado (crm): ${type}`);
+      }
+    }
 
-      case 'email.clicked':
-        await handleEmailClicked(presentation.id, data);
-        break;
-
-      case 'email.bounced':
-        await handleEmailBounced(presentation.id, data);
-        break;
-
-      case 'email.complained':
-        await handleEmailComplained(presentation.id, data);
-        break;
-
-      default:
-        console.log(`ℹ️ Evento no manejado: ${type}`);
+    if (!presentation && !crmMessage) {
+      console.warn('⚠️ Ni presentación ni CRM message encontrado para emailId:', emailId);
     }
 
     return NextResponse.json({ success: true, type });
@@ -222,5 +243,118 @@ async function handleEmailComplained(presentationId: string, data: any) {
     console.log('🚨 Spam complaint:', presentationId);
   } catch (error) {
     console.error('Error al procesar email.complained:', error);
+  }
+}
+
+// ─── CRM EMAIL MESSAGE HANDLERS ──────────────────────────
+
+async function handleCrmEmailDelivered(messageId: string, data: any) {
+  try {
+    await prisma.crmEmailMessage.update({
+      where: { id: messageId },
+      data: {
+        status: 'delivered',
+        deliveredAt: new Date(data.created_at),
+      },
+    });
+    console.log('✅ CRM email entregado:', messageId);
+  } catch (error) {
+    console.error('Error al procesar crm email.delivered:', error);
+  }
+}
+
+async function handleCrmEmailOpened(messageId: string, tenantId: string, data: any) {
+  try {
+    const current = await prisma.crmEmailMessage.findUnique({
+      where: { id: messageId },
+      select: {
+        firstOpenedAt: true,
+        openCount: true,
+        subject: true,
+        toEmails: true,
+        thread: { select: { dealId: true } },
+      },
+    });
+
+    await prisma.crmEmailMessage.update({
+      where: { id: messageId },
+      data: {
+        status: 'opened',
+        firstOpenedAt: current?.firstOpenedAt || new Date(data.created_at),
+        lastOpenedAt: new Date(data.created_at),
+        openCount: { increment: 1 },
+      },
+    });
+
+    // Crear notificación en primera apertura
+    if (!current?.firstOpenedAt) {
+      const toEmail = current?.toEmails?.[0] || 'destinatario';
+      await prisma.notification.create({
+        data: {
+          tenantId,
+          type: 'email_opened',
+          title: `Correo abierto: ${current?.subject || 'Sin asunto'}`,
+          message: `${toEmail} abrió tu correo.`,
+          data: {
+            emailMessageId: messageId,
+            dealId: current?.thread?.dealId || null,
+          },
+          link: current?.thread?.dealId
+            ? `/crm/deals/${current.thread.dealId}`
+            : null,
+        },
+      });
+    }
+
+    console.log('👀 CRM email abierto:', messageId, `(${(current?.openCount || 0) + 1}x)`);
+  } catch (error) {
+    console.error('Error al procesar crm email.opened:', error);
+  }
+}
+
+async function handleCrmEmailClicked(messageId: string, data: any) {
+  try {
+    await prisma.crmEmailMessage.update({
+      where: { id: messageId },
+      data: {
+        status: 'clicked',
+        firstClickedAt: (await prisma.crmEmailMessage.findUnique({
+          where: { id: messageId },
+          select: { firstClickedAt: true },
+        }))?.firstClickedAt || new Date(data.created_at),
+        clickCount: { increment: 1 },
+      },
+    });
+    console.log('🖱️ CRM link clickeado:', messageId, data.link);
+  } catch (error) {
+    console.error('Error al procesar crm email.clicked:', error);
+  }
+}
+
+async function handleCrmEmailBounced(messageId: string, data: any) {
+  try {
+    await prisma.crmEmailMessage.update({
+      where: { id: messageId },
+      data: {
+        status: 'bounced',
+        bouncedAt: new Date(data.created_at),
+        bounceType: data.bounce_type || null,
+      },
+    });
+    console.log('⚠️ CRM email rebotado:', messageId);
+  } catch (error) {
+    console.error('Error al procesar crm email.bounced:', error);
+  }
+}
+
+async function handleCrmEmailComplained(messageId: string, data: any) {
+  try {
+    await prisma.crmEmailMessage.update({
+      where: { id: messageId },
+      data: { status: 'complained' },
+    });
+    console.log('🚨 CRM spam complaint:', messageId);
+  } catch (error) {
+    console.error('Error al procesar crm email.complained:', error);
   }
 }

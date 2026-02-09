@@ -876,6 +876,7 @@ model CrmDeal {
   stageHistory   CrmDealStageHistory[]
   quotes         CrmDealQuote[]
   tasks          CrmTask[]
+  followUpLogs   CrmFollowUpLog[]
 
   @@index([tenantId], map: "idx_crm_deals_tenant")
   @@index([status], map: "idx_crm_deals_status")
@@ -1004,11 +1005,30 @@ model CrmEmailMessage {
   createdBy         String?  @map("created_by")
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  // ── Tracking fields ──
+  resendId        String?   @map("resend_id")
+  status          String    @default("queued") @map("email_status") // queued, sent, delivered, opened, clicked, bounced, complained
+  deliveredAt     DateTime? @map("delivered_at") @db.Timestamptz(6)
+  firstOpenedAt   DateTime? @map("first_opened_at") @db.Timestamptz(6)
+  lastOpenedAt    DateTime? @map("last_opened_at") @db.Timestamptz(6)
+  openCount       Int       @default(0) @map("open_count")
+  firstClickedAt  DateTime? @map("first_clicked_at") @db.Timestamptz(6)
+  clickCount      Int       @default(0) @map("click_count")
+  bouncedAt       DateTime? @map("bounced_at") @db.Timestamptz(6)
+  bounceType      String?   @map("bounce_type")
+
+  // ── References ──
+  signatureId     String?   @map("signature_id") @db.Uuid
+  followUpLogId   String?   @map("followup_log_id") @db.Uuid
+  source          String    @default("manual") // manual, followup, gmail
+
   thread CrmEmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
   @@index([tenantId], map: "idx_crm_email_messages_tenant")
   @@index([threadId], map: "idx_crm_email_messages_thread")
   @@index([sentAt], map: "idx_crm_email_messages_sent")
+  @@index([resendId], map: "idx_crm_email_messages_resend")
+  @@index([followUpLogId], map: "idx_crm_email_messages_followup")
   @@map("email_messages")
   @@schema("crm")
 }
@@ -1118,6 +1138,72 @@ model CrmHistoryLog {
   @@index([entityType, entityId], map: "idx_crm_history_entity")
   @@index([createdAt(sort: Desc)], map: "idx_crm_history_created_desc")
   @@map("history_logs")
+  @@schema("crm")
+}
+
+// ── Follow-up configuration (per tenant) ──
+
+model CrmFollowUpConfig {
+  id                    String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId              String   @unique @map("tenant_id")
+  firstFollowUpDays     Int      @default(3) @map("first_followup_days")
+  secondFollowUpDays    Int      @default(7) @map("second_followup_days")
+  firstEmailTemplateId  String?  @map("first_email_template_id") @db.Uuid
+  secondEmailTemplateId String?  @map("second_email_template_id") @db.Uuid
+  whatsappFirstEnabled  Boolean  @default(true) @map("whatsapp_first_enabled")
+  whatsappSecondEnabled Boolean  @default(true) @map("whatsapp_second_enabled")
+  autoAdvanceStage      Boolean  @default(true) @map("auto_advance_stage")
+  pauseOnReply          Boolean  @default(true) @map("pause_on_reply")
+  sendHour              Int      @default(9) @map("send_hour") // 0-23, hora local de envío
+  isActive              Boolean  @default(true) @map("is_active")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([tenantId], map: "idx_crm_followup_config_tenant")
+  @@map("crm_followup_config")
+  @@schema("crm")
+}
+
+model CrmFollowUpLog {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId      String    @map("tenant_id")
+  dealId        String    @map("deal_id") @db.Uuid
+  sequence      Int       // 1 = primer seguimiento, 2 = segundo
+  status        String    @default("pending") // pending, sent, failed, cancelled, paused
+  scheduledAt   DateTime  @map("scheduled_at") @db.Timestamptz(6)
+  sentAt        DateTime? @map("sent_at") @db.Timestamptz(6)
+  emailMessageId String?  @map("email_message_id") @db.Uuid
+  templateId    String?   @map("template_id") @db.Uuid
+  error         String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  deal CrmDeal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status], map: "idx_crm_followup_logs_tenant_status")
+  @@index([scheduledAt], map: "idx_crm_followup_logs_scheduled")
+  @@index([dealId], map: "idx_crm_followup_logs_deal")
+  @@map("crm_followup_logs")
+  @@schema("crm")
+}
+
+// ── Email Signatures ──
+
+model CrmEmailSignature {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId    String   @map("tenant_id")
+  userId      String?  @map("user_id")
+  name        String
+  content     Json     @db.JsonB // Tiptap JSON
+  htmlContent String?  @map("html_content") // HTML renderizado para emails
+  isDefault   Boolean  @default(false) @map("is_default")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([tenantId], map: "idx_crm_signatures_tenant")
+  @@index([userId], map: "idx_crm_signatures_user")
+  @@index([tenantId, isDefault], map: "idx_crm_signatures_default")
+  @@map("email_signatures")
   @@schema("crm")
 }
 

@@ -9,6 +9,14 @@
     {
       "path": "/api/fx/sync",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/followup-emails",
+      "schedule": "0 */2 * * *"
+    },
+    {
+      "path": "/api/cron/document-alerts",
+      "schedule": "0 8 * * *"
     }
   ]
 }

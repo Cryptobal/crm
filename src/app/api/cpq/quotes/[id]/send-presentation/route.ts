@@ -305,6 +305,96 @@ export async function POST(
             proposalSentAt: new Date(),
           },
         });
+
+        // ── Programar follow-ups automáticos ──
+        try {
+          const followUpConfig = await prisma.crmFollowUpConfig.findUnique({
+            where: { tenantId: ctx.tenantId },
+          });
+
+          if (followUpConfig?.isActive) {
+            const proposalDate = new Date();
+
+            // Cancelar follow-ups pendientes anteriores del mismo deal
+            await prisma.crmFollowUpLog.updateMany({
+              where: { dealId: deal.id, status: "pending" },
+              data: { status: "cancelled", error: "Nueva propuesta enviada" },
+            });
+
+            // Programar primer seguimiento
+            const firstDate = new Date(proposalDate);
+            firstDate.setDate(firstDate.getDate() + followUpConfig.firstFollowUpDays);
+            firstDate.setHours(followUpConfig.sendHour, 0, 0, 0);
+
+            await prisma.crmFollowUpLog.create({
+              data: {
+                tenantId: ctx.tenantId,
+                dealId: deal.id,
+                sequence: 1,
+                status: "pending",
+                scheduledAt: firstDate,
+                templateId: followUpConfig.firstEmailTemplateId,
+              },
+            });
+
+            // Programar segundo seguimiento
+            const secondDate = new Date(proposalDate);
+            secondDate.setDate(secondDate.getDate() + followUpConfig.secondFollowUpDays);
+            secondDate.setHours(followUpConfig.sendHour, 0, 0, 0);
+
+            await prisma.crmFollowUpLog.create({
+              data: {
+                tenantId: ctx.tenantId,
+                dealId: deal.id,
+                sequence: 2,
+                status: "pending",
+                scheduledAt: secondDate,
+                templateId: followUpConfig.secondEmailTemplateId,
+              },
+            });
+
+            console.log(`📅 Follow-ups programados: deal ${deal.id} → ${firstDate.toISOString()}, ${secondDate.toISOString()}`);
+          }
+        } catch (followUpError) {
+          // No bloquear el envío de presentación si falla programar follow-ups
+          console.error("Error programando follow-ups:", followUpError);
+        }
+
+        // ── Mover deal a "Cotización enviada" automáticamente ──
+        try {
+          const cotizacionStage = await prisma.crmPipelineStage.findFirst({
+            where: {
+              tenantId: ctx.tenantId,
+              name: "Cotización enviada",
+              isActive: true,
+            },
+          });
+
+          if (cotizacionStage && deal.stageId !== cotizacionStage.id) {
+            const currentStage = await prisma.crmPipelineStage.findFirst({
+              where: { id: deal.stageId },
+            });
+
+            if (currentStage && currentStage.order < cotizacionStage.order) {
+              await prisma.crmDeal.update({
+                where: { id: deal.id },
+                data: { stageId: cotizacionStage.id },
+              });
+
+              await prisma.crmDealStageHistory.create({
+                data: {
+                  tenantId: ctx.tenantId,
+                  dealId: deal.id,
+                  fromStageId: deal.stageId,
+                  toStageId: cotizacionStage.id,
+                  changedBy: ctx.userId,
+                },
+              });
+            }
+          }
+        } catch (stageError) {
+          console.error("Error actualizando etapa del deal:", stageError);
+        }
       }
       await prisma.crmHistoryLog.create({
         data: {

@@ -29,6 +29,7 @@ import {
   Loader2,
   ChevronRight,
 } from "lucide-react";
+import { EmailHistoryList } from "@/components/crm/EmailHistoryList";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
@@ -58,7 +59,7 @@ type ContactDetail = {
   } | null;
 };
 
-type Tab = "info" | "deals";
+type Tab = "info" | "deals" | "emails";
 
 export function CrmContactDetailClient({
   contact: initialContact,
@@ -128,6 +129,7 @@ export function CrmContactDetailClient({
   const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: "info", label: "Información" },
     { key: "deals", label: "Negocios", count: deals.length },
+    { key: "emails", label: "Correos" },
   ];
 
   return (
@@ -347,6 +349,21 @@ export function CrmContactDetailClient({
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Emails Tab ── */}
+      {activeTab === "emails" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Mail className="h-4 w-4" />
+              Correos enviados
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EmailHistoryList contactId={contact.id} compact />
           </CardContent>
         </Card>
       )}

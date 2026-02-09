@@ -75,6 +75,8 @@ export const TOKEN_MODULES: TokenModule[] = [
       { key: "deal.title", label: "Título del Negocio", path: "title" },
       { key: "deal.amount", label: "Monto", path: "amount", type: "currency" },
       { key: "deal.expectedCloseDate", label: "Fecha Cierre Esperada", path: "expectedCloseDate", type: "date" },
+      { key: "deal.proposalLink", label: "Link Propuesta", path: "proposalLink" },
+      { key: "deal.proposalSentDate", label: "Fecha Envío Propuesta", path: "proposalSentAt", type: "date" },
       { key: "deal.service", label: "Servicio", path: "service" },
       { key: "deal.installationName", label: "Instalación", path: "installationName" },
       { key: "deal.address", label: "Dirección", path: "address" },
@@ -135,6 +137,9 @@ export const DOC_CATEGORIES: Record<string, { key: string; label: string }[]> = 
     { key: "contrato_confidencialidad", label: "Acuerdo de Confidencialidad (NDA)" },
     { key: "acuerdo_nivel_servicio", label: "Acuerdo de Nivel de Servicio (SLA)" },
     { key: "adendum", label: "Adendum / Modificación" },
+    { key: "email_seguimiento", label: "Email de Seguimiento" },
+    { key: "email_propuesta", label: "Email de Propuesta" },
+    { key: "email_general", label: "Email General" },
     { key: "otro_crm", label: "Otro" },
   ],
   payroll: [

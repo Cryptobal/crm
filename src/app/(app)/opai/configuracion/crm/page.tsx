@@ -5,6 +5,7 @@ import { getDefaultTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/opai";
 import { ConfigSubnav } from "@/components/opai";
 import { CrmConfigClient } from "@/components/crm/CrmConfigClient";
+import { FollowUpConfigSection } from "@/components/crm/FollowUpConfigSection";
 
 export default async function CrmConfigPage() {
   const session = await auth();
@@ -37,6 +38,7 @@ export default async function CrmConfigPage() {
       />
       <ConfigSubnav />
       <CrmConfigClient initialStages={stages} initialFields={fields} />
+      <FollowUpConfigSection />
     </>
   );
 }

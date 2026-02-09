@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, ExternalLink, Trash2, TrendingUp, FileText, Mail, Users, ChevronRight } from "lucide-react";
+import { EmailHistoryList } from "@/components/crm/EmailHistoryList";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/opai/EmptyState";
 import { toast } from "sonner";
@@ -500,16 +501,7 @@ export function CrmDealDetailClient({
             )}
           </CardHeader>
           <CardContent>
-            <EmptyState
-              icon={<Mail className="h-8 w-8" />}
-              title={gmailConnected ? "Sin correos enviados" : "Gmail no conectado"}
-              description={
-                gmailConnected
-                  ? "Envía tu primer correo desde este negocio."
-                  : "Conecta Gmail en Configuración → Integraciones para enviar correos."
-              }
-              compact
-            />
+            <EmailHistoryList dealId={deal.id} compact />
           </CardContent>
         </Card>
       )}

@@ -83,6 +83,39 @@ export async function POST(request: NextRequest) {
       ? decryptText(emailAccount.refreshTokenEncrypted, tokenSecret)
       : undefined;
 
+    // ── Inyectar firma del usuario ──
+    let finalHtml = html || "";
+    let signatureId: string | null = null;
+
+    try {
+      const signature = await prisma.crmEmailSignature.findFirst({
+        where: {
+          tenantId: ctx.tenantId,
+          userId: ctx.userId,
+          isDefault: true,
+          isActive: true,
+        },
+      });
+
+      // Si no hay firma del usuario, buscar firma default del tenant
+      const sig =
+        signature ||
+        (await prisma.crmEmailSignature.findFirst({
+          where: {
+            tenantId: ctx.tenantId,
+            isDefault: true,
+            isActive: true,
+          },
+        }));
+
+      if (sig?.htmlContent) {
+        finalHtml += sig.htmlContent;
+        signatureId = sig.id;
+      }
+    } catch (sigError) {
+      console.error("Error cargando firma:", sigError);
+    }
+
     const gmail = getGmailClient(accessToken, refreshToken);
     const raw = buildRawEmail({
       from: emailAccount.email,
@@ -90,8 +123,8 @@ export async function POST(request: NextRequest) {
       cc,
       bcc,
       subject,
-      html,
-      text,
+      html: finalHtml || undefined,
+      text: finalHtml ? undefined : text,
     });
 
     const response = await gmail.users.messages.send({
@@ -135,10 +168,13 @@ export async function POST(request: NextRequest) {
         ccEmails: cc,
         bccEmails: bcc,
         subject,
-        htmlBody: html || null,
+        htmlBody: finalHtml || null,
         textBody: text || null,
         sentAt: new Date(),
         createdBy: ctx.userId,
+        status: "sent",
+        source: "gmail",
+        signatureId,
       },
     });
 

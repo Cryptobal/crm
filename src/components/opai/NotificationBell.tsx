@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Check, CheckCheck, ExternalLink, Circle } from 'lucide-react';
+import { Bell, Check, CheckCheck, ExternalLink, Circle, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -30,6 +30,12 @@ const TYPE_ICONS: Record<string, string> = {
   contract_required: '📝',
   contract_expiring: '⚠️',
   contract_expired: '🔴',
+  email_opened: '👀',
+  email_clicked: '🖱️',
+  email_bounced: '⚠️',
+  followup_sent: '📨',
+  followup_scheduled: '⏰',
+  followup_failed: '❌',
 };
 
 function timeAgo(dateStr: string): string {
@@ -202,28 +208,44 @@ export function NotificationBell() {
                 <span className="text-lg shrink-0 mt-0.5">
                   {TYPE_ICONS[notification.type] || '📌'}
                 </span>
-                <button
-                  type="button"
-                  className="flex-1 text-left min-w-0"
-                  onClick={() => handleClick(notification)}
-                >
-                  <div className="flex items-center gap-2">
-                    <p className={`text-sm truncate ${!notification.read ? 'font-semibold' : 'font-medium'}`}>
-                      {notification.title}
-                    </p>
-                    {!notification.read && (
-                      <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <button
+                    type="button"
+                    className="w-full text-left"
+                    onClick={() => handleClick(notification)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <p className={`text-sm truncate ${!notification.read ? 'font-semibold' : 'font-medium'}`}>
+                        {notification.title}
+                      </p>
+                      {!notification.read && (
+                        <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
+                      )}
+                    </div>
+                    {notification.message && (
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                        {notification.message}
+                      </p>
                     )}
-                  </div>
-                  {notification.message && (
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                      {notification.message}
+                    <p className="text-[10px] text-muted-foreground/70 mt-1">
+                      {timeAgo(notification.createdAt)}
                     </p>
-                  )}
-                  <p className="text-[10px] text-muted-foreground/70 mt-1">
-                    {timeAgo(notification.createdAt)}
-                  </p>
-                </button>
+                  </button>
+                  {/* WhatsApp button for follow-up notifications */}
+                  {(notification.type === 'followup_sent' || notification.type === 'email_opened') &&
+                    notification.data?.whatsappUrl && (
+                      <a
+                        href={notification.data.whatsappUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1.5 mt-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-[11px] font-medium text-emerald-600 hover:bg-emerald-500/20 transition-colors"
+                      >
+                        <MessageSquare className="h-3 w-3" />
+                        Enviar WhatsApp
+                      </a>
+                    )}
+                </div>
                 {notification.link && (
                   <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0 mt-1" />
                 )}
