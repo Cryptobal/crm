@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, unauthorized } from "@/lib/api-auth";
 
@@ -278,6 +279,19 @@ export async function POST(
         let installationId: string;
 
         if (useExistingInstallationId) {
+          const existingInst = await tx.crmInstallation.findFirst({
+            where: {
+              id: useExistingInstallationId,
+              tenantId: ctx.tenantId,
+              accountId: account.id,
+            },
+            select: { id: true },
+          });
+          if (!existingInst) {
+            throw new Error(
+              "La instalación seleccionada no existe o no pertenece a la cuenta. Elige otra o crea una nueva."
+            );
+          }
           installationId = useExistingInstallationId;
         } else {
           const existingSameName = await tx.crmInstallation.findFirst({
@@ -315,37 +329,34 @@ export async function POST(
         // Crear cotización CPQ si la instalación tiene dotación
         const dotacion = Array.isArray(inst?.dotacion) ? inst.dotacion : [];
         if (dotacion.length > 0 && defaultCargo && defaultRol) {
-          // Generar código único
           quoteCodeCounter++;
-          let quoteCode = `CPQ-${year}-${String(quoteCodeCounter).padStart(3, "0")}`;
-          // Retry en caso de colisión
-          let codeAttempts = 0;
-          let quote = null;
-          while (!quote && codeAttempts < 10) {
-            codeAttempts++;
-            try {
-              quote = await tx.cpqQuote.create({
-                data: {
-                  tenantId: ctx.tenantId,
-                  code: quoteCode,
-                  status: "draft",
-                  clientName: accountName,
-                  accountId: account.id,
-                  contactId: contact.id,
-                  dealId: deal.id,
-                  installationId,
-                  totalPositions: dotacion.length,
-                  totalGuards: dotacion.reduce((sum: number, d: { cantidad?: number }) => sum + (d.cantidad || 1), 0),
-                },
-              });
-            } catch (codeErr: any) {
-              if (codeErr?.code === "P2002") {
-                quoteCodeCounter++;
-                quoteCode = `CPQ-${year}-${String(quoteCodeCounter).padStart(3, "0")}`;
-                continue;
-              }
-              throw codeErr;
+          const baseCode = `CPQ-${year}-${String(quoteCodeCounter).padStart(3, "0")}`;
+          const quoteCode = `${baseCode}-${randomBytes(2).toString("hex")}`;
+          let quote;
+          try {
+            quote = await tx.cpqQuote.create({
+              data: {
+                tenantId: ctx.tenantId,
+                code: quoteCode,
+                status: "draft",
+                clientName: accountName,
+                accountId: account.id,
+                contactId: contact.id,
+                dealId: deal.id,
+                installationId,
+                totalPositions: dotacion.length,
+                totalGuards: dotacion.reduce((sum: number, d: { cantidad?: number }) => sum + (d.cantidad || 1), 0),
+              },
+            });
+          } catch (quoteErr: unknown) {
+            const prismaErr = quoteErr as { code?: string; meta?: { code?: string }; message?: string };
+            const code = prismaErr?.code ?? prismaErr?.meta?.code;
+            if (code === "P2002" || (typeof prismaErr?.message === "string" && prismaErr.message.includes("25P02"))) {
+              throw new Error(
+                "Conflicto al crear la cotización (código duplicado o transacción abortada). Por favor intenta aprobar de nuevo."
+              );
             }
+            throw quoteErr;
           }
 
           if (quote) {
@@ -450,9 +461,31 @@ export async function POST(
         { status: 409 }
       );
     }
+    const msg = err?.message ?? "";
+    if (msg.includes("La instalación seleccionada no existe")) {
+      return NextResponse.json({ success: false, error: msg }, { status: 400 });
+    }
+    const isTransactionAborted =
+      msg.includes("25P02") ||
+      msg.includes("transaction is aborted") ||
+      msg.includes("transacción abortada") ||
+      msg.includes("Conflicto al crear la cotización");
+    if (isTransactionAborted) {
+      console.error("Error approving CRM lead (transaction aborted or conflict):", error);
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            msg.includes("Conflicto al crear la cotización")
+              ? msg
+              : "La operación falló (posible conflicto de datos). Por favor intenta aprobar de nuevo.",
+        },
+        { status: 500 }
+      );
+    }
     console.error("Error approving CRM lead:", error);
     return NextResponse.json(
-      { success: false, error: err?.message || "Failed to approve lead" },
+      { success: false, error: msg || "Error al aprobar el lead" },
       { status: 500 }
     );
   }
