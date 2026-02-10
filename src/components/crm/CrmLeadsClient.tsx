@@ -428,10 +428,66 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
         const exContact = checkData.existingContact ?? null;
         setExistingContact(exContact);
         if (exContact) setContactResolution("overwrite");
-        setInstallationConflicts(checkData.installationConflicts || []);
+        const conflicts = checkData.installationConflicts || [];
+        setInstallationConflicts(conflicts);
+        setInstallationUseExisting((prev) => {
+          const next = { ...prev };
+          for (const conf of conflicts) {
+            for (const inst of installations) {
+              if (inst.name.trim().toLowerCase() === conf.name.toLowerCase()) {
+                next[inst._key] = conf.id;
+              }
+            }
+          }
+          return next;
+        });
         setDuplicateChecked(true);
-        const hasConflicts = (checkData.duplicates?.length > 0) || checkData.existingContact || (checkData.installationConflicts?.length > 0);
-        if (hasConflicts) {
+        const hasAccountOrContactConflict = (checkData.duplicates?.length > 0) || checkData.existingContact;
+        const hasInstallationConflictOnly = conflicts.length > 0 && !hasAccountOrContactConflict;
+        if (hasAccountOrContactConflict) {
+          setApproving(false);
+          return;
+        }
+        if (hasInstallationConflictOnly) {
+          const resolvedInstPayload = installations
+            .filter((inst) => inst.name.trim())
+            .map((inst) => {
+              const conf = conflicts.find((c) => c.name.toLowerCase() === inst.name.trim().toLowerCase());
+              const useExistingInstallationId = conf ? conf.id : (installationUseExisting[inst._key] || undefined);
+              const { _key, ...rest } = inst;
+              return { ...rest, ...(useExistingInstallationId ? { useExistingInstallationId } : {}) };
+            });
+          const resolvedPayload = { ...payload, installations: resolvedInstPayload };
+          const response = await fetch(`/api/crm/leads/${approveLeadId}/approve`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(resolvedPayload),
+          });
+          const result = await response.json();
+          if (response.status === 409 && result.conflict === "installation") {
+            toast.error(`Instalación "${result.installationName || ""}" ya existe. Elige "Usar existente" o otro nombre.`);
+            setApproving(false);
+            return;
+          }
+          if (!response.ok) {
+            setApproving(false);
+            throw new Error(result?.error || "Error aprobando lead");
+          }
+          setLeads((prev) =>
+            prev.map((lead) =>
+              lead.id === approveLeadId ? { ...lead, status: "approved" } : lead
+            )
+          );
+          setApproveOpen(false);
+          setApproveLeadId(null);
+          setDuplicates([]);
+          setExistingContact(null);
+          setInstallationConflicts([]);
+          setDuplicateChecked(false);
+          setUseExistingAccountId(null);
+          setContactResolution("create");
+          setInstallationUseExisting({});
+          toast.success("Lead aprobado — Cuenta, contacto y negocio creados");
           setApproving(false);
           return;
         }
@@ -715,7 +771,7 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
                 Instalación con el mismo nombre ya existe en esta cuenta
               </div>
               <p className="text-xs text-muted-foreground pl-6">
-                Elige &quot;Usar existente&quot; para no duplicar, o deja crear nueva.
+                Se usará la instalación existente (ya marcado). Puedes cambiar el nombre abajo si quieres crear otra.
               </p>
               {installationConflicts.map((conf) => (
                 <div key={conf.id} className="pl-6 flex items-center gap-2 flex-wrap">

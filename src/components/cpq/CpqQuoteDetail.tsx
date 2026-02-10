@@ -1024,19 +1024,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
             </DialogContent>
           </Dialog>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Cliente</Label>
-              <Input
-                value={quoteForm.clientName}
-                onChange={(e) => {
-                  setQuoteForm((prev) => ({ ...prev, clientName: e.target.value }));
-                  setQuoteDirty(true);
-                }}
-                placeholder="Nombre del cliente"
-                className="h-10 bg-background text-sm"
-              />
-            </div>
+          <div className="grid gap-3 md:grid-cols-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Válida hasta</Label>
               <Input
@@ -1046,7 +1034,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                   setQuoteForm((prev) => ({ ...prev, validUntil: e.target.value }));
                   setQuoteDirty(true);
                 }}
-                className="h-10 bg-background text-sm"
+                className="h-10 bg-background text-sm text-foreground [color-scheme:dark]"
               />
             </div>
             <div className="space-y-1.5">

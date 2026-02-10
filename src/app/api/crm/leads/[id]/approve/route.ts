@@ -300,30 +300,29 @@ export async function POST(
               accountId: account.id,
               name: { equals: instName, mode: "insensitive" },
             },
+            select: { id: true },
           });
           if (existingSameName) {
-            const e = new Error("CONFLICT_INSTALLATION") as Error & { conflictName?: string; existingId?: string };
-            e.conflictName = instName;
-            e.existingId = existingSameName.id;
-            throw e;
+            installationId = existingSameName.id;
+          } else {
+            const newInst = await tx.crmInstallation.create({
+              data: {
+                tenantId: ctx.tenantId,
+                accountId: account.id,
+                name: instName,
+                address: inst?.address?.trim() || null,
+                city: inst?.city?.trim() || null,
+                commune: inst?.commune?.trim() || null,
+                lat: inst?.lat ? Number(inst.lat) : null,
+                lng: inst?.lng ? Number(inst.lng) : null,
+                metadata:
+                  Array.isArray(inst?.dotacion) && inst.dotacion.length > 0
+                    ? { dotacion: inst.dotacion }
+                    : undefined,
+              },
+            });
+            installationId = newInst.id;
           }
-          const newInst = await tx.crmInstallation.create({
-            data: {
-              tenantId: ctx.tenantId,
-              accountId: account.id,
-              name: instName,
-              address: inst?.address?.trim() || null,
-              city: inst?.city?.trim() || null,
-              commune: inst?.commune?.trim() || null,
-              lat: inst?.lat ? Number(inst.lat) : null,
-              lng: inst?.lng ? Number(inst.lng) : null,
-              metadata:
-                Array.isArray(inst?.dotacion) && inst.dotacion.length > 0
-                  ? { dotacion: inst.dotacion }
-                  : undefined,
-            },
-          });
-          installationId = newInst.id;
         }
 
         // Crear cotización CPQ si la instalación tiene dotación

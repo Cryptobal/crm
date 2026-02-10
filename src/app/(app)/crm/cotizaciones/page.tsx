@@ -40,6 +40,8 @@ export default async function CrmCotizacionesPage() {
         totalGuards: true,
         createdAt: true,
         updatedAt: true,
+        accountId: true,
+        dealId: true,
         parameters: {
           select: { salePriceMonthly: true, marginPct: true },
         },
@@ -50,6 +52,18 @@ export default async function CrmCotizacionesPage() {
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+  ]);
+
+  // Resolver nombres de negocio y cuenta
+  const dealIds = quotes.map((q) => q.dealId).filter((id): id is string => Boolean(id));
+  const accountIds = quotes.map((q) => q.accountId).filter((id): id is string => Boolean(id));
+  const [dealsMap, accountsMap] = await Promise.all([
+    dealIds.length > 0
+      ? prisma.crmDeal.findMany({ where: { id: { in: dealIds } }, select: { id: true, title: true } }).then((rows) => new Map(rows.map((r) => [r.id, r.title])))
+      : Promise.resolve(new Map<string, string>()),
+    accountIds.length > 0
+      ? prisma.crmAccount.findMany({ where: { id: { in: accountIds } }, select: { id: true, name: true } }).then((rows) => new Map(rows.map((r) => [r.id, r.name])))
+      : Promise.resolve(new Map<string, string>()),
   ]);
 
   // Enriquecer con salePriceMonthly calculado si está en 0
@@ -88,6 +102,8 @@ export default async function CrmCotizacionesPage() {
         totalGuards: q.totalGuards,
         createdAt: q.createdAt,
         updatedAt: q.updatedAt,
+        dealTitle: (q.dealId && dealsMap.get(q.dealId)) || null,
+        accountName: (q.accountId && accountsMap.get(q.accountId)) || null,
       };
     })
   );

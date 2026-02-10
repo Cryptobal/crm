@@ -143,20 +143,26 @@ export function CpqPositionCard({
           className={cn("flex-1", !readOnly && "cursor-pointer hover:text-primary transition-colors")}
           onClick={readOnly ? undefined : () => setOpenEdit(true)}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-            <Badge variant="outline" className="text-xs">
-              {position.numGuards} guardias
+            <Badge variant="outline" className="text-[10px]">
+              {position.numGuards} {position.numGuards === 1 ? "guardia" : "guardias"}
             </Badge>
+            {position.cargo?.name && (
+              <Badge variant="secondary" className="text-[10px]">{position.cargo.name}</Badge>
+            )}
+            {position.rol?.name && (
+              <Badge variant="secondary" className="text-[10px]">{position.rol.name}</Badge>
+            )}
           </div>
-          <p className="text-xs sm:text-xs text-muted-foreground">
-            {daysLabel || "Días por definir"} · {position.startTime} - {position.endTime}
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {daysLabel || "Dias por definir"} · {position.startTime}-{position.endTime}
             {" · "}
             {shiftHours === null
-              ? "Jornada --"
-              : `Jornada ${shiftHours % 1 === 0 ? shiftHours.toFixed(0) : shiftHours.toFixed(1)} h`}
-            {" · "}
-            {healthLabel}
+              ? "--"
+              : `${shiftHours % 1 === 0 ? shiftHours.toFixed(0) : shiftHours.toFixed(1)}h`}
+            {" · "}{healthLabel}
+            {" · Base: "}{formatCurrency(Number(position.baseSalary))}
           </p>
         </div>
         {!readOnly && (
