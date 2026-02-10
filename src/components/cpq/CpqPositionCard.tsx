@@ -8,18 +8,12 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { EditPositionModal } from "@/components/cpq/EditPositionModal";
 import { CostBreakdownModal } from "@/components/cpq/CostBreakdownModal";
 import { formatCurrency, sortWeekdays } from "@/components/cpq/utils";
 import { cn } from "@/lib/utils";
 import type { CpqPosition } from "@/types/cpq";
-import { ChevronDown, MoreVertical } from "lucide-react";
+import { Copy, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface CpqPositionCardProps {
@@ -56,7 +50,6 @@ export function CpqPositionCard({
   const [openEdit, setOpenEdit] = useState(false);
   const [openBreakdown, setOpenBreakdown] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const positionGuards = position.numGuards;
   const proportion = totalGuards > 0 ? positionGuards / totalGuards : 0;
@@ -120,21 +113,28 @@ export function CpqPositionCard({
     }
   };
 
-  const daysLabel = sortWeekdays(position.weekdays || []).join(", ");
+  const dayAlias: Record<string, string> = {
+    lun: "Lun", lunes: "Lun",
+    mar: "Mar", martes: "Mar",
+    mie: "Mié", "mié": "Mié", miercoles: "Mié", miércoles: "Mié",
+    jue: "Jue", jueves: "Jue",
+    vie: "Vie", viernes: "Vie",
+    sab: "Sáb", "sáb": "Sáb", sabado: "Sáb", sábado: "Sáb",
+    dom: "Dom", domingo: "Dom",
+  };
+  const dayOrder = new Map([["Lun", 0], ["Mar", 1], ["Mié", 2], ["Jue", 3], ["Vie", 4], ["Sáb", 5], ["Dom", 6]]);
+  const dayChips = sortWeekdays(
+    Array.from(
+      new Set(
+        (position.weekdays || [])
+          .map((d) => dayAlias[String(d).trim().toLowerCase()] || null)
+          .filter((d): d is string => Boolean(d))
+      )
+    )
+  ).sort((a, b) => (dayOrder.get(a) ?? 99) - (dayOrder.get(b) ?? 99));
+  const isAllDays = dayChips.length === 7;
   const title = position.customName || position.puestoTrabajo?.name || "Puesto";
-  const shiftHours = (() => {
-    if (!position.startTime || !position.endTime) return null;
-    const [startH, startM] = position.startTime.split(":").map(Number);
-    const [endH, endM] = position.endTime.split(":").map(Number);
-    if (Number.isNaN(startH) || Number.isNaN(startM) || Number.isNaN(endH) || Number.isNaN(endM)) {
-      return null;
-    }
-    const startMinutes = startH * 60 + startM;
-    let endMinutes = endH * 60 + endM;
-    if (endMinutes <= startMinutes) endMinutes += 24 * 60;
-    return (endMinutes - startMinutes) / 60;
-  })();
-  const healthLabel = position.healthSystem === "isapre" ? "Isapre" : "Fonasa";
+  const roleName = position.rol?.name || "—";
 
   return (
     <Card className="overflow-hidden border border-muted/40">
@@ -145,69 +145,61 @@ export function CpqPositionCard({
         >
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-300">
               {position.numGuards} {position.numGuards === 1 ? "guardia" : "guardias"}
             </Badge>
-            {position.cargo?.name && (
-              <Badge variant="secondary" className="text-[10px]">{position.cargo.name}</Badge>
-            )}
-            {position.rol?.name && (
-              <Badge variant="secondary" className="text-[10px]">{position.rol.name}</Badge>
+            <Badge variant="secondary" className="text-[10px]">{roleName}</Badge>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {isAllDays ? (
+              <Badge className="text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" variant="outline">
+                Todos los días
+              </Badge>
+            ) : dayChips.length > 0 ? (
+              dayChips.map((day) => (
+                <Badge
+                  key={day}
+                  className="text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                  variant="outline"
+                >
+                  {day}
+                </Badge>
+              ))
+            ) : (
+              <Badge className="text-[10px]" variant="outline">Sin días</Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {daysLabel || "Dias por definir"} · {position.startTime}-{position.endTime}
-            {" · "}
-            {shiftHours === null
-              ? "--"
-              : `${shiftHours % 1 === 0 ? shiftHours.toFixed(0) : shiftHours.toFixed(1)}h`}
-            {" · "}{healthLabel}
-            {" · Base: "}{formatCurrency(Number(position.baseSalary))}
-          </p>
         </div>
         {!readOnly && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="ghost" className="h-9 w-9">
-              <MoreVertical className="h-4 w-4" />
+          <div className="flex items-center gap-1">
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setOpenEdit(true)} title="Editar">
+              <Pencil className="h-4 w-4" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setOpenEdit(true)}>Editar</DropdownMenuItem>
-            <DropdownMenuItem onClick={handleClone} disabled={loading}>
-              Clonar
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleRecalculate} disabled={loading}>
-              Recalcular costo
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleDelete} disabled={loading} className="text-destructive">
-              Eliminar
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleClone} disabled={loading} title="Clonar">
+              <Copy className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleRecalculate} disabled={loading} title="Recalcular costo">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={handleDelete} disabled={loading} title="Eliminar">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </div>
 
-      <div className={`${detailsOpen ? 'grid' : 'hidden'} sm:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 p-3`}>
-        <div className="rounded-md bg-gradient-to-br from-blue-600/40 to-blue-800/30 p-2 text-foreground">
-          <p className="text-xs uppercase text-muted-foreground">Cargo</p>
-          <p className="text-sm sm:text-xs font-semibold">{position.cargo?.name || "—"}</p>
-        </div>
-        <div className="rounded-md bg-gradient-to-br from-purple-600/40 to-purple-800/30 p-2 text-foreground">
-          <p className="text-xs uppercase text-muted-foreground">Rol</p>
-          <p className="text-sm sm:text-xs font-semibold">{position.rol?.name || "—"}</p>
-        </div>
-        <div className="rounded-md bg-gradient-to-br from-indigo-600/40 to-indigo-800/30 p-2 text-foreground">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3">
+        <div className="rounded-md border border-border/60 bg-muted/20 p-2 text-foreground">
           <p className="text-xs uppercase text-muted-foreground">Base c/u</p>
           <p className="text-sm sm:text-xs font-semibold">{formatCurrency(Number(position.baseSalary))}</p>
         </div>
-        <div className="rounded-md bg-gradient-to-br from-emerald-600/40 to-emerald-800/30 p-2 text-foreground">
+        <div className="rounded-md border border-border/60 bg-muted/20 p-2 text-foreground">
           <p className="text-xs uppercase text-muted-foreground">Líquido c/u</p>
           <p className="text-sm sm:text-xs font-semibold">
             {formatCurrency(Number(position.netSalary || 0))}
           </p>
         </div>
-        <div className="rounded-md bg-gradient-to-br from-cyan-600/40 to-cyan-800/30 p-2 text-foreground">
+        <div className="rounded-md border border-border/60 bg-muted/20 p-2 text-foreground">
           <p className="text-xs uppercase text-muted-foreground">Empresa c/u</p>
           <p className="text-sm sm:text-xs font-semibold">
             {formatCurrency(Number(position.employerCost))}
@@ -231,16 +223,6 @@ export function CpqPositionCard({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-9 w-9 p-0 sm:hidden"
-            onClick={() => setDetailsOpen((open) => !open)}
-            aria-label={detailsOpen ? "Ocultar detalles" : "Ver detalles"}
-            title={detailsOpen ? "Ocultar detalles" : "Ver detalles"}
-          >
-            <ChevronDown className={`h-4 w-4 transition-transform ${detailsOpen ? "rotate-180" : ""}`} />
-          </Button>
           <Button size="sm" variant="outline" className="h-9 sm:h-7 px-3 sm:px-2 text-xs sm:text-xs" onClick={() => setOpenBreakdown(true)}>
             Ver desglose
           </Button>
