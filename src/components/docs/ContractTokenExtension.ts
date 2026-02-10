@@ -17,11 +17,13 @@ declare module "@tiptap/core" {
     contractToken: {
       /**
        * Insert a contract token node.
+       * signerOrder: opcional; para signature.signer_N da color por firmante.
        */
       insertToken: (attrs: {
         module: string;
         tokenKey: string;
         label: string;
+        signerOrder?: number | null;
       }) => ReturnType;
     };
   }
@@ -64,6 +66,17 @@ export const ContractToken = Node.create<ContractTokenOptions>({
           "data-label": attributes.label,
         }),
       },
+      signerOrder: {
+        default: null,
+        parseHTML: (element) => {
+          const v = element.getAttribute("data-signer-order");
+          return v ? parseInt(v, 10) : null;
+        },
+        renderHTML: (attributes) =>
+          attributes.signerOrder != null
+            ? { "data-signer-order": String(attributes.signerOrder) }
+            : {},
+      },
     };
   },
 
@@ -76,14 +89,17 @@ export const ContractToken = Node.create<ContractTokenOptions>({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    return [
-      "span",
-      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-        "data-type": "contract-token",
-        class: "contract-token",
-      }),
-      `{{${node.attrs.label}}}`,
-    ];
+    const attrs: Record<string, string> = {
+      "data-type": "contract-token",
+      class: "contract-token",
+    };
+    let order = node.attrs.signerOrder;
+    if (order == null && node.attrs.tokenKey) {
+      const m = /^signature\.signer_(\d+)$/.exec(String(node.attrs.tokenKey));
+      if (m) order = parseInt(m[1], 10);
+    }
+    if (order != null) attrs["data-signer-order"] = String(order);
+    return ["span", mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, attrs), `{{${node.attrs.label}}}`];
   },
 
   addCommands() {

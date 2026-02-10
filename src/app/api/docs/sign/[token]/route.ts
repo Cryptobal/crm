@@ -4,6 +4,7 @@
  * POST - Registrar firma de firmante público
  */
 
+import { randomBytes } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { signDocumentSchema } from "@/lib/validations/docs";
@@ -351,6 +352,7 @@ export async function POST(
         },
       });
 
+      const signedViewToken = allSigned ? randomBytes(32).toString("hex") : null;
       await tx.document.update({
         where: { id: recipient.request.documentId },
         data: {
@@ -361,6 +363,7 @@ export async function POST(
             ? `${publicSiteUrl}/api/docs/documents/${recipient.request.documentId}/signed-pdf`
             : null,
           pdfGeneratedAt: null,
+          signedViewToken,
           signatureData: buildSummary(
             recipient.requestId,
             refreshedRecipients
@@ -401,6 +404,7 @@ export async function POST(
         documentTitle: recipient.request.document.title,
         requestId: recipient.requestId,
         tenantId: recipient.request.tenantId,
+        signedViewToken,
         recipients: refreshedRecipients.map((r) => ({
           id: r.id,
           email: r.email,
@@ -471,12 +475,19 @@ export async function POST(
     } else {
       const doneAt = new Date().toLocaleString("es-CL");
       const everyone = [...new Set(result.recipients.map((r) => r.email))];
+      const publicViewUrl =
+        result.signedViewToken &&
+        `${siteUrl}/signed/${result.documentId}/${result.signedViewToken}`;
+      const pdfDownloadUrl =
+        result.signedViewToken &&
+        `${siteUrl}/api/docs/documents/${result.documentId}/signed-pdf?viewToken=${result.signedViewToken}`;
       for (const email of everyone) {
         await sendSignatureAllCompletedEmail({
           to: email,
           documentTitle: result.documentTitle,
           completedAt: doneAt,
-          documentUrl: statusUrl,
+          documentUrl: publicViewUrl || statusUrl,
+          pdfUrl: pdfDownloadUrl || undefined,
         });
       }
     }

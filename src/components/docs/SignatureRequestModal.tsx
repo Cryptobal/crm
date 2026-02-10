@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { getSignerColor } from "@/lib/docs/signature-token-colors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -161,14 +162,31 @@ export function SignatureRequestModal({
             </div>
 
             <div className="space-y-2">
-              {rows.map((row) => (
-                <div key={row.id} className="grid gap-2 rounded-lg border border-border p-3 sm:grid-cols-12">
-                  <Input
-                    className="sm:col-span-3"
-                    placeholder="Nombre"
-                    value={row.name}
-                    onChange={(e) => updateRow(row.id, { name: e.target.value })}
-                  />
+              {rows.map((row) => {
+                const signerColor = row.role === "signer" ? getSignerColor(row.signingOrder) : null;
+                return (
+                <div key={row.id} className="grid gap-2 rounded-lg border border-border p-3 sm:grid-cols-12 items-center">
+                  <div className="flex items-center gap-2 sm:col-span-3">
+                    {signerColor ? (
+                      <div
+                        className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-semibold border-2"
+                        style={{
+                          background: signerColor.bg,
+                          borderColor: signerColor.border,
+                          color: signerColor.text,
+                        }}
+                        title={`Firma del firmante ${row.signingOrder} — mismo color que el token en el documento`}
+                      >
+                        {row.signingOrder}
+                      </div>
+                    ) : null}
+                    <Input
+                      className="min-w-0 flex-1"
+                      placeholder="Nombre"
+                      value={row.name}
+                      onChange={(e) => updateRow(row.id, { name: e.target.value })}
+                    />
+                  </div>
                   <Input
                     className="sm:col-span-3"
                     placeholder="Email"
@@ -209,7 +227,8 @@ export function SignatureRequestModal({
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

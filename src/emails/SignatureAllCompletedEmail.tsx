@@ -41,15 +41,13 @@ export default function SignatureAllCompletedEmail({
           </Section>
           {documentUrl ? (
             <Section style={buttonWrap}>
-              <Button href={documentUrl} style={button}>Ver documento</Button>
+              <Button href={documentUrl} style={button}>Ver documento (sin iniciar sesión)</Button>
             </Section>
           ) : null}
           {pdfUrl ? (
-            <Text style={text}>
-              PDF firmado disponible:
-              <br />
-              <Link href={pdfUrl} style={link}>{pdfUrl}</Link>
-            </Text>
+            <Section style={buttonWrap}>
+              <Button href={pdfUrl} style={buttonSecondary}>Descargar PDF firmado</Button>
+            </Section>
           ) : null}
         </Container>
       </Body>
@@ -65,4 +63,4 @@ const box = { backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRad
 const line = { color: "#1e293b", fontSize: "14px", margin: "0 0 6px" };
 const buttonWrap = { textAlign: "center" as const, margin: "20px 0 8px" };
 const button = { backgroundColor: "#14b8a6", color: "#fff", borderRadius: "8px", padding: "12px 20px", textDecoration: "none", fontSize: "15px", fontWeight: "700" };
-const link = { color: "#0ea5e9", textDecoration: "underline", wordBreak: "break-all" as const };
+const buttonSecondary = { backgroundColor: "#f1f5f9", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "12px 20px", textDecoration: "none", fontSize: "15px", fontWeight: "600" };

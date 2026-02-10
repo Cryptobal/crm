@@ -1338,6 +1338,7 @@ model Document {
   signatureData   Json?     @map("signature_data") @db.JsonB
   pdfUrl          String?   @map("pdf_url")
   pdfGeneratedAt  DateTime? @map("pdf_generated_at") @db.Timestamptz(6)
+  signedViewToken String?   @unique @map("signed_view_token")
   createdBy       String    @map("created_by")
   approvedBy      String?   @map("approved_by")
   approvedAt      DateTime? @map("approved_at") @db.Timestamptz(6)

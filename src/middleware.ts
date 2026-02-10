@@ -30,6 +30,10 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith('/api/public')) return true;
   // Firma electrónica pública: GET/POST por token sin sesión
   if (pathname.startsWith('/api/docs/sign')) return true;
+  // Vista pública de documento firmado (por viewToken)
+  if (pathname.startsWith('/api/docs/signed-view/')) return true;
+  // PDF firmado: acceso con viewToken en query (la ruta valida el token)
+  if (/^\/api\/docs\/documents\/[^/]+\/signed-pdf$/.test(pathname)) return true;
 
   // Páginas públicas (raíz / y /opai se manejan abajo para redirigir siempre a login/inicio)
   if (pathname === '/opai/login' || pathname.startsWith('/activate')) return true;
@@ -37,6 +41,8 @@ function isPublicPath(pathname: string): boolean {
 
   // Firma electrónica: link del email, sin login (token en URL)
   if (pathname.startsWith('/sign/')) return true;
+  // Ver documento firmado (link público sin login)
+  if (pathname.startsWith('/signed/')) return true;
 
   // Assets y estáticos
   if (pathname.startsWith('/_next') || pathname.startsWith('/favicon') || pathname.startsWith('/images') || pathname.startsWith('/logos')) return true;

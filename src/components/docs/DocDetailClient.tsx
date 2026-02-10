@@ -15,6 +15,8 @@ import {
   Handshake,
   History,
   Trash2,
+  ShieldCheck,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ContractEditor } from "./ContractEditor";
@@ -285,6 +287,46 @@ export function DocDetailClient({ documentId }: DocDetailClientProps) {
           onRefresh={fetchSignatureRequest}
         />
       )}
+
+      {/* Registro de firma electrónica (cuando está completado) */}
+      {doc?.signatureStatus === "completed" && doc?.signatureData && (doc.signatureData as { signers?: Array<{ name: string; email: string; signedAt?: string | null; method?: string | null }> }).signers?.length ? (
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <h3 className="flex items-center gap-2 text-sm font-semibold">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            Registro de firma electrónica
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Documento firmado conforme a la Ley 19.799. Validez verificable por fecha, firmantes y método de firma.
+          </p>
+          <ul className="space-y-2">
+            {(doc.signatureData as { signers: Array<{ name: string; email: string; signedAt?: string | null; method?: string | null }> }).signers.map((s: any, i: number) => (
+              <li key={i} className="flex flex-wrap items-baseline gap-2 text-xs py-1.5 border-b border-border last:border-0">
+                <span className="font-medium">{s.name}</span>
+                <span className="text-muted-foreground">{s.email}</span>
+                {s.signedAt ? (
+                  <span className="text-muted-foreground">
+                    · {new Date(s.signedAt).toLocaleString("es-CL", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                ) : null}
+                {s.method ? <span className="text-muted-foreground">· {s.method}</span> : null}
+              </li>
+            ))}
+          </ul>
+          {doc.signedViewToken ? (
+            <p className="text-xs text-muted-foreground pt-2">
+              Enlace público para ver/descargar (sin login):{" "}
+              <a
+                href={`/signed/${documentId}/${doc.signedViewToken}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                Ver documento firmado <ExternalLink className="h-3 w-3" />
+              </a>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {/* History panel */}
       {showHistory && history.length > 0 && (

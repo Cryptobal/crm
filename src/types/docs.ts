@@ -60,8 +60,10 @@ export interface DocDocument {
   signatureStatus?: string | null;
   signedAt?: string | null;
   signedBy?: string | null;
+  signatureData?: unknown;
   pdfUrl?: string | null;
   pdfGeneratedAt?: string | null;
+  signedViewToken?: string | null;
   createdBy: string;
   approvedBy?: string | null;
   approvedAt?: string | null;

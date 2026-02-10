@@ -14,6 +14,7 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { ContractToken } from "./ContractTokenExtension";
 import { EditorToolbar } from "./EditorToolbar";
+import { SIGNER_TOKEN_COLORS } from "@/lib/docs/signature-token-colors";
 import { useCallback, useEffect } from "react";
 
 interface ContractEditorProps {
@@ -99,6 +100,8 @@ export function ContractEditor({
   const insertToken = useCallback(
     (token: { module: string; tokenKey: string; label: string }) => {
       if (!editor) return;
+      const signerMatch = /^signature\.signer_(\d+)$/.exec(token.tokenKey);
+      const signerOrder = signerMatch ? parseInt(signerMatch[1], 10) : null;
       editor
         .chain()
         .focus()
@@ -106,6 +109,7 @@ export function ContractEditor({
           module: token.module,
           tokenKey: token.tokenKey,
           label: token.label,
+          ...(signerOrder != null && { signerOrder }),
         })
         .insertContent(" ")
         .run();
@@ -161,6 +165,17 @@ export function ContractEditor({
           opacity: 0.5;
           font-size: 0.8em;
         }
+        ${SIGNER_TOKEN_COLORS.map(
+          (c, i) =>
+            `.contract-token[data-signer-order="${i + 1}"] {
+              background: ${c.bg};
+              border-color: ${c.border};
+              color: ${c.text};
+            }
+            .ProseMirror .contract-token[data-signer-order="${i + 1}"].ProseMirror-selectednode {
+              outline-color: ${c.border};
+            }`
+        ).join("\n")}
         .ProseMirror .contract-token.ProseMirror-selectednode {
           outline: 2px solid hsl(var(--primary));
           outline-offset: 1px;

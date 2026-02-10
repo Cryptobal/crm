@@ -143,31 +143,43 @@ function buildSignedDocumentHtml(input: {
 </html>`;
 }
 
+const signedPdfInclude = {
+  signatureRequests: {
+    where: { status: "completed" as const },
+    include: {
+      recipients: {
+        where: { role: "signer" as const, status: "signed" as const },
+        orderBy: [{ signingOrder: "asc" as const }, { createdAt: "asc" as const }],
+      },
+    },
+    orderBy: { completedAt: "desc" as const },
+    take: 1,
+  },
+};
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const ctx = await requireAuth();
-    if (!ctx) return unauthorized();
-
     const { id } = await params;
-    const document = await prisma.document.findFirst({
-      where: { id, tenantId: ctx.tenantId },
-      include: {
-        signatureRequests: {
-          where: { status: "completed" },
-          include: {
-            recipients: {
-              where: { role: "signer", status: "signed" },
-              orderBy: [{ signingOrder: "asc" }, { createdAt: "asc" }],
-            },
-          },
-          orderBy: { completedAt: "desc" },
-          take: 1,
-        },
-      },
-    });
+    const viewToken = request.nextUrl.searchParams.get("viewToken");
+
+    let document = viewToken
+      ? await prisma.document.findFirst({
+          where: { id, signedViewToken: viewToken },
+          include: signedPdfInclude,
+        })
+      : null;
+
+    if (!document) {
+      const ctx = await requireAuth();
+      if (!ctx) return unauthorized();
+      document = await prisma.document.findFirst({
+        where: { id, tenantId: ctx.tenantId },
+        include: signedPdfInclude,
+      });
+    }
 
     if (!document) {
       return NextResponse.json({ success: false, error: "Documento no encontrado" }, { status: 404 });
