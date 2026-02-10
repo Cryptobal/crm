@@ -25,6 +25,7 @@ import {
 
 type EmailMessage = {
   id: string;
+  providerMessageId?: string | null;
   direction: string;
   fromEmail: string;
   toEmails: string[];
@@ -210,6 +211,7 @@ export function EmailHistoryList({
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<EmailMessage | null>(null);
+  const [loadingSelectedContent, setLoadingSelectedContent] = useState(false);
 
   const fetchEmails = useCallback(async () => {
     try {
@@ -246,6 +248,42 @@ export function EmailHistoryList({
 
     await fetchEmails();
   }, [fetchEmails]);
+
+  const hydrateEmailContent = useCallback(async (emailId: string) => {
+    setLoadingSelectedContent(true);
+    try {
+      const response = await fetch(`/api/crm/emails/${emailId}/content`, {
+        cache: "no-store",
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload?.success || !payload?.data) return;
+
+      const updatedMessage = payload.data as EmailMessage;
+      setEmails((prev) =>
+        prev.map((item) =>
+          item.id === updatedMessage.id ? { ...item, ...updatedMessage } : item
+        )
+      );
+      setSelectedEmail((prev) =>
+        prev && prev.id === updatedMessage.id
+          ? { ...prev, ...updatedMessage }
+          : prev
+      );
+    } catch (error) {
+      console.error("Error hydrating email content:", error);
+    } finally {
+      setLoadingSelectedContent(false);
+    }
+  }, []);
+
+  const openEmail = useCallback(
+    (message: EmailMessage) => {
+      setSelectedEmail(message);
+      if (message.htmlBody || message.textBody) return;
+      void hydrateEmailContent(message.id);
+    },
+    [hydrateEmailContent]
+  );
 
   useEffect(() => { void fetchEmails(); }, [fetchEmails]);
   useEffect(() => {
@@ -381,7 +419,7 @@ export function EmailHistoryList({
                 <button
                   type="button"
                   className="text-primary text-[11px] font-medium hover:underline"
-                  onClick={() => setSelectedEmail(msg)}
+                  onClick={() => openEmail(msg)}
                 >
                   Ver correo
                 </button>
@@ -435,9 +473,18 @@ export function EmailHistoryList({
                   )}
                 </p>
               </div>
-              <div className="rounded-md border p-3 text-sm whitespace-pre-wrap break-words leading-relaxed">
-                {getEmailBodyText(selectedEmail)}
-              </div>
+              {loadingSelectedContent &&
+              !selectedEmail.htmlBody &&
+              !selectedEmail.textBody ? (
+                <div className="rounded-md border p-3 text-sm text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Cargando contenido del correo...
+                </div>
+              ) : (
+                <div className="rounded-md border p-3 text-sm whitespace-pre-wrap break-words leading-relaxed">
+                  {getEmailBodyText(selectedEmail)}
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

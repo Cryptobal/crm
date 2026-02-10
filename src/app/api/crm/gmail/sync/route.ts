@@ -10,6 +10,7 @@ import { getDefaultTenantId } from "@/lib/tenant";
 import { decryptText } from "@/lib/crypto";
 import { getGmailClient } from "@/lib/gmail";
 import { extractEmailAddresses, normalizeEmailAddress } from "@/lib/email-address";
+import { extractGmailMessageBodies, type GmailMessagePart } from "@/lib/gmail-message-content";
 
 function getHeader(headers: { name?: string | null; value?: string | null }[], name: string) {
   return headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value || "";
@@ -19,59 +20,6 @@ function parseDateHeader(value: string): Date {
   if (!value) return new Date();
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
-}
-
-type GmailMessagePart = {
-  mimeType?: string | null;
-  body?: { data?: string | null } | null;
-  parts?: GmailMessagePart[] | null;
-};
-
-function decodeBase64Url(value?: string | null): string {
-  if (!value) return "";
-
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-
-  try {
-    return Buffer.from(`${base64}${padding}`, "base64").toString("utf8");
-  } catch {
-    return "";
-  }
-}
-
-function extractMessageBodies(payload?: GmailMessagePart): {
-  htmlBody: string | null;
-  textBody: string | null;
-} {
-  if (!payload) return { htmlBody: null, textBody: null };
-
-  let htmlBody: string | null = null;
-  let textBody: string | null = null;
-  const stack: GmailMessagePart[] = [payload];
-
-  while (stack.length > 0) {
-    const part = stack.pop();
-    if (!part) continue;
-
-    const mimeType = (part.mimeType || "").toLowerCase();
-    const decoded = decodeBase64Url(part.body?.data);
-
-    if (decoded) {
-      if (!htmlBody && mimeType.includes("text/html")) {
-        htmlBody = decoded;
-      }
-      if (!textBody && mimeType.includes("text/plain")) {
-        textBody = decoded;
-      }
-    }
-
-    if (part.parts?.length) {
-      stack.push(...part.parts);
-    }
-  }
-
-  return { htmlBody, textBody };
 }
 
 export async function GET(request: NextRequest) {
@@ -169,7 +117,7 @@ export async function GET(request: NextRequest) {
       const ccEmails = extractEmailAddresses(ccHeader);
       const bccEmails = extractEmailAddresses(bccHeader);
       const sentOrReceivedAt = parseDateHeader(dateHeader);
-      const { htmlBody, textBody } = extractMessageBodies(payload as GmailMessagePart | undefined);
+      const { htmlBody, textBody } = extractGmailMessageBodies(payload as GmailMessagePart | undefined);
       const snippet = full.data.snippet?.trim() || null;
 
       if (existing) {
