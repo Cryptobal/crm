@@ -435,29 +435,31 @@ export function EmailHistoryList({
           if (!open) setSelectedEmail(null);
         }}
       >
-        <DialogContent className="sm:max-w-2xl max-h-[88vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[88vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
-            <DialogTitle>{selectedEmail?.subject || "Correo"}</DialogTitle>
+            <DialogTitle className="break-words pr-8">
+              {selectedEmail?.subject || "Correo"}
+            </DialogTitle>
           </DialogHeader>
           {selectedEmail && (
-            <div className="space-y-3">
-              <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs space-y-1.5">
-                <p>
+            <div className="space-y-3 max-w-full overflow-x-hidden">
+              <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs space-y-1.5 max-w-full overflow-x-hidden">
+                <p className="break-all">
                   <span className="font-medium text-foreground">De:</span>{" "}
                   {selectedEmail.fromEmail}
                 </p>
-                <p>
+                <p className="break-all">
                   <span className="font-medium text-foreground">Para:</span>{" "}
                   {selectedEmail.toEmails.join(", ") || "Sin destinatario"}
                 </p>
                 {selectedEmail.ccEmails && selectedEmail.ccEmails.length > 0 && (
-                  <p>
+                  <p className="break-all">
                     <span className="font-medium text-foreground">CC:</span>{" "}
                     {selectedEmail.ccEmails.join(", ")}
                   </p>
                 )}
                 {selectedEmail.bccEmails && selectedEmail.bccEmails.length > 0 && (
-                  <p>
+                  <p className="break-all">
                     <span className="font-medium text-foreground">BCC:</span>{" "}
                     {selectedEmail.bccEmails.join(", ")}
                   </p>
@@ -476,12 +478,12 @@ export function EmailHistoryList({
               {loadingSelectedContent &&
               !selectedEmail.htmlBody &&
               !selectedEmail.textBody ? (
-                <div className="rounded-md border p-3 text-sm text-muted-foreground flex items-center gap-2">
+                <div className="rounded-md border p-3 text-sm text-muted-foreground flex items-center gap-2 max-w-full overflow-x-hidden">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Cargando contenido del correo...
                 </div>
               ) : (
-                <div className="rounded-md border p-3 text-sm whitespace-pre-wrap break-words leading-relaxed">
+                <div className="rounded-md border p-3 text-sm whitespace-pre-wrap break-all leading-relaxed max-w-full overflow-x-hidden">
                   {getEmailBodyText(selectedEmail)}
                 </div>
               )}
