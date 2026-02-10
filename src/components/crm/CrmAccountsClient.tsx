@@ -17,10 +17,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import Link from "next/link";
-import { Loader2, Plus, Building2, Users, ChevronRight, Trash2, Search } from "lucide-react";
+import { Loader2, Plus, Building2, Users, ChevronRight, Trash2, Search, TrendingUp, Mail } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/opai/EmptyState";
 import { CrmDates } from "@/components/crm/CrmDates";
+import { ViewToggle, type ViewMode } from "./ViewToggle";
 import { toast } from "sonner";
 
 type AccountFormState = {
@@ -62,6 +63,7 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
   const [open, setOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | "prospect" | "client">("all");
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<ViewMode>("list");
   const [industries, setIndustries] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
@@ -164,6 +166,7 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
           />
         </div>
         <div className="flex items-center gap-2">
+          <ViewToggle view={view} onChange={setView} />
           <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
             {typeFilters.map((opt) => {
               const Icon = opt.icon;
@@ -286,17 +289,15 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
               }
               compact
             />
-          ) : (
+          ) : view === "list" ? (
             <div className="space-y-2">
               {filteredAccounts.map((account) => (
-                <div
+                <Link
                   key={account.id}
+                  href={`/crm/accounts/${account.id}`}
                   className="flex flex-col gap-2 rounded-lg border p-3 sm:p-4 transition-colors hover:bg-accent/30 sm:flex-row sm:items-center sm:justify-between group"
                 >
-                  <Link
-                    href={`/crm/accounts/${account.id}`}
-                    className="flex flex-1 items-start gap-3 min-w-0"
-                  >
+                  <div className="flex flex-1 items-start gap-3 min-w-0">
                     <div
                       className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
                         account.type === "client"
@@ -304,11 +305,7 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
                           : "bg-amber-500/10 text-amber-400"
                       }`}
                     >
-                      {account.type === "client" ? (
-                        <Building2 className="h-4 w-4" />
-                      ) : (
-                        <Users className="h-4 w-4" />
-                      )}
+                      {account.type === "client" ? <Building2 className="h-4 w-4" /> : <Users className="h-4 w-4" />}
                     </div>
                     <div className="min-w-0">
                       <p className="font-medium text-sm">{account.name}</p>
@@ -317,35 +314,46 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
                       </p>
                       <CrmDates createdAt={account.createdAt} updatedAt={account.updatedAt} className="mt-0.5" />
                     </div>
-                  </Link>
+                  </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Badge
-                      variant="outline"
-                      className={
-                        account.type === "client"
-                          ? "border-emerald-500/30 text-emerald-400"
-                          : "border-amber-500/30 text-amber-400"
-                      }
-                    >
+                    <Badge variant="outline" className={account.type === "client" ? "border-emerald-500/30 text-emerald-400" : "border-amber-500/30 text-amber-400"}>
                       {account.type === "client" ? "Cliente" : "Prospecto"}
                     </Badge>
-                    <Badge variant="outline">
-                      {account._count?.contacts ?? 0} contactos
-                    </Badge>
-                    <Badge variant="outline">
-                      {account._count?.deals ?? 0} negocios
-                    </Badge>
+                    <Badge variant="outline">{account._count?.contacts ?? 0} contactos</Badge>
+                    <Badge variant="outline">{account._count?.deals ?? 0} negocios</Badge>
                     <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 hidden sm:block" />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => setDeleteConfirm({ open: true, id: account.id })}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
                   </div>
-                </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredAccounts.map((account) => (
+                <Link
+                  key={account.id}
+                  href={`/crm/accounts/${account.id}`}
+                  className="rounded-lg border p-4 transition-colors hover:bg-accent/30 hover:border-primary/30 group space-y-3"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${account.type === "client" ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>
+                        {account.type === "client" ? <Building2 className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm group-hover:text-primary transition-colors">{account.name}</p>
+                        <p className="text-[11px] text-muted-foreground">{account.industry || "Sin industria"}</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className={`text-[10px] shrink-0 ${account.type === "client" ? "border-emerald-500/30 text-emerald-400" : "border-amber-500/30 text-amber-400"}`}>
+                      {account.type === "client" ? "Cliente" : "Prospecto"}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><Users className="h-3 w-3" />{account._count?.contacts ?? 0}</span>
+                    <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" />{account._count?.deals ?? 0}</span>
+                    {account.rut && <span>{account.rut}</span>}
+                  </div>
+                </Link>
               ))}
             </div>
           )}

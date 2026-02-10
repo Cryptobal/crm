@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { MapPin, Trash2, Search, ChevronRight } from "lucide-react";
+import { MapPin, Trash2, Search, ChevronRight, Building2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/opai/EmptyState";
 import { CrmDates } from "@/components/crm/CrmDates";
+import { ViewToggle, type ViewMode } from "./ViewToggle";
 
 export type InstallationRow = {
   id: string;
@@ -32,6 +33,7 @@ export function CrmInstallationsListClient({
   const [installations, setInstallations] = useState<InstallationRow[]>(initialInstallations);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string }>({ open: false, id: "" });
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<ViewMode>("list");
   const [accountFilter, setAccountFilter] = useState<string>("all");
 
   const filteredInstallations = useMemo(() => {
@@ -88,6 +90,7 @@ export function CrmInstallationsListClient({
           />
         </div>
         <div className="flex items-center gap-2">
+          <ViewToggle view={view} onChange={setView} />
           <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
             <button
               type="button"
@@ -132,24 +135,18 @@ export function CrmInstallationsListClient({
               }
               compact
             />
-          ) : (
+          ) : view === "list" ? (
             <div className="space-y-2">
               {filteredInstallations.map((inst) => (
-                <div
+                <Link
                   key={inst.id}
+                  href={`/crm/installations/${inst.id}`}
                   className="flex items-center justify-between rounded-lg border p-3 sm:p-4 transition-colors hover:bg-accent/30 group"
                 >
-                  <Link
-                    href={`/crm/installations/${inst.id}`}
-                    className="flex-1 min-w-0"
-                  >
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm truncate">{inst.name}</p>
-                    </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{inst.name}</p>
                     {inst.account && (
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {inst.account.name}
-                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{inst.account.name}</p>
                     )}
                     {inst.address && (
                       <p className="mt-0.5 text-xs text-muted-foreground flex items-center gap-1">
@@ -161,25 +158,44 @@ export function CrmInstallationsListClient({
                       </p>
                     )}
                     {inst.createdAt && (
-                      <CrmDates
-                        createdAt={inst.createdAt}
-                        updatedAt={inst.updatedAt}
-                        className="mt-0.5"
-                      />
+                      <CrmDates createdAt={inst.createdAt} updatedAt={inst.updatedAt} className="mt-0.5" />
                     )}
-                  </Link>
-                  <div className="flex items-center gap-1.5 shrink-0 ml-3">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => setDeleteConfirm({ open: true, id: inst.id })}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 hidden sm:block" />
                   </div>
-                </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 shrink-0" />
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredInstallations.map((inst) => (
+                <Link
+                  key={inst.id}
+                  href={`/crm/installations/${inst.id}`}
+                  className="rounded-lg border p-4 transition-colors hover:bg-accent/30 hover:border-primary/30 group space-y-2.5"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+                        <MapPin className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm group-hover:text-primary transition-colors truncate">{inst.name}</p>
+                        {inst.account && <p className="text-[11px] text-muted-foreground">{inst.account.name}</p>}
+                      </div>
+                    </div>
+                  </div>
+                  {inst.address && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      {inst.address}
+                    </p>
+                  )}
+                  {(inst.commune || inst.city) && (
+                    <p className="text-xs text-muted-foreground">
+                      {[inst.commune, inst.city].filter(Boolean).join(", ")}
+                    </p>
+                  )}
+                </Link>
               ))}
             </div>
           )}

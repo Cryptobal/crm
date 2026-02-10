@@ -45,6 +45,12 @@ type ApproveFormState = {
   industry: string;
   segment: string;
   roleTitle: string;
+  // Instalación
+  installationName: string;
+  installationAddress: string;
+  installationCity: string;
+  installationCommune: string;
+  installationWebsite: string;
 };
 
 const DEFAULT_FORM: LeadFormState = {
@@ -83,6 +89,11 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
     industry: "",
     segment: "",
     roleTitle: "",
+    installationName: "",
+    installationAddress: "",
+    installationCity: "",
+    installationCommune: "",
+    installationWebsite: "",
   });
 
   const [industries, setIndustries] = useState<{ id: string; name: string }[]>([]);
@@ -170,6 +181,11 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
       industry: lead.industry || "",
       segment: "",
       roleTitle: "",
+      installationName: lead.companyName || "",
+      installationAddress: (lead as any).address || "",
+      installationCity: (lead as any).city || "",
+      installationCommune: (lead as any).commune || "",
+      installationWebsite: (lead as any).website || "",
     });
     setApproveOpen(true);
   };
@@ -511,6 +527,64 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
                   className={inputClassName}
                 />
               </div>
+            </div>
+
+            <div className="border-t border-border" />
+
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Instalación
+              </h4>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs">Nombre instalación</Label>
+                  <Input
+                    value={approveForm.installationName}
+                    onChange={(e) => updateApproveForm("installationName", e.target.value)}
+                    placeholder="Bodega central, Sucursal norte..."
+                    className={inputClassName}
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs">Dirección</Label>
+                  <Input
+                    value={approveForm.installationAddress}
+                    onChange={(e) => updateApproveForm("installationAddress", e.target.value)}
+                    placeholder="Av. Ejemplo 123, Santiago"
+                    className={inputClassName}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Comuna</Label>
+                  <Input
+                    value={approveForm.installationCommune}
+                    onChange={(e) => updateApproveForm("installationCommune", e.target.value)}
+                    placeholder="Las Condes"
+                    className={inputClassName}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Ciudad</Label>
+                  <Input
+                    value={approveForm.installationCity}
+                    onChange={(e) => updateApproveForm("installationCity", e.target.value)}
+                    placeholder="Santiago"
+                    className={inputClassName}
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs">Sitio web</Label>
+                  <Input
+                    value={approveForm.installationWebsite}
+                    onChange={(e) => updateApproveForm("installationWebsite", e.target.value)}
+                    placeholder="https://www.empresa.cl"
+                    className={inputClassName}
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Si dejas el nombre vacío no se creará instalación. Puedes agregar más instalaciones después desde la cuenta.
+              </p>
             </div>
           </div>
           <DialogFooter className="mt-4">

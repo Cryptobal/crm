@@ -16,10 +16,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Loader2, Trash2, Search, Users, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Loader2, Trash2, Search, Users, ChevronRight, Mail, Phone, Building2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/opai/EmptyState";
 import { CrmDates } from "@/components/crm/CrmDates";
+import { ViewToggle, type ViewMode } from "./ViewToggle";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -78,6 +79,7 @@ export function CrmContactsClient({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<ViewMode>("list");
   const [accountFilter, setAccountFilter] = useState<string>("all");
 
   const inputClassName =
@@ -229,6 +231,7 @@ export function CrmContactsClient({
           />
         </div>
         <div className="flex items-center gap-2">
+          <ViewToggle view={view} onChange={setView} />
           <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
             <button
               type="button"
@@ -438,23 +441,19 @@ export function CrmContactsClient({
               }
               compact
             />
-          ) : (
+          ) : view === "list" ? (
             <div className="space-y-2">
               {filteredContacts.map((contact) => (
-                <div
+                <Link
                   key={contact.id}
-                  className="flex flex-col gap-2 rounded-lg border p-3 sm:p-4 transition-colors hover:bg-accent/30 sm:flex-row sm:items-center sm:justify-between group"
+                  href={`/crm/contacts/${contact.id}`}
+                  className="flex items-center justify-between rounded-lg border p-3 sm:p-4 transition-colors hover:bg-accent/30 group"
                 >
-                  <Link
-                    href={`/crm/contacts/${contact.id}`}
-                    className="flex-1 min-w-0"
-                  >
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm hover:text-primary transition-colors">{contactName(contact)}</p>
+                      <p className="font-medium text-sm group-hover:text-primary transition-colors">{contactName(contact)}</p>
                       {contact.isPrimary && (
-                        <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-                          Principal
-                        </Badge>
+                        <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">Principal</Badge>
                       )}
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
@@ -465,17 +464,36 @@ export function CrmContactsClient({
                       {contact.roleTitle ? ` · ${contact.roleTitle}` : ""}
                     </p>
                     {contact.createdAt && (
-                      <CrmDates
-                        createdAt={contact.createdAt}
-                        updatedAt={contact.updatedAt}
-                        className="mt-0.5"
-                      />
+                      <CrmDates createdAt={contact.createdAt} updatedAt={contact.updatedAt} className="mt-0.5" />
                     )}
-                  </Link>
-                  <Link href={`/crm/contacts/${contact.id}`} className="shrink-0">
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5" />
-                  </Link>
-                </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 shrink-0" />
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredContacts.map((contact) => (
+                <Link
+                  key={contact.id}
+                  href={`/crm/contacts/${contact.id}`}
+                  className="rounded-lg border p-4 transition-colors hover:bg-accent/30 hover:border-primary/30 group space-y-2.5"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium text-sm group-hover:text-primary transition-colors">{contactName(contact)}</p>
+                      <p className="text-[11px] text-muted-foreground">{contact.roleTitle || "Sin cargo"}</p>
+                    </div>
+                    {contact.isPrimary && (
+                      <Badge variant="outline" className="text-[10px] border-primary/30 text-primary shrink-0">Principal</Badge>
+                    )}
+                  </div>
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    {contact.email && <p className="flex items-center gap-1.5"><Mail className="h-3 w-3 shrink-0" />{contact.email}</p>}
+                    {contact.phone && <p className="flex items-center gap-1.5"><Phone className="h-3 w-3 shrink-0" />{contact.phone}</p>}
+                    {contact.account?.name && <p className="flex items-center gap-1.5"><Building2 className="h-3 w-3 shrink-0" />{contact.account.name}</p>}
+                  </div>
+                </Link>
               ))}
             </div>
           )}

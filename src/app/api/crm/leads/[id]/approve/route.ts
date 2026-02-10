@@ -164,6 +164,33 @@ export async function POST(
         },
       });
 
+      // Crear instalación nueva si se proporcionó nombre
+      const instName = body?.installationName?.trim();
+      if (instName) {
+        const instWebsite = body?.installationWebsite?.trim();
+        await tx.crmInstallation.create({
+          data: {
+            tenantId: ctx.tenantId,
+            accountId: account.id,
+            name: instName,
+            address: body?.installationAddress?.trim() || null,
+            city: body?.installationCity?.trim() || null,
+            commune: body?.installationCommune?.trim() || null,
+            notes: instWebsite ? `Sitio web: ${instWebsite}` : null,
+          },
+        });
+      }
+
+      // Crear DealContact para el contacto principal
+      await tx.crmDealContact.create({
+        data: {
+          tenantId: ctx.tenantId,
+          dealId: deal.id,
+          contactId: contact.id,
+          role: "primary",
+        },
+      });
+
       await tx.crmHistoryLog.create({
         data: {
           tenantId: ctx.tenantId,
