@@ -428,7 +428,7 @@ export function CrmLeadsClient({ initialLeads }: { initialLeads: CrmLead[] }) {
         const exContact = checkData.existingContact ?? null;
         setExistingContact(exContact);
         if (exContact) setContactResolution("overwrite");
-        const conflicts = checkData.installationConflicts || [];
+        const conflicts: InstallationConflict[] = checkData.installationConflicts || [];
         setInstallationConflicts(conflicts);
         setInstallationUseExisting((prev) => {
           const next = { ...prev };

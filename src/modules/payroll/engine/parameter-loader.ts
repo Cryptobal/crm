@@ -134,12 +134,16 @@ export async function resolveUtmValue(month?: string): Promise<{
   value: number;
   month: string;
 }> {
-  const targetMonth = month
-    ? new Date(month + "T12:00:00")
-    : (() => {
-        const chile = new Date(new Date().toLocaleString("en-CA", { timeZone: "America/Santiago" }));
-        return new Date(chile.getFullYear(), chile.getMonth(), 1);
-      })();
+  const fallbackMonth = (() => {
+    const chileToday = todayChileDate();
+    return new Date(chileToday.getFullYear(), chileToday.getMonth(), 1, 12, 0, 0);
+  })();
+
+  const parsedMonth = month ? new Date(`${month}T12:00:00`) : null;
+  const targetMonth =
+    parsedMonth && !Number.isNaN(parsedMonth.getTime())
+      ? new Date(parsedMonth.getFullYear(), parsedMonth.getMonth(), 1, 12, 0, 0)
+      : fallbackMonth;
 
   const utmRate = await prisma.fxUtmRate.findFirst({
     where: { month: targetMonth },
