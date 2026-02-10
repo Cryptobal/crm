@@ -63,7 +63,7 @@ export function AppSidebar({
             title={collapsed ? "OPAI" : undefined}
           >
             <Image
-              src="/logo escudo blanco.png"
+              src="/logo%20escudo%20blanco.png"
               alt="Gard Security"
               width={28}
               height={28}
