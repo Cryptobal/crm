@@ -222,12 +222,18 @@ export async function GET(
       })),
     });
 
-    const executablePath = await chromiumPkg.executablePath();
-    const browser = await chromium.launch({
-      args: chromiumPkg.args,
-      executablePath,
-      headless: true,
-    });
+    let browser;
+    if (process.env.NODE_ENV === "development") {
+      // En desarrollo: usar Chromium local de Playwright (sin @sparticuz/chromium que es para Lambda)
+      browser = await chromium.launch({ headless: true });
+    } else {
+      const executablePath = await chromiumPkg.executablePath();
+      browser = await chromium.launch({
+        args: chromiumPkg.args,
+        executablePath,
+        headless: true,
+      });
+    }
 
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle" });

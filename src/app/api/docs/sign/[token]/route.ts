@@ -423,22 +423,31 @@ export async function POST(
     const signerName = payload.signerName;
     const signerEmail = recipient.email;
 
-    const adminUsers = await prisma.admin.findMany({
-      where: { tenantId: result.tenantId, role: { in: ["owner", "admin"] }, status: "active" },
-      select: { email: true },
-    });
-    const ccRecipients = result.recipients.filter((r) => r.role === "cc");
-    const notifyTargets = [...new Set([...adminUsers.map((a) => a.email), ...ccRecipients.map((r) => r.email)])];
+    const notifyTargets: string[] = [];
+    try {
+      const adminUsers = await prisma.admin.findMany({
+        where: { tenantId: result.tenantId, role: { in: ["owner", "admin"] }, status: "active" },
+        select: { email: true },
+      });
+      const ccRecipients = result.recipients.filter((r) => r.role === "cc");
+      notifyTargets.push(...new Set([...adminUsers.map((a) => a.email), ...ccRecipients.map((r) => r.email)]));
+    } catch (e) {
+      console.warn("Sign: could not load notify targets for email", e);
+    }
 
     for (const email of notifyTargets) {
-      await sendSignatureCompletedNotifyEmail({
-        to: email,
-        documentTitle: result.documentTitle,
-        signerName,
-        signerEmail,
-        signedAt: signedAtText,
-        statusUrl,
-      });
+      try {
+        await sendSignatureCompletedNotifyEmail({
+          to: email,
+          documentTitle: result.documentTitle,
+          signerName,
+          signerEmail,
+          signedAt: signedAtText,
+          statusUrl,
+        });
+      } catch (e) {
+        console.warn("Sign: failed to send notify email to", email, e);
+      }
     }
 
     if (!result.allSigned) {
@@ -457,19 +466,23 @@ export async function POST(
         );
 
         for (const nextSigner of nextSigners) {
-          await sendSignatureRequestEmail({
-            to: nextSigner.email,
-            recipientName: nextSigner.name,
-            documentTitle: result.documentTitle,
-            signingUrl: `${siteUrl}/sign/${nextSigner.token}`,
-          });
-          await prisma.docSignatureRecipient.update({
-            where: { id: nextSigner.id },
-            data: {
-              sentAt: new Date(),
-              status: nextSigner.status === "pending" ? "sent" : nextSigner.status,
-            },
-          });
+          try {
+            await sendSignatureRequestEmail({
+              to: nextSigner.email,
+              recipientName: nextSigner.name,
+              documentTitle: result.documentTitle,
+              signingUrl: `${siteUrl}/sign/${nextSigner.token}`,
+            });
+            await prisma.docSignatureRecipient.update({
+              where: { id: nextSigner.id },
+              data: {
+                sentAt: new Date(),
+                status: nextSigner.status === "pending" ? "sent" : nextSigner.status,
+              },
+            });
+          } catch (e) {
+            console.warn("Sign: failed to send next signer email to", nextSigner.email, e);
+          }
         }
       }
     } else {
@@ -482,13 +495,17 @@ export async function POST(
         result.signedViewToken &&
         `${siteUrl}/api/docs/documents/${result.documentId}/signed-pdf?viewToken=${result.signedViewToken}`;
       for (const email of everyone) {
-        await sendSignatureAllCompletedEmail({
-          to: email,
-          documentTitle: result.documentTitle,
-          completedAt: doneAt,
-          documentUrl: publicViewUrl || statusUrl,
-          pdfUrl: pdfDownloadUrl || undefined,
-        });
+        try {
+          await sendSignatureAllCompletedEmail({
+            to: email,
+            documentTitle: result.documentTitle,
+            completedAt: doneAt,
+            documentUrl: publicViewUrl || statusUrl,
+            pdfUrl: pdfDownloadUrl || undefined,
+          });
+        } catch (e) {
+          console.warn("Sign: failed to send completed email to", email, e);
+        }
       }
     }
 
@@ -501,9 +518,14 @@ export async function POST(
       },
     });
   } catch (error) {
-    console.error("Error signing document:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    console.error("Error signing document:", message, stack ?? "");
     return NextResponse.json(
-      { success: false, error: "Error al registrar firma" },
+      {
+        success: false,
+        error: process.env.NODE_ENV === "development" ? message : "Error al registrar firma",
+      },
       { status: 500 }
     );
   }

@@ -14,14 +14,6 @@ export async function GET(
     const { documentId, viewToken } = await params;
     const doc = await prisma.document.findFirst({
       where: { id: documentId, signedViewToken: viewToken },
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        signedAt: true,
-        signatureStatus: true,
-        signatureData: true,
-      },
       include: {
         signatureRequests: {
           where: { status: "completed" },
@@ -31,16 +23,6 @@ export async function GET(
             recipients: {
               where: { role: "signer" },
               orderBy: [{ signingOrder: "asc" }, { createdAt: "asc" }],
-              select: {
-                name: true,
-                email: true,
-                rut: true,
-                signingOrder: true,
-                signedAt: true,
-                signatureMethod: true,
-                signatureTypedName: true,
-                signatureImageUrl: true,
-              },
             },
           },
         },
@@ -66,7 +48,16 @@ export async function GET(
           signatureStatus: doc.signatureStatus,
           signatureData: doc.signatureData,
         },
-        signers: request?.recipients ?? [],
+        signers: (request?.recipients ?? []).map((r) => ({
+          name: r.name,
+          email: r.email,
+          rut: r.rut,
+          signingOrder: r.signingOrder,
+          signedAt: r.signedAt,
+          signatureMethod: r.signatureMethod,
+          signatureTypedName: r.signatureTypedName,
+          signatureImageUrl: r.signatureImageUrl,
+        })),
         completedAt: request?.completedAt ?? doc.signedAt,
       },
     });
