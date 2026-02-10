@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ContractEditor } from "./ContractEditor";
-import { DOC_CATEGORIES } from "@/lib/docs/token-registry";
+import { DOC_CATEGORIES, DOC_MODULES } from "@/lib/docs/token-registry";
 import { toast } from "sonner";
 
 interface DocTemplateEditorClientProps {
@@ -26,8 +26,10 @@ export function DocTemplateEditorClient({
   const [category, setCategory] = useState("");
   const [content, setContent] = useState<any>(null);
   const [isDefault, setIsDefault] = useState(false);
+  const [categoriesFromApi, setCategoriesFromApi] = useState<{ key: string; label: string }[]>([]);
 
-  const categories = DOC_CATEGORIES[module] || [];
+  const categories =
+    categoriesFromApi.length > 0 ? categoriesFromApi : (DOC_CATEGORIES[module] || []);
 
   // Fetch template if editing
   const fetchTemplate = useCallback(async () => {
@@ -54,6 +56,23 @@ export function DocTemplateEditorClient({
   useEffect(() => {
     fetchTemplate();
   }, [fetchTemplate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/docs/categories?module=${encodeURIComponent(module)}`, { cache: "no-store" });
+        const data = await res.json();
+        if (cancelled || !data.success || !Array.isArray(data.data)) return;
+        setCategoriesFromApi(
+          data.data.map((c: { key: string; label: string }) => ({ key: c.key, label: c.label }))
+        );
+      } catch {
+        setCategoriesFromApi([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [module]);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -147,7 +166,7 @@ export function DocTemplateEditorClient({
       </div>
 
       {/* Meta fields */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 rounded-xl border border-border bg-white">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 rounded-xl border border-border bg-card">
         <div>
           <label className="text-xs font-medium text-muted-foreground">
             Nombre del Template *
@@ -157,7 +176,7 @@ export function DocTemplateEditorClient({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ej: Contrato de Servicios de Seguridad"
-            className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
+            className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
         <div>
@@ -170,11 +189,11 @@ export function DocTemplateEditorClient({
               setModule(e.target.value);
               setCategory("");
             }}
-            className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring bg-white"
+            className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           >
-            <option value="crm">CRM</option>
-            <option value="payroll">Payroll</option>
-            <option value="legal">Legal</option>
+            {DOC_MODULES.map((m) => (
+              <option key={m.key} value={m.key}>{m.label}</option>
+            ))}
           </select>
         </div>
         <div>
@@ -184,7 +203,7 @@ export function DocTemplateEditorClient({
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring bg-white"
+            className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           >
             <option value="">Seleccionar...</option>
             {categories.map((c) => (
@@ -203,7 +222,7 @@ export function DocTemplateEditorClient({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Breve descripción..."
-            className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
+            className="mt-1 w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
       </div>
@@ -230,6 +249,8 @@ export function DocTemplateEditorClient({
             ? ["account", "contact", "installation", "deal", "quote", "system"]
             : module === "payroll"
             ? ["system"]
+            : module === "mail"
+            ? ["account", "contact", "system"]
             : ["account", "contact", "system"]
         }
         placeholder="Escribe el contenido del template aquí... Usa el botón 'Insertar Token' para agregar placeholders dinámicos"

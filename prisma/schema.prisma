@@ -1231,6 +1231,23 @@ model CrmEmailSignature {
 // DOCS MODULE (Document Management System)
 // ============================================
 
+model DocCategory {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId  String   @map("tenant_id")
+  module    String   // "crm", "payroll", "legal", "mail"
+  key       String   // "contrato_servicio", "email_seguimiento", etc.
+  label     String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, module, key], map: "uq_doc_category_tenant_module_key")
+  @@index([tenantId], map: "idx_doc_categories_tenant")
+  @@index([tenantId, module], map: "idx_doc_categories_tenant_module")
+  @@map("doc_categories")
+  @@schema("docs")
+}
+
 model DocTemplate {
   id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   tenantId    String   @map("tenant_id")

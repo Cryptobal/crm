@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/opai";
 import { prisma } from "@/lib/prisma";
 import { getDefaultTenantId } from "@/lib/tenant";
-import { ConfigSubnav, EmailTemplatesClient } from "@/components/opai";
+import { ConfigBackLink, EmailTemplatesClient } from "@/components/opai";
 import { hasConfigSubmoduleAccess } from "@/lib/module-access";
 
 export default async function EmailTemplatesPage() {
@@ -27,11 +27,11 @@ export default async function EmailTemplatesPage() {
 
   return (
     <>
+      <ConfigBackLink />
       <PageHeader
         title="Templates de email"
         description="Crea templates con placeholders para seguimiento"
       />
-      <ConfigSubnav role={role} />
       <EmailTemplatesClient initialTemplates={initialTemplates} />
     </>
   );

@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getDefaultTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/opai";
-import { ConfigSubnav } from "@/components/opai";
+import { ConfigBackLink } from "@/components/opai";
 import { CrmConfigClient } from "@/components/crm/CrmConfigClient";
 import { FollowUpConfigSection } from "@/components/crm/FollowUpConfigSection";
 import { hasConfigSubmoduleAccess } from "@/lib/module-access";
@@ -33,11 +33,11 @@ export default async function CrmConfigPage() {
 
   return (
     <>
+      <ConfigBackLink />
       <PageHeader
         title="Configuración CRM"
         description="Pipeline, campos y automatizaciones"
       />
-      <ConfigSubnav role={role} />
       <CrmConfigClient initialStages={stages} initialFields={fields} />
       <FollowUpConfigSection />
     </>

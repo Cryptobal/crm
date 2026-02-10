@@ -51,3 +51,4 @@ export { DocumentosSubnav } from './DocumentosSubnav';
 export { IntegrationsGmailClient } from './IntegrationsGmailClient';
 export { EmailTemplatesClient } from './EmailTemplatesClient';
 export { ConfigSubnav } from './ConfigSubnav';
+export { ConfigBackLink } from './ConfigBackLink';

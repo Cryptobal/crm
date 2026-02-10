@@ -153,7 +153,22 @@ export const DOC_CATEGORIES: Record<string, { key: string; label: string }[]> = 
     { key: "carta_compromiso", label: "Carta de Compromiso" },
     { key: "otro_legal", label: "Otro" },
   ],
+  mail: [
+    { key: "email_seguimiento", label: "Email de Seguimiento" },
+    { key: "email_propuesta", label: "Email de Propuesta" },
+    { key: "email_general", label: "Email General" },
+    { key: "negocio_perdido", label: "Negocio perdido / Mail a cliente" },
+    { key: "otro_mail", label: "Otro" },
+  ],
 };
+
+/** Módulos disponibles para plantillas (incluye mail para correos desde CRM) */
+export const DOC_MODULES = [
+  { key: "crm", label: "CRM" },
+  { key: "payroll", label: "Payroll" },
+  { key: "legal", label: "Legal" },
+  { key: "mail", label: "Mail (correos)" },
+] as const;
 
 /** Status labels for documents */
 export const DOC_STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {

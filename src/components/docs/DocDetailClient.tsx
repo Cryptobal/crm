@@ -178,7 +178,7 @@ export function DocDetailClient({ documentId }: DocDetailClientProps) {
       </div>
 
       {/* Document info panel */}
-      <div className="flex items-start gap-4 flex-wrap p-4 rounded-xl border border-border bg-white">
+      <div className="flex items-start gap-4 flex-wrap p-4 rounded-xl border border-border bg-card">
         <div className="flex-1 min-w-[200px]">
           <h2 className="text-lg font-semibold">{doc.title}</h2>
           <p className="text-xs text-muted-foreground mt-1">
@@ -193,7 +193,7 @@ export function DocDetailClient({ documentId }: DocDetailClientProps) {
             value={status}
             onChange={(e) => setStatus(e.target.value)}
             disabled={!isEditable && doc.status !== "approved"}
-            className="px-3 py-1.5 text-sm border border-border rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-ring"
+            className="px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           >
             {Object.entries(DOC_STATUS_CONFIG).map(([key, cfg]) => (
               <option key={key} value={key}>

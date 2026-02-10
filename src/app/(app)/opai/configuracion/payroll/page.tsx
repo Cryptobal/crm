@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/opai";
-import { ConfigSubnav } from "@/components/opai";
+import { ConfigBackLink } from "@/components/opai";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { hasConfigSubmoduleAccess } from "@/lib/module-access";
 
@@ -18,11 +18,11 @@ export default async function PayrollConfigPage() {
 
   return (
     <>
+      <ConfigBackLink />
       <PageHeader
         title="Configuración Payroll"
         description="Parámetros y supuestos"
       />
-      <ConfigSubnav role={role} />
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>

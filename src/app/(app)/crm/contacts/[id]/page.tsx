@@ -57,8 +57,8 @@ export default async function CrmContactDetailPage({
       })
     : [];
 
-  // Check Gmail connection, pipeline stages & load email templates
-  const [gmailAccount, pipelineStages, emailTemplates] = await Promise.all([
+  // Check Gmail connection, pipeline stages, email templates & doc templates (mail)
+  const [gmailAccount, pipelineStages, emailTemplates, docTemplatesMail] = await Promise.all([
     prisma.crmEmailAccount.findFirst({
       where: { tenantId, userId: session.user.id, provider: "gmail", status: "active" },
     }),
@@ -69,6 +69,11 @@ export default async function CrmContactDetailPage({
     prisma.crmEmailTemplate.findMany({
       where: { tenantId },
       orderBy: { createdAt: "desc" },
+    }),
+    prisma.docTemplate.findMany({
+      where: { tenantId, module: "mail", isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, content: true },
     }),
   ]);
 
@@ -112,6 +117,7 @@ export default async function CrmContactDetailPage({
   const initialDeals = JSON.parse(JSON.stringify(deals));
   const initialPipelineStages = JSON.parse(JSON.stringify(pipelineStages));
   const initialTemplates = JSON.parse(JSON.stringify(emailTemplates));
+  const initialDocTemplatesMail = JSON.parse(JSON.stringify(docTemplatesMail));
 
   const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(" ");
 
@@ -136,6 +142,7 @@ export default async function CrmContactDetailPage({
         pipelineStages={initialPipelineStages}
         gmailConnected={!!gmailAccount}
         templates={initialTemplates}
+        docTemplatesMail={initialDocTemplatesMail}
         initialEmailCount={initialEmailCount}
       />
     </>

@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { PageHeader } from "@/components/opai";
 import { prisma } from "@/lib/prisma";
 import { getDefaultTenantId } from "@/lib/tenant";
-import { ConfigSubnav, IntegrationsGmailClient } from "@/components/opai";
+import { ConfigBackLink, IntegrationsGmailClient } from "@/components/opai";
 import { hasConfigSubmoduleAccess } from "@/lib/module-access";
 
 export default async function IntegracionesPage() {
@@ -29,11 +29,11 @@ export default async function IntegracionesPage() {
 
   return (
     <>
+      <ConfigBackLink />
       <PageHeader
         title="Integraciones"
         description="Configura conexiones globales para el CRM"
       />
-      <ConfigSubnav role={role} />
       <div className="space-y-4">
         <IntegrationsGmailClient connected={Boolean(gmailAccount)} />
       </div>

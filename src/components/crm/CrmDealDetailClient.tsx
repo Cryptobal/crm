@@ -24,6 +24,7 @@ import { RecordActions } from "./RecordActions";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/opai/EmptyState";
 import { toast } from "sonner";
+import { resolveDocument } from "@/lib/docs/token-resolver";
 
 /** Convierte Tiptap JSON a HTML para email */
 function tiptapToEmailHtml(doc: any): string {
@@ -73,13 +74,15 @@ export type DealDetail = {
   proposalLink?: string | null;
 };
 
+type DocTemplateMail = { id: string; name: string; content: any };
+
 export function CrmDealDetailClient({
-  deal, quotes, pipelineStages, dealContacts: initialDealContacts, accountContacts, gmailConnected, templates,
+  deal, quotes, pipelineStages, dealContacts: initialDealContacts, accountContacts, gmailConnected, templates, docTemplatesMail = [],
 }: {
   deal: DealDetail; quotes: QuoteOption[];
   pipelineStages: PipelineStageOption[];
   dealContacts: DealContactRow[]; accountContacts: ContactRow[];
-  gmailConnected: boolean; templates: EmailTemplate[];
+  gmailConnected: boolean; templates: EmailTemplate[]; docTemplatesMail?: DocTemplateMail[];
 }) {
   // ── Quote linking state ──
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
@@ -133,9 +136,26 @@ export function CrmDealDetailClient({
     return Object.entries(r).reduce((acc, [key, val]) => acc.split(key).join(val), value);
   };
 
-  const selectTemplate = (templateId: string) => {
-    setSelectedTemplateId(templateId);
-    const tpl = templates.find((t) => t.id === templateId);
+  const selectTemplate = (value: string) => {
+    setSelectedTemplateId(value);
+    if (!value) return;
+
+    if (value.startsWith("doc:")) {
+      const id = value.slice(4);
+      const tpl = docTemplatesMail.find((t) => t.id === id);
+      if (!tpl?.content) return;
+      const entities = {
+        contact: (deal.primaryContact || undefined) as Record<string, unknown> | undefined,
+        account: (deal.account || undefined) as Record<string, unknown> | undefined,
+      };
+      const { resolvedContent } = resolveDocument(tpl.content, entities);
+      setEmailSubject(tpl.name);
+      setEmailTiptapContent(resolvedContent);
+      setEmailBody(tiptapToEmailHtml(resolvedContent));
+      return;
+    }
+
+    const tpl = templates.find((t) => t.id === value);
     if (!tpl) return;
     setEmailSubject(applyPlaceholders(tpl.subject));
     setEmailBody(applyPlaceholders(tpl.body));
@@ -511,8 +531,21 @@ export function CrmDealDetailClient({
             <div className="space-y-1.5">
               <Label className="text-xs">Template</Label>
               <select className={selectCn} value={selectedTemplateId} onChange={(e) => selectTemplate(e.target.value)} disabled={sending}>
-                <option value="">Sin template</option>
-                {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                <option value="">Sin plantilla</option>
+                {docTemplatesMail.length > 0 && (
+                  <optgroup label="Gestión Documental (mail)">
+                    {docTemplatesMail.map((t) => (
+                      <option key={t.id} value={`doc:${t.id}`}>{t.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {templates.length > 0 && (
+                  <optgroup label="Templates de email">
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
             <div className="space-y-1.5">

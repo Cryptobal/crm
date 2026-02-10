@@ -130,19 +130,22 @@ export function ContractEditor({
         <EditorContent editor={editor} />
       </div>
 
-      {/* Token Styles */}
+      {/* Token Styles — alineados al tema oscuro */}
       <style jsx global>{`
+        .ProseMirror {
+          background: transparent;
+        }
         .contract-token {
           display: inline-flex;
           align-items: center;
           gap: 2px;
           padding: 1px 8px;
           border-radius: 4px;
-          background: #dbeafe;
-          color: #1e40af;
+          background: hsl(var(--primary) / 0.15);
+          color: hsl(var(--primary));
           font-size: 0.85em;
           font-weight: 500;
-          border: 1px solid #93c5fd;
+          border: 1px solid hsl(var(--primary) / 0.4);
           cursor: default;
           user-select: none;
           vertical-align: baseline;
@@ -159,7 +162,7 @@ export function ContractEditor({
           font-size: 0.8em;
         }
         .ProseMirror .contract-token.ProseMirror-selectednode {
-          outline: 2px solid #3b82f6;
+          outline: 2px solid hsl(var(--primary));
           outline-offset: 1px;
         }
         .ProseMirror p.is-editor-empty:first-child::before {

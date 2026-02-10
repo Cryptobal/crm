@@ -61,12 +61,17 @@ export default async function CrmDealDetailPage({
     },
   });
 
-  const templates = await prisma.crmEmailTemplate.findMany({
-    where: {
-      tenantId,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const [templates, docTemplatesMail] = await Promise.all([
+    prisma.crmEmailTemplate.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.docTemplate.findMany({
+      where: { tenantId, module: "mail", isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, content: true },
+    }),
+  ]);
 
   // Contacts linked to this deal (via deal_contacts)
   const dealContacts = await prisma.crmDealContact.findMany({
@@ -95,6 +100,7 @@ export default async function CrmDealDetailPage({
   const initialDealContacts = JSON.parse(JSON.stringify(dealContacts));
   const initialAccountContacts = JSON.parse(JSON.stringify(accountContacts));
   const initialTemplates = JSON.parse(JSON.stringify(templates));
+  const initialDocTemplatesMail = JSON.parse(JSON.stringify(docTemplatesMail));
 
   return (
     <>
@@ -120,6 +126,7 @@ export default async function CrmDealDetailPage({
           accountContacts={initialAccountContacts}
           gmailConnected={Boolean(gmailAccount)}
           templates={initialTemplates}
+          docTemplatesMail={initialDocTemplatesMail}
         />
       </div>
     </>

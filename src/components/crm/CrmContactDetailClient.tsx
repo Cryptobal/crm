@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { resolveDocument } from "@/lib/docs/token-resolver";
 
 /** Convierte Tiptap JSON a HTML para email */
 function tiptapToEmailHtml(doc: any): string {
@@ -117,12 +118,15 @@ type PipelineStageOption = {
   isClosedLost?: boolean;
 };
 
+type DocTemplateMail = { id: string; name: string; content: any };
+
 export function CrmContactDetailClient({
   contact: initialContact,
   deals,
   pipelineStages,
   gmailConnected = false,
   templates = [],
+  docTemplatesMail = [],
   initialEmailCount = 0,
 }: {
   contact: ContactDetail;
@@ -130,6 +134,7 @@ export function CrmContactDetailClient({
   pipelineStages: PipelineStageOption[];
   gmailConnected?: boolean;
   templates?: EmailTemplate[];
+  docTemplatesMail?: DocTemplateMail[];
   initialEmailCount?: number;
 }) {
   const router = useRouter();
@@ -225,9 +230,26 @@ export function CrmContactDetailClient({
     return Object.entries(replacements).reduce((acc, [key, val]) => acc.split(key).join(val), value);
   };
 
-  const selectTemplate = (templateId: string) => {
-    setSelectedTemplateId(templateId);
-    const tpl = templates.find((t) => t.id === templateId);
+  const selectTemplate = (value: string) => {
+    setSelectedTemplateId(value);
+    if (!value) return;
+
+    if (value.startsWith("doc:")) {
+      const id = value.slice(4);
+      const tpl = docTemplatesMail.find((t) => t.id === id);
+      if (!tpl?.content) return;
+      const entities = {
+        contact: contact as Record<string, unknown>,
+        account: (contact.account || undefined) as Record<string, unknown> | undefined,
+      };
+      const { resolvedContent } = resolveDocument(tpl.content, entities);
+      setEmailSubject(tpl.name);
+      setEmailTiptapContent(resolvedContent);
+      setEmailBody(tiptapToEmailHtml(resolvedContent));
+      return;
+    }
+
+    const tpl = templates.find((t) => t.id === value);
     if (!tpl) return;
     setEmailSubject(applyPlaceholders(tpl.subject));
   };
@@ -525,10 +547,23 @@ export function CrmContactDetailClient({
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Template</Label>
+              <Label className="text-xs">Plantilla (solo mail)</Label>
               <select className={selectCn} value={selectedTemplateId} onChange={(e) => selectTemplate(e.target.value)} disabled={sending}>
-                <option value="">Sin template</option>
-                {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                <option value="">Sin plantilla</option>
+                {docTemplatesMail.length > 0 && (
+                  <optgroup label="Gestión Documental (mail)">
+                    {docTemplatesMail.map((t) => (
+                      <option key={t.id} value={`doc:${t.id}`}>{t.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {templates.length > 0 && (
+                  <optgroup label="Templates de email">
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
             <div className="space-y-1.5">

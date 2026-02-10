@@ -12,7 +12,7 @@ import UsersTable from "@/components/usuarios/UsersTable";
 import InvitationsTable from "@/components/usuarios/InvitationsTable";
 import InviteUserButton from "@/components/usuarios/InviteUserButton";
 import RolesHelpCard from "@/components/usuarios/RolesHelpCard";
-import { ConfigSubnav } from "@/components/opai";
+import { ConfigBackLink } from "@/components/opai";
 import { hasConfigSubmoduleAccess } from "@/lib/module-access";
 
 export default async function UsuariosConfigPage() {
@@ -43,6 +43,7 @@ export default async function UsuariosConfigPage() {
 
   return (
     <>
+      <ConfigBackLink />
       <PageHeader
         title="Gestión de Usuarios"
         description="Administra los usuarios y permisos de tu equipo"
@@ -53,7 +54,6 @@ export default async function UsuariosConfigPage() {
           </div>
         }
       />
-      <ConfigSubnav role={role} />
 
       <div className="space-y-8">
         <Card>
