@@ -290,7 +290,7 @@ function getLeadFilterLabel(filter: LeadStatusFilter): string | null {
 
 export function CrmLeadsClient({
   initialLeads,
-  initialStatusFilter = "all",
+  initialStatusFilter = "pending",
 }: {
   initialLeads: CrmLead[];
   initialStatusFilter?: LeadStatusFilter;
@@ -1742,14 +1742,15 @@ export function CrmLeadsClient({
                               </div>
                               <div className="space-y-1">
                                 <Label className="text-[10px]">Guardias</Label>
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  max={100}
-                                  value={dot.cantidad}
-                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "cantidad", Math.max(1, Number(e.target.value) || 1))}
-                                  className={`h-8 text-sm text-center ${inputClassName}`}
-                                />
+                                <select
+                                  className={selectCompactClassName}
+                                  value={Math.min(10, Math.max(1, dot.cantidad ?? 1))}
+                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "cantidad", Number(e.target.value))}
+                                >
+                                  {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                                    <option key={n} value={n}>{n}</option>
+                                  ))}
+                                </select>
                               </div>
                               <div className="space-y-1">
                                 <Label className="text-[10px]">Sueldo base</Label>

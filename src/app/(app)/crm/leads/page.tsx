@@ -14,7 +14,7 @@ type LeadStatusFilter = "all" | "pending" | "approved" | "rejected";
 
 function normalizeLeadStatusFilter(value?: string): LeadStatusFilter {
   if (value === "pending" || value === "approved" || value === "rejected") return value;
-  return "all";
+  return "pending";
 }
 
 export default async function CrmLeadsPage({

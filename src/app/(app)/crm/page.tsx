@@ -98,7 +98,9 @@ export default async function CRMPage() {
 
   const tenantId = session.user?.tenantId ?? (await getDefaultTenantId());
 
-  const leadsCount = await prisma.crmLead.count({ where: { tenantId } });
+  const leadsCount = await prisma.crmLead.count({
+    where: { tenantId, status: "pending" },
+  });
 
   const counts: Record<string, number> = {
     leads: leadsCount,
@@ -136,7 +138,7 @@ export default async function CRMPage() {
                 {!mod.disabled && count !== null && (
                   <span
                     className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-semibold text-background"
-                    title={`Total: ${count}`}
+                    title={`Pendientes: ${count}`}
                   >
                     {count > 999 ? '999+' : count}
                   </span>
