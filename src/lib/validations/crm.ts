@@ -66,6 +66,7 @@ export const createAccountSchema = z.object({
   industry: z.string().trim().max(100).optional().nullable(),
   segment: z.string().trim().max(100).optional().nullable(),
   status: z.string().trim().max(50).default("active"),
+  isActive: z.boolean().default(true),
   website: z.string().trim().url("URL inválida").max(500).optional().nullable().or(z.literal("")),
   address: z.string().trim().max(500).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
@@ -100,6 +101,7 @@ export const createInstallationSchema = z.object({
   commune: z.string().trim().max(100).optional().nullable(),
   lat: z.number().optional().nullable(),
   lng: z.number().optional().nullable(),
+  isActive: z.boolean().optional(),
   geoRadiusM: z.number().int().min(10).max(1000).optional(),
   teMontoClp: z.number().min(0).optional(),
   notes: z.string().trim().max(2000).optional().nullable(),
@@ -112,9 +114,11 @@ export const updateInstallationSchema = z.object({
   commune: z.string().trim().max(100).optional().nullable(),
   lat: z.number().optional().nullable(),
   lng: z.number().optional().nullable(),
+  isActive: z.boolean().optional(),
   geoRadiusM: z.number().int().min(10).max(1000).optional(),
   teMontoClp: z.number().min(0).optional(),
   notes: z.string().trim().max(2000).optional().nullable(),
+  activateAccount: z.boolean().optional(),
 });
 
 // ── Deal ──

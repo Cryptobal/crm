@@ -22,7 +22,8 @@ export default async function OpsPuestosPage() {
     prisma.crmInstallation.findMany({
       where: {
         tenantId,
-        account: { type: "client" },
+        account: { type: "client", isActive: true },
+        isActive: true,
       },
       select: { id: true, name: true, teMontoClp: true },
       orderBy: { name: "asc" },

@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
         tenantId: ctx.tenantId,
         ...(accountId ? { accountId } : {}),
       },
-      include: { account: { select: { id: true, name: true } } },
+      include: { account: { select: { id: true, name: true, type: true, isActive: true } } },
       orderBy: { createdAt: "desc" },
     });
 
@@ -55,11 +55,21 @@ export async function POST(request: NextRequest) {
     // Verify account belongs to tenant
     const account = await prisma.crmAccount.findFirst({
       where: { id: body.accountId, tenantId: ctx.tenantId },
+      select: { id: true, isActive: true },
     });
     if (!account) {
       return NextResponse.json(
         { success: false, error: "Cuenta no encontrada" },
         { status: 404 }
+      );
+    }
+    if (body.isActive === true && !account.isActive) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No puedes crear una instalación activa para una cuenta inactiva",
+        },
+        { status: 400 }
       );
     }
 
@@ -73,11 +83,12 @@ export async function POST(request: NextRequest) {
         commune: body.commune || null,
         lat: body.lat || null,
         lng: body.lng || null,
+        isActive: body.isActive ?? false,
         geoRadiusM: body.geoRadiusM ?? 100,
         teMontoClp: body.teMontoClp ?? 0,
         notes: body.notes || null,
       },
-      include: { account: { select: { id: true, name: true } } },
+      include: { account: { select: { id: true, name: true, type: true, isActive: true } } },
     });
 
     return NextResponse.json({ success: true, data: installation }, { status: 201 });

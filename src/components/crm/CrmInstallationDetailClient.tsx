@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin, Building2, ExternalLink, Trash2, ArrowLeft, Info, FileText } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -21,6 +21,7 @@ export type InstallationDetail = {
   commune?: string | null;
   lat?: number | null;
   lng?: number | null;
+  isActive?: boolean;
   notes?: string | null;
   metadata?: Record<string, unknown> | null;
   puestosActivos?: Array<{
@@ -40,7 +41,7 @@ export type InstallationDetail = {
     totalGuards: number;
     updatedAt: string;
   }>;
-  account?: { id: string; name: string } | null;
+  account?: { id: string; name: string; type?: "prospect" | "client"; isActive?: boolean } | null;
 };
 
 export function CrmInstallationDetailClient({
@@ -51,6 +52,8 @@ export function CrmInstallationDetailClient({
   const router = useRouter();
   const hasCoords = installation.lat != null && installation.lng != null;
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const isActive = useMemo(() => installation.isActive === true, [installation.isActive]);
 
   const dotacionDesdeCotizacion = (
     installation.metadata &&
@@ -90,6 +93,38 @@ export function CrmInstallationDetailClient({
     }
   };
 
+  const toggleInstallationStatus = async () => {
+    const next = !isActive;
+    const shouldActivateAccount =
+      next &&
+      installation.account?.isActive === false &&
+      window.confirm(
+        "Esta instalación quedará ACTIVA.\n\nLa cuenta está inactiva. ¿También quieres activarla?"
+      );
+
+    setStatusUpdating(true);
+    try {
+      const res = await fetch(`/api/crm/installations/${installation.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isActive: next,
+          activateAccount: Boolean(shouldActivateAccount),
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) throw new Error(payload.error || "No se pudo actualizar estado");
+
+      toast.success(next ? "Instalación activada" : "Instalación desactivada");
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo cambiar el estado de la instalación");
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* ── Toolbar ── */}
@@ -101,11 +136,30 @@ export function CrmInstallationDetailClient({
           <ArrowLeft className="h-4 w-4" />
           Volver a instalaciones
         </Link>
-        <RecordActions
-          actions={[
-            { label: "Eliminar instalación", icon: Trash2, onClick: () => setDeleteConfirm(true), variant: "destructive" },
-          ]}
-        />
+        <div className="flex items-center gap-2">
+          <span
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+              isActive
+                ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                : "border border-amber-500/30 bg-amber-500/10 text-amber-300"
+            }`}
+          >
+            {isActive ? "Activa" : "Inactiva"}
+          </span>
+          <button
+            type="button"
+            onClick={() => void toggleInstallationStatus()}
+            disabled={statusUpdating}
+            className="rounded-md border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-accent/40 disabled:opacity-60"
+          >
+            {statusUpdating ? "Guardando..." : isActive ? "Desactivar" : "Activar"}
+          </button>
+          <RecordActions
+            actions={[
+              { label: "Eliminar instalación", icon: Trash2, onClick: () => setDeleteConfirm(true), variant: "destructive" },
+            ]}
+          />
+        </div>
       </div>
 
       {/* ── Section 1: Datos generales + mapa a la derecha (desktop) ── */}

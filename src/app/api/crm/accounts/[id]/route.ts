@@ -67,9 +67,27 @@ export async function PATCH(
     const parsed = await parseBody(request, createAccountSchema.partial());
     if (parsed.error) return parsed.error;
 
-    const account = await prisma.crmAccount.update({
-      where: { id },
-      data: parsed.data,
+    const updateData = {
+      ...parsed.data,
+      ...(parsed.data.isActive === true ? { status: "active" } : {}),
+      ...(parsed.data.isActive === false ? { status: "inactive" } : {}),
+    };
+
+    const account = await prisma.$transaction(async (tx) => {
+      const updatedAccount = await tx.crmAccount.update({
+        where: { id },
+        data: updateData,
+      });
+
+      // Invariant: no inactive account can have active installations.
+      if (parsed.data.isActive === false) {
+        await tx.crmInstallation.updateMany({
+          where: { tenantId: ctx.tenantId, accountId: id, isActive: true },
+          data: { isActive: false },
+        });
+      }
+
+      return updatedAccount;
     });
 
     return NextResponse.json({ success: true, data: account });

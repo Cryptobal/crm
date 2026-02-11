@@ -98,6 +98,7 @@ type InstallationRow = {
   lat?: number | null;
   lng?: number | null;
   notes?: string | null;
+  isActive?: boolean;
 };
 
 type QuoteRow = {
@@ -113,6 +114,7 @@ type AccountDetail = {
   id: string;
   name: string;
   type: "prospect" | "client";
+  isActive: boolean;
   status: string;
   rut?: string | null;
   legalName?: string | null;
@@ -144,6 +146,9 @@ export function CrmAccountDetailClient({ account: initialAccount, quotes = [], c
   // ── Account edit state ──
   const [editAccountOpen, setEditAccountOpen] = useState(false);
   const [savingAccount, setSavingAccount] = useState(false);
+  const [updatingAccountStatus, setUpdatingAccountStatus] = useState(false);
+  const [accountStatusConfirmOpen, setAccountStatusConfirmOpen] = useState(false);
+  const [accountStatusNextValue, setAccountStatusNextValue] = useState<boolean>(false);
   const [accountForm, setAccountForm] = useState({
     name: account.name,
     rut: account.rut || "",
@@ -226,6 +231,41 @@ export function CrmAccountDetailClient({ account: initialAccount, quotes = [], c
       router.push("/crm/accounts");
     } catch {
       toast.error("No se pudo eliminar");
+    }
+  };
+
+  const openToggleAccountStatus = () => {
+    setAccountStatusNextValue(!account.isActive);
+    setAccountStatusConfirmOpen(true);
+  };
+
+  const confirmToggleAccountStatus = async () => {
+    setUpdatingAccountStatus(true);
+    try {
+      const res = await fetch(`/api/crm/accounts/${account.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: accountStatusNextValue }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data?.error);
+
+      setAccount((prev) => ({
+        ...prev,
+        isActive: data.data.isActive,
+        installations: prev.installations.map((inst) => ({
+          ...inst,
+          isActive: data.data.isActive ? inst.isActive : false,
+        })),
+      }));
+      setAccountStatusConfirmOpen(false);
+      toast.success(data.data.isActive ? "Cuenta activada" : "Cuenta desactivada");
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo actualizar el estado de la cuenta.");
+    } finally {
+      setUpdatingAccountStatus(false);
     }
   };
 
@@ -335,10 +375,25 @@ export function CrmAccountDetailClient({ account: initialAccount, quotes = [], c
         icon={<Building2 className="h-4 w-4" />}
         title="Datos generales"
         action={
-          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={openAccountEdit}>
-            <Pencil className="h-3 w-3 mr-1" />
-            Editar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant={account.isActive ? "outline" : "secondary"}
+              className="h-7 text-xs"
+              onClick={openToggleAccountStatus}
+              disabled={updatingAccountStatus}
+            >
+              {updatingAccountStatus
+                ? "Guardando..."
+                : account.isActive
+                ? "Desactivar cuenta"
+                : "Activar cuenta"}
+            </Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={openAccountEdit}>
+              <Pencil className="h-3 w-3 mr-1" />
+              Editar
+            </Button>
+          </div>
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
@@ -361,6 +416,18 @@ export function CrmAccountDetailClient({ account: initialAccount, quotes = [], c
             <InfoRow label="RUT representante legal">{account.legalRepresentativeRut || "—"}</InfoRow>
             <InfoRow label="Industria">{account.industry || "—"}</InfoRow>
             <InfoRow label="Segmento">{account.segment || "—"}</InfoRow>
+            <InfoRow label="Estado">
+              <Badge
+                variant="outline"
+                className={
+                  account.isActive
+                    ? "border-emerald-500/30 text-emerald-400"
+                    : "border-rose-500/30 text-rose-400"
+                }
+              >
+                {account.isActive ? "Activa" : "Inactiva"}
+              </Badge>
+            </InfoRow>
           </div>
           <div className="space-y-3 text-sm">
             <InfoRow label="Página web">
@@ -453,7 +520,11 @@ export function CrmAccountDetailClient({ account: initialAccount, quotes = [], c
         count={account.installations.length}
         defaultOpen={account.installations.length > 0}
       >
-        <CrmInstallationsClient accountId={account.id} initialInstallations={account.installations} />
+        <CrmInstallationsClient
+          accountId={account.id}
+          accountIsActive={account.isActive}
+          initialInstallations={account.installations}
+        />
       </CollapsibleSection>
 
       {/* ── Section 4: Negocios ── */}
@@ -725,6 +796,17 @@ export function CrmAccountDetailClient({ account: initialAccount, quotes = [], c
         title="Eliminar cuenta"
         description="Se eliminarán también contactos, negocios e instalaciones asociados. Esta acción no se puede deshacer."
         onConfirm={deleteAccount}
+      />
+      <ConfirmDialog
+        open={accountStatusConfirmOpen}
+        onOpenChange={setAccountStatusConfirmOpen}
+        title={accountStatusNextValue ? "Activar cuenta" : "Desactivar cuenta"}
+        description={
+          accountStatusNextValue
+            ? "La cuenta quedará activa. Podrás activar instalaciones para operación."
+            : "La cuenta quedará inactiva y se desactivarán todas sus instalaciones activas para evitar inconsistencias."
+        }
+        onConfirm={confirmToggleAccountStatus}
       />
       <ConfirmDialog
         open={deleteContactConfirm.open}

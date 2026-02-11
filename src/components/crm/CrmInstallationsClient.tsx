@@ -27,6 +27,7 @@ type InstallationRow = {
   lat?: number | null;
   lng?: number | null;
   notes?: string | null;
+  isActive?: boolean;
 };
 
 type FormState = {
@@ -53,9 +54,11 @@ const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
 export function CrmInstallationsClient({
   accountId,
+  accountIsActive,
   initialInstallations,
 }: {
   accountId: string;
+  accountIsActive: boolean;
   initialInstallations: InstallationRow[];
 }) {
   const [installations, setInstallations] = useState<InstallationRow[]>(initialInstallations);
@@ -63,6 +66,7 @@ export function CrmInstallationsClient({
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [statusUpdatingIds, setStatusUpdatingIds] = useState<Set<string>>(new Set());
 
   const inputClassName =
     "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
@@ -155,6 +159,43 @@ export function CrmInstallationsClient({
     }
   };
 
+  const toggleInstallationStatus = async (inst: InstallationRow) => {
+    const current = inst.isActive === true;
+    const next = !current;
+    const shouldActivateAccount =
+      next &&
+      accountIsActive === false &&
+      window.confirm(
+        "Esta instalación quedará ACTIVA.\n\nLa cuenta está inactiva. ¿También quieres activarla?"
+      );
+
+    setStatusUpdatingIds((prev) => new Set(prev).add(inst.id));
+    try {
+      const response = await fetch(`/api/crm/installations/${inst.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isActive: next,
+          activateAccount: Boolean(shouldActivateAccount),
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success) throw new Error(payload?.error || "No se pudo actualizar");
+
+      setInstallations((prev) => prev.map((i) => (i.id === inst.id ? payload.data : i)));
+      toast.success(next ? "Instalación activada" : "Instalación desactivada");
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo cambiar el estado de la instalación.");
+    } finally {
+      setStatusUpdatingIds((prev) => {
+        const nextSet = new Set(prev);
+        nextSet.delete(inst.id);
+        return nextSet;
+      });
+    }
+  };
+
   return (
     <>
       <div className="flex items-center justify-between mb-3">
@@ -185,7 +226,18 @@ export function CrmInstallationsClient({
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{inst.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm truncate">{inst.name}</p>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          inst.isActive
+                            ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                            : "border border-amber-500/30 bg-amber-500/10 text-amber-300"
+                        }`}
+                      >
+                        {inst.isActive ? "Activa" : "Inactiva"}
+                      </span>
+                    </div>
                     {inst.address && (
                       <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                         <MapPin className="h-3 w-3 shrink-0" />
@@ -199,6 +251,19 @@ export function CrmInstallationsClient({
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      variant={inst.isActive ? "outline" : "secondary"}
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => void toggleInstallationStatus(inst)}
+                      disabled={statusUpdatingIds.has(inst.id)}
+                    >
+                      {statusUpdatingIds.has(inst.id)
+                        ? "..."
+                        : inst.isActive
+                        ? "Desactivar"
+                        : "Activar"}
+                    </Button>
                     <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(inst)}>
                       <Pencil className="h-3 w-3" />
                     </Button>

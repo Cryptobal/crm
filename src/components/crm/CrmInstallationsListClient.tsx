@@ -22,7 +22,8 @@ export type InstallationRow = {
   lng?: number | null;
   createdAt?: string | null;
   updatedAt?: string | null;
-  account?: { id: string; name: string } | null;
+  isActive?: boolean;
+  account?: { id: string; name: string; type?: "prospect" | "client"; isActive?: boolean } | null;
 };
 
 export function CrmInstallationsListClient({
@@ -38,6 +39,7 @@ export function CrmInstallationsListClient({
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("cards");
   const [accountFilter, setAccountFilter] = useState<string>("all");
+  const [statusUpdatingIds, setStatusUpdatingIds] = useState<Set<string>>(new Set());
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) => {
@@ -91,6 +93,45 @@ export function CrmInstallationsListClient({
       toast.success("Instalación eliminada");
     } catch {
       toast.error("No se pudo eliminar");
+    }
+  };
+
+  const toggleInstallationStatus = async (inst: InstallationRow) => {
+    const current = inst.isActive === true;
+    const next = !current;
+    const shouldActivateAccount =
+      next &&
+      inst.account?.isActive === false &&
+      window.confirm(
+        "Esta instalación quedará ACTIVA.\n\nLa cuenta está inactiva. ¿También quieres activar la cuenta?"
+      );
+
+    setStatusUpdatingIds((prev) => new Set(prev).add(inst.id));
+    try {
+      const res = await fetch(`/api/crm/installations/${inst.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isActive: next,
+          activateAccount: Boolean(shouldActivateAccount),
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) throw new Error(payload.error || "No se pudo actualizar");
+
+      setInstallations((prev) =>
+        prev.map((row) => (row.id === inst.id ? payload.data : row))
+      );
+      toast.success(next ? "Instalación activada" : "Instalación desactivada");
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo cambiar el estado de la instalación");
+    } finally {
+      setStatusUpdatingIds((prev) => {
+        const nextSet = new Set(prev);
+        nextSet.delete(inst.id);
+        return nextSet;
+      });
     }
   };
 
@@ -199,7 +240,18 @@ export function CrmInstallationsListClient({
                     </button>
                     <Link href={`/crm/installations/${inst.id}`} className="flex flex-1 items-center justify-between min-w-0">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{inst.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{inst.name}</p>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                              inst.isActive === true
+                                ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                                : "border border-amber-500/30 bg-amber-500/10 text-amber-300"
+                            }`}
+                          >
+                            {inst.isActive ? "Activa" : "Inactiva"}
+                          </span>
+                        </div>
                         {inst.account && (
                           <p className="mt-0.5 text-xs text-muted-foreground">{inst.account.name}</p>
                         )}
@@ -218,6 +270,24 @@ export function CrmInstallationsListClient({
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 shrink-0 ml-2" />
                     </Link>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={inst.isActive ? "outline" : "secondary"}
+                      className="h-8 shrink-0"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void toggleInstallationStatus(inst);
+                      }}
+                      disabled={statusUpdatingIds.has(inst.id)}
+                    >
+                      {statusUpdatingIds.has(inst.id)
+                        ? "Guardando..."
+                        : inst.isActive
+                        ? "Desactivar"
+                        : "Activar"}
+                    </Button>
                   </div>
                 );
               })}
@@ -246,7 +316,18 @@ export function CrmInstallationsListClient({
                             <MapPin className="h-4 w-4" />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-medium text-sm group-hover:text-primary transition-colors truncate">{inst.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-sm group-hover:text-primary transition-colors truncate">{inst.name}</p>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                  inst.isActive === true
+                                    ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                                    : "border border-amber-500/30 bg-amber-500/10 text-amber-300"
+                                }`}
+                              >
+                                {inst.isActive ? "Activa" : "Inactiva"}
+                              </span>
+                            </div>
                             {inst.account && <p className="text-[11px] text-muted-foreground">{inst.account.name}</p>}
                           </div>
                         </div>
@@ -262,7 +343,27 @@ export function CrmInstallationsListClient({
                           </p>
                         )}
                       </Link>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={inst.isActive ? "outline" : "secondary"}
+                          className="h-8"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void toggleInstallationStatus(inst);
+                          }}
+                          disabled={statusUpdatingIds.has(inst.id)}
+                        >
+                          {statusUpdatingIds.has(inst.id)
+                            ? "..."
+                            : inst.isActive
+                            ? "Desactivar"
+                            : "Activar"}
+                        </Button>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+                      </div>
                     </div>
                   </div>
                 );

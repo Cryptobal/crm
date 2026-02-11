@@ -24,7 +24,7 @@ export default async function CrmInstallationsPage() {
   const tenantId = session.user?.tenantId ?? (await getDefaultTenantId());
   const installations = await prisma.crmInstallation.findMany({
     where: { tenantId },
-    include: { account: { select: { id: true, name: true } } },
+    include: { account: { select: { id: true, name: true, type: true, isActive: true } } },
     orderBy: { createdAt: "desc" },
   });
 

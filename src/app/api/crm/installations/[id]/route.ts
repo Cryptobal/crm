@@ -24,7 +24,7 @@ export async function GET(
 
     const installation = await prisma.crmInstallation.findFirst({
       where: { id, tenantId: ctx.tenantId },
-      include: { account: { select: { id: true, name: true } } },
+      include: { account: { select: { id: true, name: true, type: true, isActive: true } } },
     });
 
     if (!installation) {
@@ -67,16 +67,48 @@ export async function PATCH(
     const parsed = await parseBody(request, updateInstallationSchema);
     if (parsed.error) return parsed.error;
     const payload = parsed.data;
+    const installationData: Record<string, unknown> = { ...payload };
+    delete installationData.activateAccount;
 
     const normalizedData =
       payload.name === undefined
-        ? payload
-        : { ...payload, name: toSentenceCase(payload.name) ?? payload.name };
+        ? installationData
+        : { ...installationData, name: toSentenceCase(payload.name) ?? payload.name };
+    const installation = await prisma.$transaction(async (tx) => {
+      const updatedInstallation = await tx.crmInstallation.update({
+        where: { id },
+        data: normalizedData,
+        include: { account: { select: { id: true, name: true, type: true, isActive: true } } },
+      });
 
-    const installation = await prisma.crmInstallation.update({
-      where: { id },
-      data: normalizedData,
-      include: { account: { select: { id: true, name: true } } },
+      if (
+        payload.isActive === true &&
+        payload.activateAccount === true &&
+        updatedInstallation.accountId &&
+        updatedInstallation.account?.isActive === false
+      ) {
+        await tx.crmAccount.update({
+          where: { id: updatedInstallation.accountId },
+          data: { isActive: true, status: "active" },
+        });
+        return {
+          ...updatedInstallation,
+          account: updatedInstallation.account
+            ? { ...updatedInstallation.account, isActive: true }
+            : updatedInstallation.account,
+        };
+      }
+
+      if (
+        payload.isActive === true &&
+        updatedInstallation.accountId &&
+        updatedInstallation.account?.isActive === false &&
+        payload.activateAccount !== true
+      ) {
+        throw new Error("ACCOUNT_INACTIVE");
+      }
+
+      return updatedInstallation;
     });
 
     revalidatePath(`/crm/installations`);
@@ -87,6 +119,15 @@ export async function PATCH(
 
     return NextResponse.json({ success: true, data: installation });
   } catch (error) {
+    if (error instanceof Error && error.message === "ACCOUNT_INACTIVE") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No puedes activar una instalación de una cuenta inactiva sin activar la cuenta",
+        },
+        { status: 400 }
+      );
+    }
     console.error("Error updating installation:", error);
     return NextResponse.json(
       { success: false, error: "Failed to update installation" },

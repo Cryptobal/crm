@@ -30,7 +30,7 @@ export default async function CrmInstallationDetailPage({
   const [installation, puestosActivos, quotesInstalacion] = await Promise.all([
     prisma.crmInstallation.findFirst({
       where: { id, tenantId },
-      include: { account: { select: { id: true, name: true } } },
+      include: { account: { select: { id: true, name: true, type: true, isActive: true } } },
     }),
     prisma.opsPuestoOperativo.findMany({
       where: { tenantId, installationId: id, active: true },

@@ -15,11 +15,14 @@ export async function GET(request: NextRequest) {
     if (!ctx) return unauthorized();
 
     const type = request.nextUrl.searchParams.get("type") || undefined;
+    const active = request.nextUrl.searchParams.get("active");
 
     const accounts = await prisma.crmAccount.findMany({
       where: {
         tenantId: ctx.tenantId,
         ...(type ? { type } : {}),
+        ...(active === "true" ? { isActive: true } : {}),
+        ...(active === "false" ? { isActive: false } : {}),
       },
       orderBy: { createdAt: "desc" },
     });
@@ -55,7 +58,8 @@ export async function POST(request: NextRequest) {
         segment: body.segment || null,
         ownerId: ctx.userId,
         type: body.type,
-        status: body.status,
+        status: body.isActive === false ? "inactive" : body.status,
+        isActive: body.isActive ?? true,
         website: body.website || null,
         address: body.address || null,
         notes: body.notes || null,

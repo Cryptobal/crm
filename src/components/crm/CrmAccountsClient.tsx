@@ -49,6 +49,7 @@ type AccountRow = {
   website?: string | null;
   type: "prospect" | "client";
   status: string;
+  isActive: boolean;
   createdAt: string;
   updatedAt?: string | null;
   _count?: {
@@ -131,6 +132,12 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [statusUpdatingIds, setStatusUpdatingIds] = useState<Set<string>>(new Set());
+  const [statusConfirm, setStatusConfirm] = useState<{ open: boolean; id: string; next: boolean }>({
+    open: false,
+    id: "",
+    next: false,
+  });
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) => {
@@ -212,6 +219,44 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
       toast.error("No se pudo crear la cuenta.");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openToggleAccountStatus = (account: AccountRow) => {
+    setStatusConfirm({ open: true, id: account.id, next: !account.isActive });
+  };
+
+  const toggleAccountStatus = async () => {
+    const id = statusConfirm.id;
+    if (!id) return;
+    setStatusUpdatingIds((prev) => new Set(prev).add(id));
+    try {
+      const res = await fetch(`/api/crm/accounts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: statusConfirm.next }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) throw new Error(payload?.error || "No se pudo actualizar");
+
+      setAccounts((prev) =>
+        prev.map((row) =>
+          row.id === id
+            ? { ...row, isActive: payload.data.isActive, status: payload.data.isActive ? "active" : "inactive" }
+            : row
+        )
+      );
+      setStatusConfirm({ open: false, id: "", next: false });
+      toast.success(statusConfirm.next ? "Cuenta activada" : "Cuenta desactivada");
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo cambiar el estado de la cuenta");
+    } finally {
+      setStatusUpdatingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
@@ -427,11 +472,35 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
                         <Badge variant="outline" className={account.type === "client" ? "border-emerald-500/30 text-emerald-400" : "border-amber-500/30 text-amber-400"}>
                           {account.type === "client" ? "Cliente" : "Prospecto"}
                         </Badge>
+                        <Badge
+                          variant="outline"
+                          className={account.isActive ? "border-emerald-500/30 text-emerald-400" : "border-rose-500/30 text-rose-400"}
+                        >
+                          {account.isActive ? "Activa" : "Inactiva"}
+                        </Badge>
                         <Badge variant="outline">{account._count?.contacts ?? 0} contactos</Badge>
                         <Badge variant="outline">{account._count?.deals ?? 0} negocios</Badge>
                         <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 hidden sm:block" />
                       </div>
                     </Link>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={account.isActive ? "outline" : "secondary"}
+                      className="h-8 shrink-0"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openToggleAccountStatus(account);
+                      }}
+                      disabled={statusUpdatingIds.has(account.id)}
+                    >
+                      {statusUpdatingIds.has(account.id)
+                        ? "Guardando..."
+                        : account.isActive
+                        ? "Desactivar"
+                        : "Activar"}
+                    </Button>
                   </div>
                 );
               })}
@@ -468,6 +537,12 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
                           <Badge variant="outline" className={`text-[10px] ${account.type === "client" ? "border-emerald-500/30 text-emerald-400" : "border-amber-500/30 text-amber-400"}`}>
                             {account.type === "client" ? "Cliente" : "Prospecto"}
                           </Badge>
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] ${account.isActive ? "border-emerald-500/30 text-emerald-400" : "border-rose-500/30 text-rose-400"}`}
+                          >
+                            {account.isActive ? "Activa" : "Inactiva"}
+                          </Badge>
                           <span className="flex items-center gap-1"><Users className="h-3 w-3" />{account._count?.contacts ?? 0}</span>
                           <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" />{account._count?.deals ?? 0}</span>
                           {account.rut && <span>{account.rut}</span>}
@@ -481,6 +556,24 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
                       </Link>
                       <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
                     </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={account.isActive ? "outline" : "secondary"}
+                      className="h-8"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openToggleAccountStatus(account);
+                      }}
+                      disabled={statusUpdatingIds.has(account.id)}
+                    >
+                      {statusUpdatingIds.has(account.id)
+                        ? "..."
+                        : account.isActive
+                        ? "Desactivar"
+                        : "Activar"}
+                    </Button>
                   </div>
                 );
               })}
@@ -523,6 +616,19 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
         title="Eliminar cuenta"
         description="Se eliminarán también contactos, negocios e instalaciones asociados. Esta acción no se puede deshacer."
         onConfirm={() => deleteAccount(deleteConfirm.id)}
+      />
+      <ConfirmDialog
+        open={statusConfirm.open}
+        onOpenChange={(open) =>
+          setStatusConfirm((prev) => ({ ...prev, open }))
+        }
+        title={statusConfirm.next ? "Activar cuenta" : "Desactivar cuenta"}
+        description={
+          statusConfirm.next
+            ? "La cuenta quedará activa."
+            : "La cuenta quedará inactiva y sus instalaciones activas se desactivarán automáticamente."
+        }
+        onConfirm={toggleAccountStatus}
       />
     </div>
   );

@@ -52,7 +52,8 @@ export async function POST(request: NextRequest) {
       select: {
         id: true,
         teMontoClp: true,
-        account: { select: { type: true } },
+        isActive: true,
+        account: { select: { type: true, isActive: true } },
       },
     });
     if (!installation) {
@@ -64,6 +65,18 @@ export async function POST(request: NextRequest) {
     if (installation.account?.type !== "client") {
       return NextResponse.json(
         { success: false, error: "Solo puedes crear puestos para cuentas cliente" },
+        { status: 400 }
+      );
+    }
+    if (!installation.isActive) {
+      return NextResponse.json(
+        { success: false, error: "La instalación debe estar activa para crear puestos" },
+        { status: 400 }
+      );
+    }
+    if (installation.account?.isActive === false) {
+      return NextResponse.json(
+        { success: false, error: "La cuenta debe estar activa para crear puestos" },
         { status: 400 }
       );
     }
