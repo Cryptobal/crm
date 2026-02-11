@@ -16,7 +16,7 @@ import { ScrollProgress } from './ScrollProgress';
 // Import secciones implementadas
 import { Section01Hero } from './sections/Section01Hero';
 import { Section01bSobreEmpresa } from './sections/Section01bSobreEmpresa';
-// Section02 Resumen Ejecutivo: nunca se muestra (solicitud del cliente)
+import { Section02ExecutiveSummary } from './sections/Section02ExecutiveSummary';
 import { Section03Transparencia } from './sections/Section03Transparencia';
 import { Section04Riesgo } from './sections/Section04Riesgo';
 import { Section05FallasModelo } from './sections/Section05FallasModelo';
@@ -80,14 +80,23 @@ export function PresentationRenderer({ payload, showTokens = false }: Presentati
             showTokens={showTokens}
           />
           
-          {/* S01b - Sobre [empresa] (entre Hero y S03) */}
+          {/* S01b - Sobre [empresa] (entre Hero y Resumen) */}
           <Section01bSobreEmpresa
             companyName={payload.client.company_name}
             companyDescription={payload.client.company_description || ''}
             showTokens={showTokens}
           />
           
-          {/* S02 Resumen Ejecutivo: nunca se muestra (solicitud del cliente) */}
+          {/* S02 - Resumen Ejecutivo (texto IA del cotizador) */}
+          <Section02ExecutiveSummary
+            data={sections.s02_executive_summary}
+            quoteDescription={payload.quote.description}
+            companyName={payload.client.company_name}
+            industry={payload.client.industry}
+            sitesCount={payload.service.sites.length}
+            coverageHours={payload.service.coverage_hours}
+            showTokens={showTokens}
+          />
           
           {/* S03 - Transparencia */}
           <Section03Transparencia data={sections.s03_transparencia} />

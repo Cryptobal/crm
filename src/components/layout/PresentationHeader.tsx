@@ -22,7 +22,7 @@ interface PresentationHeaderProps {
 }
 
 export function PresentationHeader({ 
-  logo = '/logo-gard-blanco.svg', // SVG con fondo transparente
+  logo = '/uploads/company-logos/Logo Gard 15 x 7 cm Blanco.png',
   clientLogoUrl = null,
   cta,
   contactName = 'Interesado',
@@ -106,11 +106,11 @@ export function PresentationHeader({
               </div>
             </a>
             {clientLogoUrl && (
-              <div className="relative w-24 h-10 sm:w-28 sm:h-12 border-l border-white/20 pl-4 flex items-center">
+              <div className="relative w-28 h-10 sm:w-32 sm:h-12 border-l border-white/20 pl-4 flex items-center">
                 <img
                   src={clientLogoUrl}
                   alt={`Logo ${companyName}`}
-                  className="h-full w-auto object-contain object-left max-h-10"
+                  className="h-full w-auto object-contain object-left max-h-12"
                 />
               </div>
             )}

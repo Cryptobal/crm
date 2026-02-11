@@ -27,7 +27,7 @@ interface PresentationFooterProps {
 }
 
 export function PresentationFooter({ 
-  logo = '/logo-gard-blanco.svg', // SVG con fondo transparente
+  logo = '/uploads/company-logos/Logo Gard 15 x 7 cm Blanco.png',
   contact,
   address,
   website,
