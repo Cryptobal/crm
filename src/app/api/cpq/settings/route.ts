@@ -14,8 +14,7 @@ const DEFAULTS = {
   monthlyHoursStandard: 180,
   avgStayMonths: 4,
   uniformChangesPerYear: 3,
-  holidayAnnualCount: 16,
-  holidayCompensationFactor: 1.7,
+  holidayAnnualCount: 12,
   holidayCommercialBufferPct: 10,
 };
 
@@ -42,8 +41,7 @@ export async function GET() {
 
     const holidayMonthlyFactor = (data.holidayAnnualCount || 0) / 12;
     const holidayCommercialFactor = 1 + (data.holidayCommercialBufferPct || 0) / 100;
-    const holidayTotalFactor =
-      0.5 * holidayMonthlyFactor * (data.holidayCompensationFactor || 0) * holidayCommercialFactor;
+    const holidayTotalFactor = 0.5 * holidayMonthlyFactor * holidayCommercialFactor;
 
     return NextResponse.json({
       success: true,

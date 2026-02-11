@@ -93,8 +93,7 @@ export function CpqCatalogConfig({ showHeader = true }: { showHeader?: boolean }
     monthlyHoursStandard: 180,
     avgStayMonths: 4,
     uniformChangesPerYear: 3,
-    holidayAnnualCount: 16,
-    holidayCompensationFactor: 1.7,
+    holidayAnnualCount: 12,
     holidayCommercialBufferPct: 10,
   });
   const [savingGlobals, setSavingGlobals] = useState(false);
@@ -112,8 +111,7 @@ export function CpqCatalogConfig({ showHeader = true }: { showHeader?: boolean }
   const parseNumber = (value: string) => parseLocalizedNumber(value);
   const holidayMonthlyFactor = (globalParams.holidayAnnualCount || 0) / 12;
   const holidayCommercialFactor = 1 + (globalParams.holidayCommercialBufferPct || 0) / 100;
-  const holidayTotalFactor =
-    0.5 * holidayMonthlyFactor * (globalParams.holidayCompensationFactor || 0) * holidayCommercialFactor;
+  const holidayTotalFactor = 0.5 * holidayMonthlyFactor * holidayCommercialFactor;
 
   const fetchItems = async () => {
     setLoading(true);
@@ -383,30 +381,6 @@ export function CpqCatalogConfig({ showHeader = true }: { showHeader?: boolean }
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Factor empresa feriados</span>
-              <button
-                type="button"
-                className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border text-muted-foreground"
-                title="Factor base multiplicador para el ajuste de feriados (ej: 1.70)."
-                aria-label="Información sobre factor empresa de feriados"
-              >
-                <Info className="h-3 w-3" />
-              </button>
-            </div>
-            <Input
-              inputMode="decimal"
-              value={formatNumber(globalParams.holidayCompensationFactor, { minDecimals: 2, maxDecimals: 2 })}
-              onChange={(e) =>
-                setGlobalParams((prev) => ({
-                  ...prev,
-                  holidayCompensationFactor: parseNumber(e.target.value),
-                }))
-              }
-              className={inputClass}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Holgura comercial (%)</span>
               <button
                 type="button"
@@ -430,19 +404,29 @@ export function CpqCatalogConfig({ showHeader = true }: { showHeader?: boolean }
             />
           </div>
         </div>
-        <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-2 text-xs space-y-1">
+        <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs space-y-2">
           <div className="font-semibold text-emerald-300">Factor automático ajuste feriados</div>
           <div className="text-muted-foreground">
-            Factor mensual feriados: <span className="font-medium text-foreground">{formatNumber(holidayMonthlyFactor, { minDecimals: 3, maxDecimals: 3 })}</span> ({formatNumber(globalParams.holidayAnnualCount)} / 12)
+            <strong className="text-foreground">Factor mensual feriados</strong>:{" "}
+            <span className="font-medium text-foreground">{formatNumber(holidayMonthlyFactor, { minDecimals: 3, maxDecimals: 3 })}</span> = {formatNumber(globalParams.holidayAnnualCount)} ÷ 12 (promedio de feriados por mes).
           </div>
           <div className="text-muted-foreground">
-            Factor comercial: <span className="font-medium text-foreground">{formatNumber(holidayCommercialFactor, { minDecimals: 3, maxDecimals: 3 })}</span> (1 + {formatNumber(globalParams.holidayCommercialBufferPct, { minDecimals: 2, maxDecimals: 2 })}%)
+            <strong className="text-foreground">Factor comercial</strong>:{" "}
+            <span className="font-medium text-foreground">{formatNumber(holidayCommercialFactor, { minDecimals: 3, maxDecimals: 3 })}</span> = 1 + {formatNumber(globalParams.holidayCommercialBufferPct, { minDecimals: 2, maxDecimals: 2 })}% (holgura).
           </div>
           <div className="text-muted-foreground">
-            Factor total aplicado al sueldo/30:{" "}
+            <strong className="text-foreground">Factor total</strong>:{" "}
             <span className="font-semibold text-emerald-200">
               {formatNumber(holidayTotalFactor, { minDecimals: 4, maxDecimals: 4 })}
-            </span>
+            </span>{" "}
+            = 0,5 × factor mensual × factor comercial.
+          </div>
+          <div className="border-t border-emerald-500/20 pt-2 mt-2 text-muted-foreground">
+            <strong className="text-foreground">Cómo se calcula:</strong>{" "}
+            <strong className="text-emerald-200">
+              Ajuste mensual feriados = (costo empresa mensual total guardias ÷ 30) × (feriados/año ÷ 12) × 0,5 × (1 + holgura%)
+            </strong>
+            . El ajuste resultante se suma al costo mensual de la cotización.
           </div>
         </div>
         <div className="flex justify-end">

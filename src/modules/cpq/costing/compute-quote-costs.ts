@@ -52,7 +52,7 @@ export async function computeCpqQuoteCosts(quoteId: string): Promise<QuoteCostSu
   ] = await Promise.all([
     prisma.cpqPosition.findMany({
       where: { quoteId },
-      select: { numGuards: true, monthlyPositionCost: true, baseSalary: true },
+      select: { numGuards: true, monthlyPositionCost: true },
     }),
     prisma.cpqQuoteParameters.findUnique({ where: { quoteId } }),
     prisma.cpqQuoteUniformItem.findMany({
@@ -89,17 +89,12 @@ export async function computeCpqQuoteCosts(quoteId: string): Promise<QuoteCostSu
     (sum, p) => sum + safeNumber(p.monthlyPositionCost),
     0
   );
-  const monthlyBaseSalaryTotal = positions.reduce(
-    (sum, p) => sum + safeNumber(p.baseSalary) * safeNumber(p.numGuards),
-    0
-  );
 
   const uniformChangesPerYear = parameters?.uniformChangesPerYear ?? 3;
   const avgStayMonths = parameters?.avgStayMonths ?? 4;
   const monthlyHoursStandard = parameters?.monthlyHoursStandard ?? 180;
   const holidaySettingKeys = [
     "cpq.holidayAnnualCount",
-    "cpq.holidayCompensationFactor",
     "cpq.holidayCommercialBufferPct",
   ];
   const holidaySettings = await prisma.setting.findMany({
@@ -113,10 +108,7 @@ export async function computeCpqQuoteCosts(quoteId: string): Promise<QuoteCostSu
     },
   });
   const holidayAnnualCount = safeNumber(
-    holidaySettings.find((item) => item.key === "cpq.holidayAnnualCount")?.value ?? 16
-  );
-  const holidayCompensationFactor = safeNumber(
-    holidaySettings.find((item) => item.key === "cpq.holidayCompensationFactor")?.value ?? 1.7
+    holidaySettings.find((item) => item.key === "cpq.holidayAnnualCount")?.value ?? 12
   );
   const holidayCommercialBufferPct = safeNumber(
     holidaySettings.find((item) => item.key === "cpq.holidayCommercialBufferPct")?.value ?? 10
@@ -124,10 +116,9 @@ export async function computeCpqQuoteCosts(quoteId: string): Promise<QuoteCostSu
   const holidayMonthlyFactor = holidayAnnualCount / 12;
   const holidayCommercialFactor = 1 + holidayCommercialBufferPct / 100;
   const monthlyHolidayAdjustment =
-    (monthlyBaseSalaryTotal / 30) *
+    (monthlyPositions / 30) *
     0.5 *
     holidayMonthlyFactor *
-    holidayCompensationFactor *
     holidayCommercialFactor;
 
   const defaultCatalog = catalogItems.filter((item) => item.isDefault);

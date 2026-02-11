@@ -39,8 +39,7 @@ const DEFAULT_PARAMS: CpqQuoteParameters = {
   monthlyHoursStandard: 180,
   avgStayMonths: 4,
   uniformChangesPerYear: 3,
-  holidayAnnualCount: 16,
-  holidayCompensationFactor: 1.7,
+  holidayAnnualCount: 12,
   holidayCommercialBufferPct: 10,
   financialRatePct: 0,
   salePriceMonthly: 0,
@@ -692,13 +691,11 @@ export function CpqQuoteCosts({
     }, 0);
   }, [meals, mealCatalog]);
   const financialTotal = summary ? summary.monthlyFinancial + summary.monthlyPolicy : 0;
-  const holidayAnnualCount = Number(parameters.holidayAnnualCount ?? 16);
-  const holidayCompensationFactor = Number(parameters.holidayCompensationFactor ?? 1.7);
+  const holidayAnnualCount = Number(parameters.holidayAnnualCount ?? 12);
   const holidayCommercialBufferPct = Number(parameters.holidayCommercialBufferPct ?? 10);
   const holidayMonthlyFactor = holidayAnnualCount / 12;
   const holidayCommercialFactor = 1 + holidayCommercialBufferPct / 100;
-  const holidayTotalFactor =
-    0.5 * holidayMonthlyFactor * holidayCompensationFactor * holidayCommercialFactor;
+  const holidayTotalFactor = 0.5 * holidayMonthlyFactor * holidayCommercialFactor;
 
   const costForm = loading ? (
     <div className="text-sm text-muted-foreground">Cargando...</div>
@@ -2678,7 +2675,7 @@ export function CpqQuoteCosts({
                 <div className="space-y-1">
                   <div className="font-semibold">Cálculo</div>
                   <p className="text-muted-foreground">
-                    Se calcula sobre sueldo mensual: (sueldo/30) × 50% × (feriados/año ÷ 12) × factor empresa × factor comercial.
+                    Se calcula sobre costo empresa mensual: (costo empresa/30) × 50% × (feriados/año ÷ 12) × factor comercial.
                   </p>
                 </div>
               }
@@ -2687,11 +2684,10 @@ export function CpqQuoteCosts({
                   <div>Guardias: {summary.totalGuards}</div>
                   <div>Feriados/año: {formatNumber(holidayAnnualCount, { minDecimals: 0, maxDecimals: 2 })}</div>
                   <div>Factor mensual: {formatNumber(holidayMonthlyFactor, { minDecimals: 3, maxDecimals: 3 })}</div>
-                  <div>Factor empresa: {formatNumber(holidayCompensationFactor, { minDecimals: 2, maxDecimals: 2 })}</div>
                   <div>Holgura comercial: {formatNumber(holidayCommercialBufferPct, { minDecimals: 2, maxDecimals: 2 })}%</div>
                   <div>Factor comercial: {formatNumber(holidayCommercialFactor, { minDecimals: 3, maxDecimals: 3 })}</div>
                   <div className="border-t border-border/60 pt-1.5 font-medium">
-                    Factor total sueldo/30: {formatNumber(holidayTotalFactor, { minDecimals: 4, maxDecimals: 4 })}
+                    Factor total costo empresa/30: {formatNumber(holidayTotalFactor, { minDecimals: 4, maxDecimals: 4 })}
                   </div>
                 </div>
               }

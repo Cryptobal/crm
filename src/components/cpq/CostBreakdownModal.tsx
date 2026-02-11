@@ -16,6 +16,8 @@ export function CostBreakdownModal({ open, onOpenChange, position }: CostBreakdo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
+  const [holidayAnnualCount, setHolidayAnnualCount] = useState(12);
+  const [holidayCommercialBufferPct, setHolidayCommercialBufferPct] = useState(10);
 
   const healthPlanPct = useMemo(() => {
     if (position.healthSystem === "fonasa") return 0.07;
@@ -30,25 +32,33 @@ export function CostBreakdownModal({ open, onOpenChange, position }: CostBreakdo
 
     const load = async () => {
       try {
-        const res = await fetch("/api/payroll/costing/compute", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            base_salary_clp: Number(position.baseSalary),
-            contract_type: "indefinite",
-            afp_name: position.afpName || "modelo",
-            health_system: position.healthSystem || "fonasa",
-            health_plan_pct: healthPlanPct,
-            assumptions: {
-              include_vacation_provision: true,
-              include_severance_provision: true,
-              vacation_provision_pct: 0.0833,
-              severance_provision_pct: 0.04166,
-            },
+        const [res, settingsRes] = await Promise.all([
+          fetch("/api/payroll/costing/compute", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              base_salary_clp: Number(position.baseSalary),
+              contract_type: "indefinite",
+              afp_name: position.afpName || "modelo",
+              health_system: position.healthSystem || "fonasa",
+              health_plan_pct: healthPlanPct,
+              assumptions: {
+                include_vacation_provision: true,
+                include_severance_provision: true,
+                vacation_provision_pct: 0.0833,
+                severance_provision_pct: 0.04166,
+              },
+            }),
           }),
-        });
+          fetch("/api/cpq/settings", { cache: "no-store" }),
+        ]);
         const payload = await res.json();
+        const settingsPayload = await settingsRes.json();
         if (!payload.success) throw new Error(payload.error?.message || "Error");
+        if (settingsPayload?.success && settingsPayload.data) {
+          setHolidayAnnualCount(Number(settingsPayload.data.holidayAnnualCount ?? 12));
+          setHolidayCommercialBufferPct(Number(settingsPayload.data.holidayCommercialBufferPct ?? 10));
+        }
         setData(payload.data);
       } catch (err: any) {
         setError(err?.message || "No se pudo calcular.");
@@ -62,6 +72,15 @@ export function CostBreakdownModal({ open, onOpenChange, position }: CostBreakdo
 
   const breakdown = data?.breakdown;
   const worker = data?.worker_breakdown_estimate;
+  const holidayMonthlyFactor = holidayAnnualCount / 12;
+  const holidayCommercialFactor = 1 + holidayCommercialBufferPct / 100;
+  const holidayAdjustment =
+    data?.monthly_employer_cost_clp
+      ? (Number(data.monthly_employer_cost_clp) / 30) *
+        0.5 *
+        holidayMonthlyFactor *
+        holidayCommercialFactor
+      : 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -137,6 +156,13 @@ export function CostBreakdownModal({ open, onOpenChange, position }: CostBreakdo
                   <div className="flex items-center justify-between">
                     <span>Indemnización</span>
                     <span className="font-mono">{formatCurrency(breakdown.severance_provision)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Ajuste feriado</span>
+                    <span className="font-mono">{formatCurrency(holidayAdjustment)}</span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    (costo empresa/30) x ({holidayAnnualCount}/12) x 0,5 x (1 + {holidayCommercialBufferPct}%)
                   </div>
                 </div>
               </div>

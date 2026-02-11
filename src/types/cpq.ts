@@ -107,7 +107,6 @@ export interface CpqQuoteParameters {
   avgStayMonths: number;
   uniformChangesPerYear: number;
   holidayAnnualCount?: number;
-  holidayCompensationFactor?: number;
   holidayCommercialBufferPct?: number;
   financialEnabled?: boolean;
   financialRatePct: number;
