@@ -61,6 +61,17 @@ export default async function CrmDealsPage({
     stage: true,
     primaryContact: true,
     quotes: true,
+    followUpLogs: {
+      where: { status: "pending" },
+      orderBy: { scheduledAt: "asc" },
+      take: 1,
+      select: {
+        id: true,
+        sequence: true,
+        status: true,
+        scheduledAt: true,
+      },
+    },
   } as const;
 
   let deals;
