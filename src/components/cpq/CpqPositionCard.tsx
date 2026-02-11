@@ -72,7 +72,10 @@ export function CpqPositionCard({
   const financialCost = baseWithMargin * (financialRatePct / 100);
   const policyCost = baseWithMargin * (policyRatePct / 100) * policyFactor;
   const salePricePosition = baseWithMargin + financialCost + policyCost;
-  const hourlyRate = monthlyHours > 0 ? salePricePosition / monthlyHours : 0;
+  const hourlyRate =
+    monthlyHours > 0 && positionGuards > 0
+      ? salePricePosition / positionGuards / monthlyHours
+      : 0;
 
   const handleRecalculate = async () => {
     setLoading(true);

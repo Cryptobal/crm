@@ -1079,8 +1079,18 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       {activeStep === 1 && (
         <Card className="p-3 sm:p-4" inert={isLocked}>
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-sm font-semibold">Puestos de trabajo</h2>
+              {positions.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  Costo total:{" "}
+                  <span className="font-mono font-semibold text-foreground">
+                    {formatCurrency(
+                      positions.reduce((sum, p) => sum + Number(p.monthlyPositionCost), 0)
+                    )}
+                  </span>
+                </span>
+              )}
               <Badge variant="outline" className="text-xs">
                 {quote.status}
               </Badge>
