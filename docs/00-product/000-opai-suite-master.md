@@ -2,7 +2,7 @@
 
 **Resumen:** Plataforma SaaS unificada multi-tenant para empresas de seguridad con arquitectura single-domain (opai.gard.cl).
 
-**Estado:** Vigente — Actualizado 2026-02-10
+**Estado:** Vigente — Actualizado 2026-02-11
 
 **Scope:** OPAI Suite (módulos comerciales + operacionales)
 
@@ -10,7 +10,8 @@
 
 > **Visión completa (todas las fases OPI):** Ver [MASTER_SPEC_OPI.md](./MASTER_SPEC_OPI.md)  
 > **Estado detallado del proyecto:** Ver [ESTADO_GENERAL.md](../02-implementation/ESTADO_GENERAL.md)  
-> **Módulo Docs específico:** Ver [001-docs-master.md](./001-docs-master.md)
+> **Módulo Docs específico:** Ver [001-docs-master.md](./001-docs-master.md)  
+> **Plan detallado OPI Fase 1:** Ver [ETAPA_1_IMPLEMENTACION.md](../05-etapa-1/ETAPA_1_IMPLEMENTACION.md)
 
 ## 1. Propósito
 OPAI es una suite SaaS para empresas de seguridad que unifica:
@@ -125,7 +126,8 @@ Policies por acción: docs.proposal.send, crm.deal.update, ops.incident.create, 
 - ❌ OPI Fase 4: Inventario (catálogo, stock, kits, asignaciones)
 - ❌ OPI Fase 5: Asistencia externa (FaceID/API, reconciliación automática)
 
-**Detalle completo de fases OPI:** Ver [MASTER_SPEC_OPI.md](./MASTER_SPEC_OPI.md)
+**Detalle completo de fases OPI:** Ver [MASTER_SPEC_OPI.md](./MASTER_SPEC_OPI.md)  
+**Ejecución recomendada de Fase 1:** Ver [ETAPA_1_IMPLEMENTACION.md](../05-etapa-1/ETAPA_1_IMPLEMENTACION.md)
 
 ## 9. Convenciones
 - Naming: {domain}.{entity} en DB. Ej: ops.incidents, crm.deals.

@@ -1,6 +1,6 @@
 # Documentacion OPAI Suite
 
-> **Actualizado:** 2026-02-10
+> **Actualizado:** 2026-02-11
 
 ---
 
@@ -50,6 +50,9 @@ docs/
 ├── 05-pdf-generation/                   ← Generacion de PDFs
 │   └── playwright-pdf.md               ← Playwright + Chromium
 │
+├── 05-etapa-1/                          ← Plan de implementacion Fase 1 OPI
+│   └── ETAPA_1_IMPLEMENTACION.md        ← Plan maestro (Ops + TE + Personas)
+│
 ├── 06-etapa-2/                          ← Plan de implementacion Fase 2 OPI
 │   ├── ETAPA_2_IMPLEMENTACION.md        ← Plan maestro (Postventa + Tickets)
 │   ├── ETAPA_2_CHANGELOG.md             ← Archivos a crear/modificar
@@ -88,7 +91,7 @@ docs/
 
 | Fase | Modulo | Plan |
 |:----:|--------|------|
-| 1 | Ops + TE + Personas | [MASTER_SPEC_OPI.md](./00-product/MASTER_SPEC_OPI.md) |
+| 1 | Ops + TE + Personas | [docs/05-etapa-1/](./05-etapa-1/) |
 | 2 | Postventa + Tickets | [docs/06-etapa-2/](./06-etapa-2/) |
 | 3 | Portal guardias | [MASTER_SPEC_OPI.md](./00-product/MASTER_SPEC_OPI.md) |
 | 4 | Inventario | [MASTER_SPEC_OPI.md](./00-product/MASTER_SPEC_OPI.md) |
@@ -100,7 +103,8 @@ docs/
 
 1. Lee [MASTER_SPEC_OPI.md](./00-product/MASTER_SPEC_OPI.md) para entender la vision completa
 2. Lee [ESTADO_GENERAL.md](./02-implementation/ESTADO_GENERAL.md) para saber que esta implementado
-3. Para trabajar en Fase 2, lee [docs/06-etapa-2/](./06-etapa-2/)
+3. Para continuar Fase 1, lee [docs/05-etapa-1/](./05-etapa-1/)
+4. Si se prioriza Fase 2, usa [docs/06-etapa-2/](./06-etapa-2/)
 
 ---
 

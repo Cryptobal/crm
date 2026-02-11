@@ -1,6 +1,6 @@
 # Estado General del Proyecto — OPAI Suite
 
-> **Fecha:** 2026-02-10  
+> **Fecha:** 2026-02-11  
 > **Estado:** Vigente — se actualiza con cada implementación  
 > **Referencia:** `docs/00-product/MASTER_SPEC_OPI.md`
 
@@ -285,12 +285,40 @@ Resumen de lo incompleto dentro de los módulos actuales:
 
 ---
 
-## Qué sigue
+## Revisión de avances Fase 1 (2026-02-11)
 
-El siguiente hito es decidir si se implementa **Fase 1** (Ops + TE + Personas) o **Fase 2** (Postventa + Tickets). La Fase 2 tiene un plan de implementación completo en `docs/06-etapa-2/`.
+Resultado de la revisión cruzada entre código y documentación:
 
-Ver roadmap completo en: `docs/00-product/MASTER_SPEC_OPI.md`
+| Ítem Fase 1 | Evidencia revisada | Estado |
+|-------------|--------------------|:------:|
+| Modelos `ops`/`personas`/`te` en Prisma | `prisma/schema.prisma` sin modelos `puesto_operativo`, `asistencia_diaria`, `turno_extra`, `guardia`, etc. | ❌ |
+| APIs Fase 1 | No existen rutas `/api/ops/*` ni `/api/te/*` en `src/app/api` | ❌ |
+| UI Fase 1 | No existen pantallas `/ops/*`, `/personas/*`, `/te/*` en `src/app/(app)` | ❌ |
+| Control de acceso | `ops` ya está declarado como módulo futuro en app access | 🟡 Base lista |
+| Base comercial actual | Hub/CRM/CPQ/Docs/Config operativos y con mejoras recientes | ✅ |
+
+### Avances recientes (fuera de Fase 1)
+
+Los últimos commits se concentraron en estabilización y UX de módulos ya productivos (CRM, CPQ, Documentos y firma digital), junto con fixes de build TypeScript.
 
 ---
 
-*Este documento refleja el estado real del repositorio al 2026-02-10.*
+## Qué sigue (recomendación actualizada)
+
+Dado el estado actual, el siguiente bloque recomendado es iniciar **Fase 1** por fundamento técnico y en este orden:
+
+1. **F1-01 — Base de datos y contratos API mínimos**  
+   Crear schema/modelos de Ops + Personas + TE en Prisma y definir endpoints base (`/api/ops/*`, `/api/te/*`) sin UI final.
+2. **F1-02 — Pauta mensual y asistencia diaria (UI + API)**  
+   Generación/guardado de pauta y edición de asistencia diaria por instalación.
+3. **F1-03 — Flujo TE y pagos**  
+   Aprobación RRHH, lote semanal y marcado de pago.
+4. **F1-04 — Personas/guardias MVP**  
+   Ficha de guardia, flags y lista negra básica.
+
+Plan detallado de ejecución: `docs/05-etapa-1/ETAPA_1_IMPLEMENTACION.md`  
+Roadmap completo: `docs/00-product/MASTER_SPEC_OPI.md`
+
+---
+
+*Este documento refleja el estado real del repositorio al 2026-02-11.*

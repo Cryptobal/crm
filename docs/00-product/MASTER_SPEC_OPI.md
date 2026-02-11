@@ -2,7 +2,7 @@
 
 > **Este es el documento maestro definitivo.** Define qué hará la plataforma al completar TODAS sus fases.  
 > **Fuente:** `Desarrollo Opai/fase-2.md` (MASTER_SPEC vFinal) + auditoría del repositorio actual.  
-> **Fecha:** 2026-02-10  
+> **Fecha:** 2026-02-11  
 > **Estado:** Vigente — fuente única de verdad para roadmap completo
 
 ---
@@ -284,7 +284,9 @@ Lo que ya existe y funciona en producción:
 - Asignar reemplazo → genera TE pendiente con monto instalación
 - Aprobar TE → incluir en lote semanal → marcar pagado
 
-**Estado:** ❌ No iniciado
+**Plan detallado:** `docs/05-etapa-1/ETAPA_1_IMPLEMENTACION.md`
+
+**Estado:** 🟡 En planificación (implementación no iniciada)
 
 ### Fase 2 — Postventa + Tickets core
 
