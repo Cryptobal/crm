@@ -508,6 +508,7 @@ export function CrmLeadsClient({
       }
       const summary = payload?.data?.summary || "";
       const normalizedWebsite = payload?.data?.websiteNormalized || "";
+      const companyNameDetected = payload?.data?.companyNameDetected || "";
       const logoUrl = payload?.data?.localLogoUrl || payload?.data?.logoUrl || null;
       const industry = payload?.data?.industry || "";
       const segment = payload?.data?.segment || "";
@@ -519,6 +520,16 @@ export function CrmLeadsClient({
       if (summary) updateApproveForm("companyInfo", summary);
       setApproveForm((prev) => ({
         ...prev,
+        accountName:
+          companyNameDetected &&
+          !["not available", "n/a", "no disponible"].includes(companyNameDetected.trim().toLowerCase())
+            ? companyNameDetected
+            : prev.accountName,
+        dealTitle:
+          companyNameDetected &&
+          (prev.dealTitle.trim() === "" || prev.dealTitle.trim().startsWith("Oportunidad "))
+            ? `Oportunidad ${companyNameDetected}`.trim()
+            : prev.dealTitle,
         industry: shouldReplaceEnriched(prev.industry) && industry ? industry : prev.industry,
         segment: shouldReplaceEnriched(prev.segment) && segment ? segment : prev.segment,
         legalName: shouldReplaceEnriched(prev.legalName) && legalName ? legalName : prev.legalName,

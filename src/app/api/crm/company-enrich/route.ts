@@ -20,6 +20,7 @@ type ExtractedWebData = {
 };
 
 type CompanyAiEnrichment = {
+  companyNameDetected: string;
   summary: string;
   industry: string;
   segment: string;
@@ -345,6 +346,35 @@ function normalizeExtracted(value: unknown): string {
   return clean;
 }
 
+function cleanCompanyNameCandidate(value: string): string {
+  let clean = normalizeWhitespace(value)
+    .replace(/®|™|\(.*?\)|\[.*?\]/g, "")
+    .trim();
+  // Para títulos tipo "Marca: descriptor", "Marca | descriptor", etc.
+  clean = clean.split(/\s[:|–—-]\s/)[0]?.trim() || clean;
+  clean = clean.replace(/^inicio\s*[-:]\s*/i, "").trim();
+  return clean;
+}
+
+function guessCompanyNameFromExtracted(
+  requestedCompanyName: string,
+  extracted: ExtractedWebData
+): string {
+  const candidates = [
+    requestedCompanyName,
+    extracted.headings[0] || "",
+    extracted.title || "",
+  ]
+    .map((c) => cleanCompanyNameCandidate(c))
+    .filter(Boolean);
+  for (const candidate of candidates) {
+    if (candidate.length < 2 || candidate.length > 120) continue;
+    if (/^(inicio|home|bienvenido|welcome)$/i.test(candidate)) continue;
+    return candidate;
+  }
+  return NOT_AVAILABLE;
+}
+
 function extractJsonObject(raw: string): string {
   const trimmed = raw.trim();
   if (trimmed.startsWith("{") && trimmed.endsWith("}")) return trimmed;
@@ -416,8 +446,9 @@ async function enrichCompanyWithAi(
         role: "user",
         content:
           `Devuelve un objeto JSON con las claves exactas:\n` +
-          `summary, industry, segment, legalName, companyRut, legalRepresentativeName, legalRepresentativeRut.\n\n` +
+          `companyNameDetected, summary, industry, segment, legalName, companyRut, legalRepresentativeName, legalRepresentativeRut.\n\n` +
           `Reglas:\n` +
+          `- companyNameDetected: nombre comercial/empresa corto (ej: "Steak"), o 'Not Available'.\n` +
           `- summary: 4-6 líneas en español sobre qué hace la empresa y foco comercial.\n` +
           `- industry y segment: clasificaciones comerciales en español, o 'Not Available'.\n` +
           `- legalName: razón social, o 'Not Available'.\n` +
@@ -435,6 +466,10 @@ async function enrichCompanyWithAi(
   const regexRep = extractRepresentativeByRegex(sourceText);
 
   return {
+    companyNameDetected:
+      normalizeExtracted(parsed.companyNameDetected) !== NOT_AVAILABLE
+        ? cleanCompanyNameCandidate(normalizeExtracted(parsed.companyNameDetected))
+        : guessCompanyNameFromExtracted(companyName, extracted),
     summary:
       normalizeExtracted(parsed.summary) === NOT_AVAILABLE
         ? extracted.metaDescription || extracted.headings[0] || "Not Available"
@@ -484,6 +519,7 @@ export async function POST(request: NextRequest) {
     }
 
     let enrichment: CompanyAiEnrichment = {
+      companyNameDetected: guessCompanyNameFromExtracted(companyName, extracted),
       summary: extracted.metaDescription || extracted.headings[0] || "Not Available",
       industry: NOT_AVAILABLE,
       segment: NOT_AVAILABLE,
@@ -504,6 +540,7 @@ export async function POST(request: NextRequest) {
       success: true,
       data: {
         websiteNormalized,
+        companyNameDetected: enrichment.companyNameDetected,
         logoUrl: extracted.logoUrl,
         localLogoUrl,
         summary: enrichment.summary,
