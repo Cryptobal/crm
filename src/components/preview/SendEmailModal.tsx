@@ -17,10 +17,13 @@ interface SendEmailModalProps {
   onSuccess: (result: { uniqueId: string; publicUrl: string; recipientEmail: string; recipientPhone?: string }) => void;
 }
 
+const DEFAULT_BCC = 'comercial@gard.cl';
+
 export function SendEmailModal({ sessionId, companyName, contactName, contactEmail, onClose, onSuccess }: SendEmailModalProps) {
   const [recipientEmail, setRecipientEmail] = useState(contactEmail);
   const [recipientName, setRecipientName] = useState(contactName);
   const [ccEmails, setCcEmails] = useState<string[]>(['']);
+  const [bccEmails, setBccEmails] = useState<string[]>([DEFAULT_BCC, '']);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +39,20 @@ export function SendEmailModal({ sessionId, companyName, contactName, contactEma
     const updated = [...ccEmails];
     updated[index] = value;
     setCcEmails(updated);
+  };
+
+  const addBccField = () => {
+    if (bccEmails.length < 6) setBccEmails([...bccEmails, '']);
+  };
+
+  const removeBccField = (index: number) => {
+    setBccEmails(bccEmails.filter((_, i) => i !== index));
+  };
+
+  const updateBccEmail = (index: number, value: string) => {
+    const updated = [...bccEmails];
+    updated[index] = value;
+    setBccEmails(updated);
   };
 
   const handleSend = async () => {
@@ -55,6 +72,10 @@ export function SendEmailModal({ sessionId, companyName, contactName, contactEma
         .map(email => email.trim())
         .filter(email => email && email.includes('@'));
 
+      const validBccEmails = bccEmails
+        .map(email => email.trim())
+        .filter(email => email && email.includes('@'));
+
       const response = await fetch('/api/presentations/send-email', {
         method: 'POST',
         headers: {
@@ -65,6 +86,7 @@ export function SendEmailModal({ sessionId, companyName, contactName, contactEma
           recipientEmail: recipientEmail.trim(),
           recipientName: recipientName.trim(),
           ccEmails: validCcEmails,
+          bccEmails: validBccEmails,
         }),
       });
 
@@ -128,7 +150,7 @@ export function SendEmailModal({ sessionId, companyName, contactName, contactEma
           {/* CC Emails */}
           <div>
             <label className="text-white font-semibold mb-2 block">
-              Copias adicionales (CC) - Opcional
+              Copia (CC) - Opcional
             </label>
             
             {ccEmails.map((email, index) => (
@@ -156,7 +178,43 @@ export function SendEmailModal({ sessionId, companyName, contactName, contactEma
                 onClick={addCcField}
                 className="text-teal-400 hover:text-teal-300 text-sm font-semibold mt-2"
               >
-                + Agregar otro email CC
+                + Agregar otro CC
+              </button>
+            )}
+          </div>
+
+          {/* BCC Emails */}
+          <div>
+            <label className="text-white font-semibold mb-2 block">
+              Copia oculta (CCO)
+            </label>
+            
+            {bccEmails.map((email, index) => (
+              <div key={index} className="flex gap-2 mb-2">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => updateBccEmail(index, e.target.value)}
+                  placeholder="comercial@gard.cl"
+                  className="flex-1 px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+                {bccEmails.length > 1 && (
+                  <button
+                    onClick={() => removeBccField(index)}
+                    className="px-3 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-colors"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {bccEmails.length < 6 && (
+              <button
+                onClick={addBccField}
+                className="text-teal-400 hover:text-teal-300 text-sm font-semibold mt-2"
+              >
+                + Agregar otro CCO
               </button>
             )}
           </div>

@@ -17,7 +17,14 @@ import { render } from '@react-email/render';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sessionId, recipientEmail: customEmail, recipientName: customName, ccEmails = [] } = body;
+    const { sessionId, recipientEmail: customEmail, recipientName: customName, ccEmails = [], bccEmails: customBccEmails = [] } = body;
+
+    // BCC: siempre incluir comercial@gard.cl + los adicionales del usuario
+    const defaultBcc = 'comercial@gard.cl';
+    const validCustomBcc = (Array.isArray(customBccEmails) ? customBccEmails : [])
+      .map((e: string) => (e || '').trim())
+      .filter((e: string) => e && e.includes('@'));
+    const bccEmails = [...new Set([defaultBcc, ...validCustomBcc])];
 
     // 1. Validar sessionId
     if (!sessionId) {
@@ -104,10 +111,12 @@ export async function POST(req: NextRequest) {
     const emailSubject = `${quoteSubject} - Gard Security`;
 
     // 8. Enviar email con Resend
+    const ccList = ccEmails.filter((email: string) => email && email.trim());
     const emailResponse = await resend.emails.send({
       from: EMAIL_CONFIG.from,
       to: recipientEmail,
-      cc: ccEmails.filter((email: string) => email && email.trim()),
+      cc: ccList.length ? ccList : undefined,
+      bcc: bccEmails.length ? bccEmails : undefined,
       replyTo: EMAIL_CONFIG.replyTo,
       subject: emailSubject,
       html: emailHtml,

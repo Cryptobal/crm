@@ -72,7 +72,6 @@ export function SendCpqQuoteModal({
   // Recipient
   const [recipientName, setRecipientName] = useState(contactName || "");
   const [recipientEmail, setRecipientEmail] = useState(contactEmail || "");
-  const [ccEmails, setCcEmails] = useState<string[]>([""]);
 
   // Success state
   const [previewUrl, setPreviewUrl] = useState("");
@@ -90,10 +89,6 @@ export function SendCpqQuoteModal({
     setCreating(true);
     setStep("creating");
     try {
-      const validCcEmails = ccEmails
-        .map((e) => e.trim())
-        .filter((e) => e && e.includes("@"));
-
       const response = await fetch(
         `/api/cpq/quotes/${quoteId}/create-draft`,
         {
@@ -103,7 +98,6 @@ export function SendCpqQuoteModal({
             templateSlug: selectedTemplate,
             recipientEmail: recipientEmail.trim(),
             recipientName: recipientName.trim(),
-            ccEmails: validCcEmails,
           }),
         }
       );
@@ -137,22 +131,7 @@ export function SendCpqQuoteModal({
   const resetModal = () => {
     setStep("template");
     setSelectedTemplate("commercial");
-    setCcEmails([""]);
     setPreviewUrl("");
-  };
-
-  const addCcField = () => {
-    if (ccEmails.length < 5) setCcEmails([...ccEmails, ""]);
-  };
-
-  const removeCcField = (index: number) => {
-    setCcEmails(ccEmails.filter((_, i) => i !== index));
-  };
-
-  const updateCcEmail = (index: number, value: string) => {
-    const updated = [...ccEmails];
-    updated[index] = value;
-    setCcEmails(updated);
   };
 
   return (
@@ -265,43 +244,6 @@ export function SendCpqQuoteModal({
                   className="bg-background"
                 />
               </div>
-            </div>
-
-            {/* CC */}
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">
-                Copias (CC) - Opcional
-              </Label>
-              {ccEmails.map((email, i) => (
-                <div key={i} className="flex gap-2">
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => updateCcEmail(i, e.target.value)}
-                    placeholder="cc@empresa.com"
-                    className="bg-background text-sm"
-                  />
-                  {ccEmails.length > 1 && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-10 w-10 shrink-0 text-destructive"
-                      onClick={() => removeCcField(i)}
-                    >
-                      &times;
-                    </Button>
-                  )}
-                </div>
-              ))}
-              {ccEmails.length < 5 && (
-                <button
-                  type="button"
-                  onClick={addCcField}
-                  className="text-xs text-primary hover:underline"
-                >
-                  + Agregar otro CC
-                </button>
-              )}
             </div>
 
             <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
