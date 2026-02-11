@@ -24,41 +24,112 @@ async function reconcileQuoteCrmContext(
   if (!quote) return quote;
 
   const patch: {
-    dealId?: string;
-    accountId?: string;
-    contactId?: string;
-    clientName?: string;
+    dealId?: string | null;
+    accountId?: string | null;
+    contactId?: string | null;
+    installationId?: string | null;
+    clientName?: string | null;
   } = {};
 
+  const [accountRecord, contactRecord, installationRecord] = await Promise.all([
+    quote.accountId
+      ? prisma.crmAccount.findFirst({
+          where: { id: quote.accountId, tenantId },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+    quote.contactId
+      ? prisma.crmContact.findFirst({
+          where: { id: quote.contactId, tenantId },
+          select: { id: true, accountId: true },
+        })
+      : Promise.resolve(null),
+    quote.installationId
+      ? prisma.crmInstallation.findFirst({
+          where: { id: quote.installationId, tenantId },
+          select: { id: true, accountId: true },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  // Sanitize invalid references first (common on legacy/broken records).
+  if (quote.accountId && !accountRecord) {
+    patch.accountId = null;
+  }
+  if (
+    quote.contactId &&
+    (!contactRecord ||
+      (accountRecord && contactRecord.accountId !== quote.accountId))
+  ) {
+    patch.contactId = null;
+  }
+  if (
+    quote.installationId &&
+    (!installationRecord ||
+      (accountRecord &&
+        installationRecord.accountId &&
+        installationRecord.accountId !== quote.accountId))
+  ) {
+    patch.installationId = null;
+  }
+
+  const effectiveAccountId =
+    patch.accountId !== undefined ? patch.accountId : quote.accountId;
+  const effectiveContactId =
+    patch.contactId !== undefined ? patch.contactId : quote.contactId;
+
   let effectiveDealId = quote.dealId ?? null;
+  let dealRecord =
+    effectiveDealId
+      ? await prisma.crmDeal.findFirst({
+          where: { id: effectiveDealId, tenantId },
+          select: {
+            id: true,
+            accountId: true,
+            primaryContactId: true,
+            account: { select: { name: true } },
+          },
+        })
+      : null;
+
+  // Existing dealId points outside tenant / stale relation.
+  if (effectiveDealId && !dealRecord) {
+    patch.dealId = null;
+    effectiveDealId = null;
+  }
 
   // Backfill from crm.deal_quotes link when cpq.quote.dealId is empty.
-  if (!effectiveDealId) {
+  if (!dealRecord) {
     const linkedDeal = await prisma.crmDealQuote.findFirst({
       where: { tenantId, quoteId: quote.id },
       orderBy: { createdAt: "desc" },
       select: { dealId: true },
     });
     if (linkedDeal?.dealId) {
-      effectiveDealId = linkedDeal.dealId;
-      patch.dealId = linkedDeal.dealId;
+      dealRecord = await prisma.crmDeal.findFirst({
+        where: { id: linkedDeal.dealId, tenantId },
+        select: {
+          id: true,
+          accountId: true,
+          primaryContactId: true,
+          account: { select: { name: true } },
+        },
+      });
+      if (dealRecord) {
+        effectiveDealId = linkedDeal.dealId;
+        patch.dealId = linkedDeal.dealId;
+      }
     }
   }
 
   // If there is a deal, infer missing account/contact/client fields.
-  if (effectiveDealId && (!quote.accountId || !quote.contactId || !quote.clientName)) {
-    const deal = await prisma.crmDeal.findFirst({
-      where: { id: effectiveDealId, tenantId },
-      select: {
-        accountId: true,
-        primaryContactId: true,
-        account: { select: { name: true } },
-      },
-    });
-    if (deal) {
-      if (!quote.accountId) patch.accountId = deal.accountId;
-      if (!quote.contactId && deal.primaryContactId) patch.contactId = deal.primaryContactId;
-      if (!quote.clientName && deal.account?.name) patch.clientName = deal.account.name;
+  if (dealRecord) {
+    if (!effectiveAccountId) patch.accountId = dealRecord.accountId;
+    if (!effectiveContactId && dealRecord.primaryContactId) {
+      patch.contactId = dealRecord.primaryContactId;
+    }
+    if (!quote.clientName && dealRecord.account?.name) {
+      patch.clientName = dealRecord.account.name;
     }
   }
 

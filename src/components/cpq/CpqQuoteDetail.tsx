@@ -138,6 +138,18 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
 
   // Inline creation modals
   const [inlineCreateType, setInlineCreateType] = useState<"account" | "installation" | "contact" | "deal" | null>(null);
+  const emptyInlineForm = {
+    name: "",
+    firstName: "",
+    lastName: "",
+    email: "",
+    title: "",
+    address: "",
+    city: "",
+    commune: "",
+    lat: null as number | null,
+    lng: null as number | null,
+  };
   const [inlineForm, setInlineForm] = useState({
     name: "",
     firstName: "",
@@ -151,9 +163,25 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
     lng: null as number | null,
   });
   const [inlineCreating, setInlineCreating] = useState(false);
+  const openInlineCreate = (type: "account" | "installation" | "contact" | "deal") => {
+    if (typeof document !== "undefined") {
+      (document.activeElement as HTMLElement | null)?.blur();
+    }
+    setInlineForm(emptyInlineForm);
+    setInlineCreateType(type);
+  };
 
   const createInline = async () => {
     if (!inlineCreateType) return;
+    if (
+      (inlineCreateType === "installation" ||
+        inlineCreateType === "contact" ||
+        inlineCreateType === "deal") &&
+      !hasUsableAccount
+    ) {
+      toast.error("Selecciona una cuenta válida antes de crear.");
+      return;
+    }
     setInlineCreating(true);
     try {
       let endpoint = "";
@@ -248,7 +276,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       }
 
       setInlineCreateType(null);
-      setInlineForm({ name: "", firstName: "", lastName: "", email: "", title: "", address: "", city: "", commune: "", lat: null, lng: null });
+      setInlineForm(emptyInlineForm);
       toast.success("Creado exitosamente");
     } catch (error: unknown) {
       console.error(error);
@@ -343,6 +371,15 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
     () => ensureSelectedOption(filteredCrmAccounts, crmContext.accountId, crmAccounts),
     [filteredCrmAccounts, crmContext.accountId, crmAccounts]
   );
+  const missingSelectedAccount =
+    !!crmContext.accountId &&
+    !accountOptions.some((account) => account.id === crmContext.accountId);
+  const hasUsableAccount = useMemo(
+    () =>
+      !!crmContext.accountId &&
+      crmAccounts.some((account) => account.id === crmContext.accountId),
+    [crmContext.accountId, crmAccounts]
+  );
   const installationOptions = useMemo(
     () =>
       ensureSelectedOption(
@@ -352,14 +389,24 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
       ),
     [filteredCrmInstallations, crmContext.installationId, crmInstallations]
   );
+  const missingSelectedInstallation =
+    !!crmContext.installationId &&
+    !installationOptions.some(
+      (installation) => installation.id === crmContext.installationId
+    );
   const contactOptions = useMemo(
     () => ensureSelectedOption(filteredCrmContacts, crmContext.contactId, crmContacts),
     [filteredCrmContacts, crmContext.contactId, crmContacts]
   );
+  const missingSelectedContact =
+    !!crmContext.contactId &&
+    !contactOptions.some((contact) => contact.id === crmContext.contactId);
   const dealOptions = useMemo(
     () => ensureSelectedOption(filteredCrmDeals, crmContext.dealId, crmDeals),
     [filteredCrmDeals, crmContext.dealId, crmDeals]
   );
+  const missingSelectedDeal =
+    !!crmContext.dealId && !dealOptions.some((deal) => deal.id === crmContext.dealId);
 
   const refresh = async () => {
     setLoading(true);
@@ -465,9 +512,10 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
 
   // Load installations/contacts/deals when account changes
   useEffect(() => {
-    const accountQuery = crmContext.accountId
-      ? `?accountId=${encodeURIComponent(crmContext.accountId)}`
-      : "";
+    const accountQuery =
+      hasUsableAccount && crmContext.accountId
+        ? `?accountId=${encodeURIComponent(crmContext.accountId)}`
+        : "";
     let cancelled = false;
 
     Promise.all([
@@ -530,7 +578,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
     return () => {
       cancelled = true;
     };
-  }, [crmContext.accountId]);
+  }, [crmContext.accountId, hasUsableAccount]);
 
   const saveCrmContext = async (patch: Partial<typeof crmContext>) => {
     const updated = { ...crmContext, ...patch };
@@ -612,6 +660,54 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
     }
     setCrmSearch((prev) => ({ ...prev, deal: "" }));
   };
+  useEffect(() => {
+    if (!crmContext.dealId) return;
+    let cancelled = false;
+
+    fetch(`/api/crm/deals/${crmContext.dealId}`)
+      .then((res) => res.json())
+      .then((payload) => {
+        if (cancelled || !payload?.success) return;
+        const deal = payload.data as {
+          account?: { id?: string; name?: string } | null;
+          primaryContact?: { id?: string } | null;
+        };
+
+        const patch: Partial<typeof crmContext> = {};
+        const dealAccountId = deal.account?.id ?? "";
+        const shouldSyncAccount =
+          !!dealAccountId && crmContext.accountId !== dealAccountId;
+        if (shouldSyncAccount) {
+          patch.accountId = dealAccountId;
+          if (crmContext.installationId) patch.installationId = "";
+        }
+
+        const dealPrimaryContactId = deal.primaryContact?.id ?? "";
+        if (dealPrimaryContactId && !crmContext.contactId) {
+          patch.contactId = dealPrimaryContactId;
+        }
+
+        if (Object.keys(patch).length > 0) {
+          void saveCrmContext(patch);
+        }
+
+        if (deal.account?.name && (!quoteForm.clientName || shouldSyncAccount)) {
+          setQuoteForm((prev) => ({ ...prev, clientName: deal.account?.name || prev.clientName }));
+          setQuoteDirty(true);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    crmContext.dealId,
+    crmContext.accountId,
+    crmContext.contactId,
+    crmContext.installationId,
+    quoteForm.clientName,
+  ]);
 
   const generateAiDescription = async () => {
     setGeneratingAi(true);
@@ -1187,11 +1283,16 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                     onChange={(e) => handleAccountSelect(e.target.value)}
                   >
                     <option value="">Seleccionar cuenta...</option>
+                    {missingSelectedAccount && (
+                      <option value={crmContext.accountId}>
+                        Cuenta vinculada no disponible
+                      </option>
+                    )}
                     {accountOptions.map((a) => (
                       <option key={a.id} value={a.id}>{a.name}</option>
                     ))}
                   </select>
-                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" onClick={() => { setInlineForm({ name: "", firstName: "", lastName: "", email: "", title: "", address: "", city: "", commune: "", lat: null, lng: null }); setInlineCreateType("account"); }}>
+                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" onClick={() => openInlineCreate("account")}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
@@ -1213,11 +1314,16 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                     onChange={(e) => handleInstallationSelect(e.target.value)}
                   >
                     <option value="">Seleccionar instalación...</option>
+                    {missingSelectedInstallation && (
+                      <option value={crmContext.installationId}>
+                        Instalación vinculada no disponible
+                      </option>
+                    )}
                     {installationOptions.map((i) => (
                       <option key={i.id} value={i.id}>{i.name}{i.city ? ` (${i.city})` : ""}</option>
                     ))}
                   </select>
-                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" disabled={!crmContext.accountId} onClick={() => { setInlineForm({ name: "", firstName: "", lastName: "", email: "", title: "", address: "", city: "", commune: "", lat: null, lng: null }); setInlineCreateType("installation"); }}>
+                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" disabled={!hasUsableAccount} onClick={() => openInlineCreate("installation")}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
@@ -1239,11 +1345,16 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                     onChange={(e) => handleContactSelect(e.target.value)}
                   >
                     <option value="">Seleccionar contacto...</option>
+                    {missingSelectedContact && (
+                      <option value={crmContext.contactId}>
+                        Contacto vinculado no disponible
+                      </option>
+                    )}
                     {contactOptions.map((c) => (
                       <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.email ? ` (${c.email})` : ""}</option>
                     ))}
                   </select>
-                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" disabled={!crmContext.accountId} onClick={() => { setInlineForm({ name: "", firstName: "", lastName: "", email: "", title: "", address: "", city: "", commune: "", lat: null, lng: null }); setInlineCreateType("contact"); }}>
+                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" disabled={!hasUsableAccount} onClick={() => openInlineCreate("contact")}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
@@ -1265,21 +1376,32 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                     onChange={(e) => handleDealSelect(e.target.value)}
                   >
                     <option value="">Seleccionar negocio...</option>
+                    {missingSelectedDeal && (
+                      <option value={crmContext.dealId}>
+                        Negocio vinculado no disponible
+                      </option>
+                    )}
                     {dealOptions.map((d) => (
                       <option key={d.id} value={d.id}>{d.title}</option>
                     ))}
                   </select>
-                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" disabled={!crmContext.accountId} onClick={() => { setInlineForm({ name: "", firstName: "", lastName: "", email: "", title: "", address: "", city: "", commune: "", lat: null, lng: null }); setInlineCreateType("deal"); }}>
+                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" disabled={!hasUsableAccount} onClick={() => openInlineCreate("deal")}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
             </div>
+            {crmContext.accountId && !hasUsableAccount && (
+              <p className="text-[11px] text-amber-400">
+                La cuenta vinculada no está disponible para este tenant. Selecciona una
+                cuenta válida para habilitar creación rápida de instalación/contacto/negocio.
+              </p>
+            )}
           </div>
 
           {/* Inline Create Modal */}
           <Dialog open={!!inlineCreateType} onOpenChange={(v) => !v && setInlineCreateType(null)}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="max-h-[88dvh] sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>
                   {inlineCreateType === "account" && "Nueva cuenta"}
