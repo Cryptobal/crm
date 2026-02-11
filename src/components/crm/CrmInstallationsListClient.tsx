@@ -36,7 +36,7 @@ export function CrmInstallationsListClient({
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<ViewMode>("list");
+  const [view, setView] = useState<ViewMode>("cards");
   const [accountFilter, setAccountFilter] = useState<string>("all");
 
   const toggleSelection = (id: string) => {

@@ -302,7 +302,7 @@ export function CrmLeadsClient({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<LeadStatusFilter>(initialStatusFilter);
   const [sort, setSort] = useState("newest");
-  const [view, setView] = useState<ViewMode>("list");
+  const [view, setView] = useState<ViewMode>("cards");
 
   // Approve modal state
   const [approveOpen, setApproveOpen] = useState(false);

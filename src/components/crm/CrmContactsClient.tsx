@@ -80,7 +80,7 @@ export function CrmContactsClient({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<ViewMode>("list");
+  const [view, setView] = useState<ViewMode>("cards");
   const [sort, setSort] = useState("newest");
   const [contactFilter, setContactFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

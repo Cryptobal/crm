@@ -76,7 +76,7 @@ export function CrmAccountsClient({ initialAccounts }: { initialAccounts: Accoun
   const [open, setOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | "prospect" | "client">("all");
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<ViewMode>("list");
+  const [view, setView] = useState<ViewMode>("cards");
   const [sort, setSort] = useState("newest");
   const [industries, setIndustries] = useState<{ id: string; name: string }[]>([]);
 
