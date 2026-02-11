@@ -6,7 +6,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["public", "payroll", "fx", "cpq", "crm", "docs"]
+  schemas  = ["public", "payroll", "fx", "cpq", "crm", "docs", "ops"]
 }
 
 model Tenant {
@@ -780,14 +780,20 @@ model CrmInstallation {
   commune   String?
   lat       Float?
   lng       Float?
+  geoRadiusM Int     @default(100) @map("geo_radius_m")
+  teMontoClp Decimal @default(0) @map("te_monto_clp") @db.Decimal(12, 2)
   notes     String?
   metadata  Json?    @db.JsonB // dotacion sugerida, datos extra
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  account CrmAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  lead    CrmLead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  quotes  CpqQuote[]
+  account       CrmAccount?           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  lead          CrmLead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  quotes        CpqQuote[]
+  opsPuestos    OpsPuestoOperativo[]
+  opsPautas     OpsPautaMensual[]
+  opsAsistencias OpsAsistenciaDiaria[]
+  opsTurnosExtra OpsTurnoExtra[]
 
   @@index([tenantId], map: "idx_crm_installations_tenant")
   @@index([accountId], map: "idx_crm_installations_account")
@@ -1267,6 +1273,330 @@ model CrmEmailSignature {
   @@index([tenantId, isDefault], map: "idx_crm_signatures_default")
   @@map("email_signatures")
   @@schema("crm")
+}
+
+// ============================================
+// OPS MODULE (Operaciones, TE, Personas)
+// ============================================
+
+model OpsPersona {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId  String   @map("tenant_id")
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  rut       String?
+  email     String?
+  phone     String?
+  status    String   @default("active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  guardia OpsGuardia?
+
+  @@index([tenantId], map: "idx_ops_personas_tenant")
+  @@index([status], map: "idx_ops_personas_status")
+  @@index([rut], map: "idx_ops_personas_rut")
+  @@map("personas")
+  @@schema("ops")
+}
+
+model OpsGuardia {
+  id              String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId        String    @map("tenant_id")
+  personaId       String    @unique @map("persona_id") @db.Uuid
+  code            String?
+  status          String    @default("active")
+  isBlacklisted   Boolean   @default(false) @map("is_blacklisted")
+  blacklistReason String?   @map("blacklist_reason")
+  blacklistedAt   DateTime? @map("blacklisted_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  persona               OpsPersona              @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  bankAccounts          OpsCuentaBancaria[]
+  flags                 OpsGuardiaFlag[]
+  comments              OpsComentarioGuardia[]
+  documents             OpsDocumentoPersona[]
+  pautas                OpsPautaMensual[]      @relation("ops_pauta_guardia")
+  asistenciasPlanificadas OpsAsistenciaDiaria[] @relation("ops_asistencia_planificada_guardia")
+  asistenciasReales     OpsAsistenciaDiaria[]  @relation("ops_asistencia_real_guardia")
+  asistenciasReemplazo  OpsAsistenciaDiaria[]  @relation("ops_asistencia_reemplazo_guardia")
+  turnosExtra           OpsTurnoExtra[]        @relation("ops_turno_extra_guardia")
+  eventosRrhh           OpsEventoRrhh[]
+  pagoItems             OpsPagoTeItem[]        @relation("ops_pago_item_guardia")
+
+  @@unique([tenantId, code], map: "uq_ops_guardias_tenant_code")
+  @@index([tenantId], map: "idx_ops_guardias_tenant")
+  @@index([status], map: "idx_ops_guardias_status")
+  @@index([isBlacklisted], map: "idx_ops_guardias_blacklist")
+  @@map("guardias")
+  @@schema("ops")
+}
+
+model OpsGuardiaFlag {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId  String   @map("tenant_id")
+  guardiaId String   @map("guardia_id") @db.Uuid
+  type      String
+  label     String
+  severity  String   @default("info")
+  notes     String?
+  active    Boolean  @default(true)
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  guardia OpsGuardia @relation(fields: [guardiaId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "idx_ops_guardia_flags_tenant")
+  @@index([guardiaId], map: "idx_ops_guardia_flags_guardia")
+  @@index([active], map: "idx_ops_guardia_flags_active")
+  @@map("guardia_flags")
+  @@schema("ops")
+}
+
+model OpsDocumentoPersona {
+  id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  guardiaId String    @map("guardia_id") @db.Uuid
+  type      String
+  fileUrl   String?   @map("file_url")
+  status    String    @default("pending")
+  issuedAt  DateTime? @map("issued_at") @db.Date
+  expiresAt DateTime? @map("expires_at") @db.Date
+  notes     String?
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  guardia OpsGuardia @relation(fields: [guardiaId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "idx_ops_docs_persona_tenant")
+  @@index([guardiaId], map: "idx_ops_docs_persona_guardia")
+  @@index([expiresAt], map: "idx_ops_docs_persona_expires")
+  @@map("documentos_persona")
+  @@schema("ops")
+}
+
+model OpsCuentaBancaria {
+  id            String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId      String   @map("tenant_id")
+  guardiaId     String   @map("guardia_id") @db.Uuid
+  bankName      String   @map("bank_name")
+  accountType   String   @map("account_type")
+  accountNumber String   @map("account_number")
+  holderName    String   @map("holder_name")
+  holderRut     String?  @map("holder_rut")
+  isDefault     Boolean  @default(false) @map("is_default")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  guardia OpsGuardia @relation(fields: [guardiaId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "idx_ops_cuentas_bancarias_tenant")
+  @@index([guardiaId], map: "idx_ops_cuentas_bancarias_guardia")
+  @@index([isDefault], map: "idx_ops_cuentas_bancarias_default")
+  @@map("cuentas_bancarias")
+  @@schema("ops")
+}
+
+model OpsComentarioGuardia {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId  String   @map("tenant_id")
+  guardiaId String   @map("guardia_id") @db.Uuid
+  comment   String   @db.Text
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  guardia OpsGuardia @relation(fields: [guardiaId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "idx_ops_comentarios_guardia_tenant")
+  @@index([guardiaId], map: "idx_ops_comentarios_guardia_guardia")
+  @@map("comentarios_guardia")
+  @@schema("ops")
+}
+
+model OpsPuestoOperativo {
+  id             String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId       String   @map("tenant_id")
+  installationId String   @map("installation_id") @db.Uuid
+  name           String
+  shiftStart     String   @map("shift_start")
+  shiftEnd       String   @map("shift_end")
+  weekdays       String[] @default([])
+  requiredGuards Int      @default(1) @map("required_guards")
+  teMontoClp     Decimal? @map("te_monto_clp") @db.Decimal(12, 2)
+  active         Boolean  @default(true)
+  createdBy      String?  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  installation CrmInstallation      @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  pautas       OpsPautaMensual[]
+  asistencias  OpsAsistenciaDiaria[]
+  turnosExtra  OpsTurnoExtra[]
+
+  @@index([tenantId], map: "idx_ops_puestos_tenant")
+  @@index([installationId], map: "idx_ops_puestos_installation")
+  @@index([active], map: "idx_ops_puestos_active")
+  @@map("puestos_operativos")
+  @@schema("ops")
+}
+
+model OpsPautaMensual {
+  id              String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId        String    @map("tenant_id")
+  installationId  String    @map("installation_id") @db.Uuid
+  puestoId        String    @map("puesto_id") @db.Uuid
+  date            DateTime  @db.Date
+  plannedGuardiaId String?   @map("planned_guardia_id") @db.Uuid
+  status          String    @default("planificado")
+  notes           String?
+  createdBy       String?   @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  installation  CrmInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  puesto        OpsPuestoOperativo @relation(fields: [puestoId], references: [id], onDelete: Cascade)
+  plannedGuardia OpsGuardia?      @relation("ops_pauta_guardia", fields: [plannedGuardiaId], references: [id], onDelete: SetNull)
+
+  @@unique([puestoId, date], map: "uq_ops_pauta_puesto_fecha")
+  @@index([tenantId], map: "idx_ops_pauta_tenant")
+  @@index([installationId, date], map: "idx_ops_pauta_installation_date")
+  @@index([plannedGuardiaId], map: "idx_ops_pauta_guardia")
+  @@map("pauta_mensual")
+  @@schema("ops")
+}
+
+model OpsEventoRrhh {
+  id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId  String    @map("tenant_id")
+  guardiaId String?   @map("guardia_id") @db.Uuid
+  date      DateTime  @db.Date
+  type      String
+  status    String    @default("approved")
+  notes     String?
+  createdBy String?   @map("created_by")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  guardia OpsGuardia? @relation(fields: [guardiaId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId], map: "idx_ops_eventos_rrhh_tenant")
+  @@index([guardiaId], map: "idx_ops_eventos_rrhh_guardia")
+  @@index([date], map: "idx_ops_eventos_rrhh_date")
+  @@map("eventos_rrhh")
+  @@schema("ops")
+}
+
+model OpsAsistenciaDiaria {
+  id                 String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId           String    @map("tenant_id")
+  installationId     String    @map("installation_id") @db.Uuid
+  puestoId           String    @map("puesto_id") @db.Uuid
+  date               DateTime  @db.Date
+  plannedGuardiaId   String?   @map("planned_guardia_id") @db.Uuid
+  actualGuardiaId    String?   @map("actual_guardia_id") @db.Uuid
+  replacementGuardiaId String? @map("replacement_guardia_id") @db.Uuid
+  attendanceStatus   String    @default("pendiente") @map("attendance_status")
+  checkInAt          DateTime? @map("check_in_at") @db.Timestamptz(6)
+  checkOutAt         DateTime? @map("check_out_at") @db.Timestamptz(6)
+  notes              String?
+  teGenerated        Boolean   @default(false) @map("te_generated")
+  createdBy          String?   @map("created_by")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  installation      CrmInstallation   @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  puesto            OpsPuestoOperativo @relation(fields: [puestoId], references: [id], onDelete: Cascade)
+  plannedGuardia    OpsGuardia?       @relation("ops_asistencia_planificada_guardia", fields: [plannedGuardiaId], references: [id], onDelete: SetNull)
+  actualGuardia     OpsGuardia?       @relation("ops_asistencia_real_guardia", fields: [actualGuardiaId], references: [id], onDelete: SetNull)
+  replacementGuardia OpsGuardia?      @relation("ops_asistencia_reemplazo_guardia", fields: [replacementGuardiaId], references: [id], onDelete: SetNull)
+  turnosExtra       OpsTurnoExtra[]
+
+  @@unique([puestoId, date], map: "uq_ops_asistencia_puesto_fecha")
+  @@index([tenantId], map: "idx_ops_asistencia_tenant")
+  @@index([installationId, date], map: "idx_ops_asistencia_installation_date")
+  @@index([attendanceStatus], map: "idx_ops_asistencia_status")
+  @@map("asistencia_diaria")
+  @@schema("ops")
+}
+
+model OpsTurnoExtra {
+  id             String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId       String    @map("tenant_id")
+  asistenciaId   String?   @unique @map("asistencia_id") @db.Uuid
+  installationId String    @map("installation_id") @db.Uuid
+  puestoId       String?   @map("puesto_id") @db.Uuid
+  guardiaId      String    @map("guardia_id") @db.Uuid
+  date           DateTime  @db.Date
+  status         String    @default("pending")
+  amountClp      Decimal   @default(0) @map("amount_clp") @db.Decimal(12, 2)
+  approvedBy     String?   @map("approved_by")
+  approvedAt     DateTime? @map("approved_at") @db.Timestamptz(6)
+  rejectedBy     String?   @map("rejected_by")
+  rejectedAt     DateTime? @map("rejected_at") @db.Timestamptz(6)
+  rejectionReason String?  @map("rejection_reason")
+  paidAt         DateTime? @map("paid_at") @db.Timestamptz(6)
+  createdBy      String?   @map("created_by")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  asistencia   OpsAsistenciaDiaria? @relation(fields: [asistenciaId], references: [id], onDelete: SetNull)
+  installation CrmInstallation      @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  puesto       OpsPuestoOperativo?  @relation(fields: [puestoId], references: [id], onDelete: SetNull)
+  guardia      OpsGuardia           @relation("ops_turno_extra_guardia", fields: [guardiaId], references: [id], onDelete: Restrict)
+  paymentItems OpsPagoTeItem[]
+
+  @@index([tenantId], map: "idx_ops_turnos_extra_tenant")
+  @@index([status], map: "idx_ops_turnos_extra_status")
+  @@index([date], map: "idx_ops_turnos_extra_date")
+  @@index([guardiaId], map: "idx_ops_turnos_extra_guardia")
+  @@index([installationId], map: "idx_ops_turnos_extra_installation")
+  @@map("turnos_extra")
+  @@schema("ops")
+}
+
+model OpsPagoTeLote {
+  id             String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId       String    @map("tenant_id")
+  code           String    @unique
+  weekStart      DateTime  @map("week_start") @db.Date
+  weekEnd        DateTime  @map("week_end") @db.Date
+  status         String    @default("draft")
+  totalAmountClp Decimal   @default(0) @map("total_amount_clp") @db.Decimal(14, 2)
+  createdBy      String?   @map("created_by")
+  paidAt         DateTime? @map("paid_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  items OpsPagoTeItem[]
+
+  @@index([tenantId], map: "idx_ops_pago_te_lotes_tenant")
+  @@index([status], map: "idx_ops_pago_te_lotes_status")
+  @@index([weekStart, weekEnd], map: "idx_ops_pago_te_lotes_week")
+  @@map("pago_te_lotes")
+  @@schema("ops")
+}
+
+model OpsPagoTeItem {
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId     String    @map("tenant_id")
+  loteId       String    @map("lote_id") @db.Uuid
+  turnoExtraId String    @unique @map("turno_extra_id") @db.Uuid
+  guardiaId    String    @map("guardia_id") @db.Uuid
+  amountClp    Decimal   @default(0) @map("amount_clp") @db.Decimal(12, 2)
+  status       String    @default("pending")
+  paidAt       DateTime? @map("paid_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  lote       OpsPagoTeLote @relation(fields: [loteId], references: [id], onDelete: Cascade)
+  turnoExtra OpsTurnoExtra @relation(fields: [turnoExtraId], references: [id], onDelete: Cascade)
+  guardia    OpsGuardia    @relation("ops_pago_item_guardia", fields: [guardiaId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId], map: "idx_ops_pago_te_items_tenant")
+  @@index([loteId], map: "idx_ops_pago_te_items_lote")
+  @@index([guardiaId], map: "idx_ops_pago_te_items_guardia")
+  @@index([status], map: "idx_ops_pago_te_items_status")
+  @@map("pago_te_items")
+  @@schema("ops")
 }
 
 // ============================================
