@@ -34,6 +34,7 @@ import { Presentation, Template, PresentationView } from '@prisma/client';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { EmailStatusBadge } from './EmailStatusBadge';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 type PresentationWithRelations = Presentation & {
   template: Template;
@@ -54,6 +55,7 @@ export function PresentationsList({ presentations: initialPresentations, initial
   const [dateFilter, setDateFilter] = useState<string>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ id: string; companyName: string } | null>(null);
 
   // Sincronizar viewFilter cuando cambia initialFilter (KPIs clickeables)
   useEffect(() => {
@@ -173,13 +175,15 @@ export function PresentationsList({ presentations: initialPresentations, initial
     window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
   };
 
-  // Eliminar presentación (solo drafts)
-  const deletePresentation = async (id: string, companyName: string) => {
-    if (!window.confirm(`¿Eliminar el borrador de "${companyName}"?\n\nEsta acción no se puede deshacer.`)) {
+  // Eliminar presentación (todos los documentos; confirmación vía modal)
+  const deletePresentation = async (id: string, companyName: string, skipConfirm = false) => {
+    if (!skipConfirm) {
+      setDeleteModal({ id, companyName });
       return;
     }
 
     setDeletingId(id);
+    setDeleteModal(null);
     try {
       const response = await fetch(`/api/presentations/${id}`, {
         method: 'DELETE',
@@ -190,14 +194,18 @@ export function PresentationsList({ presentations: initialPresentations, initial
         throw new Error(data.error || 'Error al eliminar');
       }
 
-      // Actualizar lista localmente
       setPresentations((prev) => prev.filter((p) => p.id !== id));
-      toast.success('Borrador eliminado correctamente');
+      toast.success('Documento eliminado correctamente');
     } catch (error: any) {
       toast.error(error.message || 'No se pudo eliminar el documento');
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const onConfirmDelete = () => {
+    if (!deleteModal) return;
+    deletePresentation(deleteModal.id, deleteModal.companyName, true);
   };
 
   return (
@@ -349,7 +357,7 @@ export function PresentationsList({ presentations: initialPresentations, initial
                   </div>
 
                   {/* Acciones a la derecha */}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <a
                       href={`/p/${presentation.uniqueId}?preview=true`}
                       target="_blank"
@@ -377,16 +385,7 @@ export function PresentationsList({ presentations: initialPresentations, initial
                     >
                       <MessageCircle className="w-4 h-4" />
                     </button>
-                    {presentation.status === 'draft' ? (
-                      <button
-                        onClick={() => deletePresentation(presentation.id, companyName)}
-                        disabled={deletingId === presentation.id}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-red-500/20 hover:bg-red-500/30 text-red-300 transition-colors disabled:opacity-50"
-                        title="Eliminar borrador"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    ) : crmDealUrl ? (
+                    {crmDealUrl ? (
                       <a
                         href={crmDealUrl}
                         target="_blank"
@@ -407,6 +406,14 @@ export function PresentationsList({ presentations: initialPresentations, initial
                         <Building2 className="w-4 h-4" />
                       </a>
                     ) : null}
+                    <button
+                      onClick={() => deletePresentation(presentation.id, companyName)}
+                      disabled={deletingId === presentation.id}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-red-500/20 hover:bg-red-500/30 text-red-300 transition-colors disabled:opacity-50"
+                      title="Eliminar documento"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -414,6 +421,22 @@ export function PresentationsList({ presentations: initialPresentations, initial
           })
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!deleteModal}
+        onOpenChange={(open) => !open && setDeleteModal(null)}
+        title="Eliminar documento comercial"
+        description={
+          deleteModal
+            ? `¿Eliminar el documento "${deleteModal.companyName}"? Esta acción no se puede deshacer.`
+            : ''
+        }
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        onConfirm={onConfirmDelete}
+        variant="destructive"
+        loading={deleteModal ? deletingId === deleteModal.id : false}
+      />
     </div>
   );
 }
