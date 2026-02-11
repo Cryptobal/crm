@@ -254,7 +254,15 @@ export default async function HubPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {crmMetrics.openLeads.map((lead) => (
+                    {crmMetrics.openLeads.map((lead: {
+                      id: string;
+                      source: string | null;
+                      firstName: string | null;
+                      lastName: string | null;
+                      email: string | null;
+                      companyName: string | null;
+                      createdAt: Date;
+                    }) => (
                       <Link
                         key={lead.id}
                         href="/crm/leads"
@@ -304,7 +312,17 @@ export default async function HubPage() {
               <CardContent>
                 {crmMetrics.followUpQueue.length > 0 ? (
                   <div className="space-y-2">
-                    {crmMetrics.followUpQueue.map((log) => {
+                    {crmMetrics.followUpQueue.map((log: {
+                      id: string;
+                      sequence: number;
+                      scheduledAt: Date;
+                      deal: {
+                        id: string;
+                        title: string;
+                        account: { name: string } | null;
+                        primaryContact: { firstName: string; lastName: string } | null;
+                      };
+                    }) => {
                       const scheduleState = getScheduleState(log.scheduledAt, now);
                       const contactName = formatPersonName(
                         log.deal.primaryContact?.firstName,
@@ -351,7 +369,12 @@ export default async function HubPage() {
                     <p className="text-xs text-amber-500">
                       Hay {crmMetrics.dealsWithoutPendingFollowUpCount} negocios con propuesta enviada sin seguimiento pendiente.
                     </p>
-                    {crmMetrics.dealsWithoutPendingFollowUp.map((deal) => (
+                    {crmMetrics.dealsWithoutPendingFollowUp.map((deal: {
+                      id: string;
+                      title: string;
+                      proposalSentAt: Date | null;
+                      account: { name: string } | null;
+                    }) => (
                       <Link
                         key={deal.id}
                         href={`/crm/deals/${deal.id}`}
