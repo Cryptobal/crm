@@ -280,9 +280,15 @@ export async function POST(
       });
 
       // ── Instalaciones + Cotización CPQ ──
-      // Obtener defaults para CPQ (cargo y rol por defecto)
+      // Obtener defaults y catálogos CPQ activos
       const defaultCargo = await tx.cpqCargo.findFirst({ where: { active: true }, orderBy: { name: "asc" } });
       const defaultRol = await tx.cpqRol.findFirst({ where: { active: true }, orderBy: { name: "asc" } });
+      const [activeCargos, activeRoles] = await Promise.all([
+        tx.cpqCargo.findMany({ where: { active: true }, select: { id: true } }),
+        tx.cpqRol.findMany({ where: { active: true }, select: { id: true } }),
+      ]);
+      const activeCargoIds = new Set(activeCargos.map((c) => c.id));
+      const activeRolIds = new Set(activeRoles.map((r) => r.id));
 
       // Generar código de cotización
       const year = new Date().getFullYear();
@@ -343,7 +349,7 @@ export async function POST(
 
         // Crear cotización CPQ si la instalación tiene dotación
         const dotacion = Array.isArray(inst?.dotacion) ? inst.dotacion : [];
-        if (dotacion.length > 0 && defaultCargo && defaultRol) {
+        if (dotacion.length > 0) {
           quoteCodeCounter++;
           const baseCode = `CPQ-${year}-${String(quoteCodeCounter).padStart(3, "0")}`;
           const quoteCode = `${baseCode}-${randomBytes(2).toString("hex")}`;
@@ -391,31 +397,92 @@ export async function POST(
           if (quote) {
             // Crear posiciones CPQ a partir de la dotación
             for (const d of dotacion) {
-              const puestoName = (d.puesto || "Guardia de Seguridad").trim();
-              // Buscar o crear puesto de trabajo
-              let puesto = await tx.cpqPuestoTrabajo.findFirst({
-                where: { name: { equals: puestoName, mode: "insensitive" } },
-              });
-              if (!puesto) {
-                puesto = await tx.cpqPuestoTrabajo.create({
-                  data: { name: puestoName, active: true },
+              const customName =
+                typeof d.customName === "string" && d.customName.trim().length > 0
+                  ? d.customName.trim()
+                  : null;
+              const fallbackPuestoName = (d.puesto || customName || "Guardia de Seguridad").trim();
+              const requestedPuestoTrabajoId =
+                typeof d.puestoTrabajoId === "string" && d.puestoTrabajoId.trim().length > 0
+                  ? d.puestoTrabajoId.trim()
+                  : null;
+              let puestoIdToUse: string;
+              let puestoNameToUse = fallbackPuestoName;
+
+              if (requestedPuestoTrabajoId) {
+                const existingPuesto = await tx.cpqPuestoTrabajo.findFirst({
+                  where: { id: requestedPuestoTrabajoId, active: true },
+                  select: { id: true, name: true },
                 });
+                if (existingPuesto) {
+                  puestoIdToUse = existingPuesto.id;
+                  puestoNameToUse = existingPuesto.name;
+                } else {
+                  const fallbackPuesto = await tx.cpqPuestoTrabajo.findFirst({
+                    where: { name: { equals: fallbackPuestoName, mode: "insensitive" } },
+                    select: { id: true, name: true },
+                  });
+                  if (fallbackPuesto) {
+                    puestoIdToUse = fallbackPuesto.id;
+                    puestoNameToUse = fallbackPuesto.name;
+                  } else {
+                    const createdPuesto = await tx.cpqPuestoTrabajo.create({
+                      data: { name: fallbackPuestoName, active: true },
+                      select: { id: true, name: true },
+                    });
+                    puestoIdToUse = createdPuesto.id;
+                    puestoNameToUse = createdPuesto.name;
+                  }
+                }
+              } else {
+                const fallbackPuesto = await tx.cpqPuestoTrabajo.findFirst({
+                  where: { name: { equals: fallbackPuestoName, mode: "insensitive" } },
+                  select: { id: true, name: true },
+                });
+                if (fallbackPuesto) {
+                  puestoIdToUse = fallbackPuesto.id;
+                  puestoNameToUse = fallbackPuesto.name;
+                } else {
+                  const createdPuesto = await tx.cpqPuestoTrabajo.create({
+                    data: { name: fallbackPuestoName, active: true },
+                    select: { id: true, name: true },
+                  });
+                  puestoIdToUse = createdPuesto.id;
+                  puestoNameToUse = createdPuesto.name;
+                }
               }
 
               const weekdays = normalizeWeekdays(d.dias);
+              const requestedCargoId =
+                typeof d.cargoId === "string" && activeCargoIds.has(d.cargoId) ? d.cargoId : null;
+              const requestedRolId =
+                typeof d.rolId === "string" && activeRolIds.has(d.rolId) ? d.rolId : null;
+              const cargoIdToUse = requestedCargoId || defaultCargo?.id || null;
+              const rolIdToUse = requestedRolId || defaultRol?.id || null;
+              if (!cargoIdToUse || !rolIdToUse) {
+                throw new Error(
+                  "No hay configuración CPQ suficiente para crear posiciones (faltan cargo o rol activos)."
+                );
+              }
+              const baseSalaryValue =
+                typeof d.baseSalary === "number" && Number.isFinite(d.baseSalary) && d.baseSalary > 0
+                  ? Number(d.baseSalary)
+                  : 550000;
+              const startTime = typeof d.horaInicio === "string" && d.horaInicio ? d.horaInicio : "08:00";
+              const endTime = typeof d.horaFin === "string" && d.horaFin ? d.horaFin : "20:00";
 
               await tx.cpqPosition.create({
                 data: {
                   quoteId: quote.id,
-                  puestoTrabajoId: puesto.id,
-                  customName: puestoName,
+                  puestoTrabajoId: puestoIdToUse,
+                  customName: customName || puestoNameToUse,
                   weekdays,
-                  startTime: d.horaInicio || "08:00",
-                  endTime: d.horaFin || "20:00",
+                  startTime,
+                  endTime,
                   numGuards: d.cantidad || 1,
-                  cargoId: defaultCargo.id,
-                  rolId: defaultRol.id,
-                  baseSalary: 500000, // Salario base por defecto, se ajusta en CPQ
+                  cargoId: cargoIdToUse,
+                  rolId: rolIdToUse,
+                  baseSalary: baseSalaryValue,
                   employerCost: 0, // Se recalcula al abrir en CPQ
                   netSalary: 0,
                   monthlyPositionCost: 0,

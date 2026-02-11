@@ -16,7 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { CrmLead } from "@/types";
-import { Plus, Loader2, AlertTriangle, Trash2, ChevronRight, UserPlus, Phone, Mail, MessageSquare, Clock, Users, Calendar, Briefcase, MapPin, X } from "lucide-react";
+import { Plus, Loader2, AlertTriangle, Trash2, ChevronRight, UserPlus, Phone, Mail, MessageSquare, Clock, Users, Calendar, Briefcase, MapPin, X, Copy } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { StatusBadge } from "@/components/opai/StatusBadge";
 import { EmptyState } from "@/components/opai/EmptyState";
@@ -25,11 +25,18 @@ import { CrmToolbar } from "./CrmToolbar";
 import type { ViewMode } from "./ViewToggle";
 import { AddressAutocomplete, type AddressResult } from "@/components/ui/AddressAutocomplete";
 import { toast } from "sonner";
+import { formatNumber, parseLocalizedNumber } from "@/lib/utils";
 
 /* ─── Dotación & Installation draft types ─── */
 
 type DotacionItem = {
+  puestoTrabajoId?: string;
   puesto: string;
+  customName?: string;
+  cargoId?: string;
+  rolId?: string;
+  baseSalary?: number;
+  shiftType?: "day" | "night";
   cantidad: number;
   horaInicio: string;
   horaFin: string;
@@ -51,6 +58,9 @@ const WEEKDAYS = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado",
 const WEEKDAYS_SHORT: Record<string, string> = {
   lunes: "Lu", martes: "Ma", miercoles: "Mi", jueves: "Ju", viernes: "Vi", sabado: "Sa", domingo: "Do",
 };
+const DAY_START_OPTIONS = ["07:00", "07:30", "08:00", "08:30", "09:00", "09:30"] as const;
+
+type CpqCatalogOption = { id: string; name: string };
 
 /** Normaliza días que vienen del lead (ej. "Lunes", "Miércoles") al formato interno (minúsculas, sin tilde). */
 function normalizeLeadDias(dias: string[] | undefined): string[] {
@@ -71,6 +81,45 @@ function normalizeLeadDias(dias: string[] | undefined): string[] {
   return unique.length > 0 ? unique : [...WEEKDAYS];
 }
 
+function toMinutes(value: string): number | null {
+  const [h, m] = value.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+function minutesToTime(total: number): string {
+  const normalized = ((total % 1440) + 1440) % 1440;
+  const h = Math.floor(normalized / 60);
+  const m = normalized % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function normalizeTimeToHHmm(value: unknown, fallback = "08:00"): string {
+  if (typeof value !== "string" || !value.trim()) return fallback;
+  const raw = value.trim().toLowerCase();
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?:\s*(a\.?\s*m\.?|p\.?\s*m\.?))?$/i);
+  if (!match) return fallback;
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const suffix = match[3]?.toLowerCase().replace(/\s|\./g, "") || "";
+  if (Number.isNaN(hour) || Number.isNaN(minute) || minute < 0 || minute > 59) return fallback;
+  if (suffix === "pm" && hour < 12) hour += 12;
+  if (suffix === "am" && hour === 12) hour = 0;
+  if (hour < 0 || hour > 23) return fallback;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function inferShiftType(horaInicio: string, horaFin: string): "day" | "night" {
+  const start = normalizeTimeToHHmm(horaInicio, "08:00");
+  const end = normalizeTimeToHHmm(horaFin, "20:00");
+  if (start === "20:00" && end === "08:00") return "night";
+  const startMin = toMinutes(start);
+  const endMin = toMinutes(end);
+  if (startMin == null || endMin == null) return "day";
+  if (endMin <= startMin) return "night";
+  return "day";
+}
+
 let _installationCounter = 0;
 function newInstallationKey() { return `inst_${++_installationCounter}_${Date.now()}`; }
 
@@ -78,8 +127,20 @@ function createEmptyInstallation(name = "", address = "", city = "", commune = "
   return { _key: newInstallationKey(), name, address, city, commune, dotacion: [] };
 }
 
-function createEmptyDotacion(): DotacionItem {
-  return { puesto: "", cantidad: 1, horaInicio: "08:00", horaFin: "20:00", dias: [...WEEKDAYS] };
+function createEmptyDotacion(defaultCargoId = "", defaultRolId = ""): DotacionItem {
+  return {
+    puestoTrabajoId: "",
+    puesto: "",
+    customName: "",
+    cargoId: defaultCargoId,
+    rolId: defaultRolId,
+    baseSalary: 550000,
+    shiftType: "day",
+    cantidad: 1,
+    horaInicio: "08:00",
+    horaFin: "20:00",
+    dias: [...WEEKDAYS],
+  };
 }
 
 /* ─── Form types ─── */
@@ -249,6 +310,9 @@ export function CrmLeadsClient({
 
   const [industries, setIndustries] = useState<{ id: string; name: string }[]>([]);
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
+  const [cpqPuestos, setCpqPuestos] = useState<CpqCatalogOption[]>([]);
+  const [cpqCargos, setCpqCargos] = useState<CpqCatalogOption[]>([]);
+  const [cpqRoles, setCpqRoles] = useState<CpqCatalogOption[]>([]);
 
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectLeadId, setRejectLeadId] = useState<string | null>(null);
@@ -277,10 +341,52 @@ export function CrmLeadsClient({
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/cpq/puestos?active=true").then((r) => r.json()),
+      fetch("/api/cpq/cargos?active=true").then((r) => r.json()),
+      fetch("/api/cpq/roles?active=true").then((r) => r.json()),
+    ])
+      .then(([puestosRes, cargosRes, rolesRes]) => {
+        if (puestosRes?.success) setCpqPuestos(puestosRes.data || []);
+        if (cargosRes?.success) setCpqCargos(cargosRes.data || []);
+        if (rolesRes?.success) setCpqRoles(rolesRes.data || []);
+      })
+      .catch(() => {});
+  }, []);
+
+  const defaultCargoId = useMemo(
+    () => cpqCargos.find((c) => c.name.toLowerCase().includes("guardia"))?.id || cpqCargos[0]?.id || "",
+    [cpqCargos]
+  );
+  const defaultRolId = useMemo(
+    () => cpqRoles.find((r) => r.name.trim().toLowerCase() === "2x5")?.id || cpqRoles[0]?.id || "",
+    [cpqRoles]
+  );
+
   const inputClassName =
     "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
   const selectClassName =
     "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+  const selectCompactClassName =
+    "flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+
+  useEffect(() => {
+    if (!approveOpen) return;
+    if (!defaultCargoId && !defaultRolId) return;
+    setInstallations((prev) =>
+      prev.map((inst) => ({
+        ...inst,
+        dotacion: inst.dotacion.map((dot) => ({
+          ...dot,
+          cargoId: dot.cargoId || defaultCargoId,
+          rolId: dot.rolId || defaultRolId,
+          baseSalary: dot.baseSalary || 550000,
+          shiftType: dot.shiftType || inferShiftType(dot.horaInicio, dot.horaFin),
+        })),
+      }))
+    );
+  }, [approveOpen, defaultCargoId, defaultRolId]);
 
   const counts = useMemo(() => ({
     total: leads.filter((l) => l.status !== "approved").length,
@@ -405,10 +511,16 @@ export function CrmLeadsClient({
     if (leadLat != null) firstInst.lat = leadLat;
     if (leadLng != null) firstInst.lng = leadLng;
     firstInst.dotacion = leadDotacion.map((d) => ({
+      puestoTrabajoId: typeof d.puestoTrabajoId === "string" ? d.puestoTrabajoId : "",
       puesto: d.puesto || "",
+      customName: typeof d.customName === "string" ? d.customName : "",
+      cargoId: typeof d.cargoId === "string" ? d.cargoId : defaultCargoId,
+      rolId: typeof d.rolId === "string" ? d.rolId : defaultRolId,
+      baseSalary: typeof d.baseSalary === "number" ? d.baseSalary : 550000,
+      shiftType: inferShiftType(d.horaInicio || "08:00", d.horaFin || "20:00"),
       cantidad: d.cantidad || 1,
-      horaInicio: d.horaInicio || "08:00",
-      horaFin: d.horaFin || "20:00",
+      horaInicio: normalizeTimeToHHmm(d.horaInicio, "08:00"),
+      horaFin: normalizeTimeToHHmm(d.horaFin, "20:00"),
       dias: normalizeLeadDias(d.dias),
     }));
     setInstallations([firstInst]);
@@ -431,7 +543,13 @@ export function CrmLeadsClient({
 
   // Dotación helpers
   const addDotacionToInst = (instKey: string) => {
-    setInstallations((prev) => prev.map((inst) => inst._key === instKey ? { ...inst, dotacion: [...inst.dotacion, createEmptyDotacion()] } : inst));
+    setInstallations((prev) =>
+      prev.map((inst) =>
+        inst._key === instKey
+          ? { ...inst, dotacion: [...inst.dotacion, createEmptyDotacion(defaultCargoId, defaultRolId)] }
+          : inst
+      )
+    );
   };
   const updateDotacionField = (instKey: string, dotIdx: number, field: keyof DotacionItem, value: unknown) => {
     setInstallations((prev) => prev.map((inst) => {
@@ -446,6 +564,59 @@ export function CrmLeadsClient({
       if (inst._key !== instKey) return inst;
       return { ...inst, dotacion: inst.dotacion.filter((_, i) => i !== dotIdx) };
     }));
+  };
+  const cloneDotacionInInst = (instKey: string, dotIdx: number) => {
+    setInstallations((prev) =>
+      prev.map((inst) => {
+        if (inst._key !== instKey) return inst;
+        const original = inst.dotacion[dotIdx];
+        if (!original) return inst;
+        const clone: DotacionItem = { ...original, dias: [...original.dias], cantidad: original.cantidad || 1 };
+        const nextDotacion = [...inst.dotacion];
+        nextDotacion.splice(dotIdx + 1, 0, clone);
+        return { ...inst, dotacion: nextDotacion };
+      })
+    );
+  };
+  const setDotacionShift = (instKey: string, dotIdx: number, shiftType: "day" | "night") => {
+    setInstallations((prev) =>
+      prev.map((inst) => {
+        if (inst._key !== instKey) return inst;
+        const nextDot = [...inst.dotacion];
+        const current = nextDot[dotIdx];
+        if (!current) return inst;
+        nextDot[dotIdx] =
+          shiftType === "night"
+            ? { ...current, shiftType, horaInicio: "20:00", horaFin: "08:00" }
+            : {
+                ...current,
+                shiftType,
+                horaInicio: DAY_START_OPTIONS.includes(current.horaInicio as (typeof DAY_START_OPTIONS)[number])
+                  ? current.horaInicio
+                  : "08:00",
+                horaFin: "20:00",
+              };
+        return { ...inst, dotacion: nextDot };
+      })
+    );
+  };
+  const setDotacionDayStart = (instKey: string, dotIdx: number, startTime: string) => {
+    setInstallations((prev) =>
+      prev.map((inst) => {
+        if (inst._key !== instKey) return inst;
+        const nextDot = [...inst.dotacion];
+        const current = nextDot[dotIdx];
+        if (!current) return inst;
+        const normalizedStart = normalizeTimeToHHmm(startTime, "08:00");
+        nextDot[dotIdx] = {
+          ...current,
+          shiftType: "day",
+          horaInicio: normalizedStart,
+          horaFin: minutesToTime((toMinutes(normalizedStart) ?? 480) + 12 * 60),
+        };
+        return { ...inst, dotacion: nextDot };
+      })
+    );
   };
   const toggleDotacionDay = (instKey: string, dotIdx: number, day: string) => {
     setInstallations((prev) => prev.map((inst) => {
@@ -1250,18 +1421,97 @@ export function CrmLeadsClient({
                             key={dotIdx}
                             className="rounded-md border border-border/60 bg-background p-2.5 space-y-2"
                           >
-                            {/* Row 1: Puesto + Cantidad + Delete */}
-                            <div className="flex items-end gap-2">
-                              <div className="flex-1 space-y-1">
-                                <Label className="text-[10px]">Puesto</Label>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-semibold text-muted-foreground">
+                                Posición {dotIdx + 1}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-[10px] px-2 gap-1"
+                                  onClick={() => cloneDotacionInInst(inst._key, dotIdx)}
+                                >
+                                  <Copy className="h-3 w-3" />
+                                  Clonar
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+                                  onClick={() => removeDotacionFromInst(inst._key, dotIdx)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <div className="space-y-1">
+                                <Label className="text-[10px]">Tipo de puesto *</Label>
+                                <select
+                                  className={selectCompactClassName}
+                                  value={dot.puestoTrabajoId || ""}
+                                  onChange={(e) => {
+                                    const puestoTrabajoId = e.target.value;
+                                    const selected = cpqPuestos.find((p) => p.id === puestoTrabajoId);
+                                    updateDotacionField(inst._key, dotIdx, "puestoTrabajoId", puestoTrabajoId);
+                                    updateDotacionField(inst._key, dotIdx, "puesto", selected?.name || dot.puesto || "");
+                                  }}
+                                >
+                                  <option value="">Seleccionar puesto...</option>
+                                  {cpqPuestos.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px]">Nombre personalizado</Label>
                                 <Input
-                                  value={dot.puesto}
-                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "puesto", e.target.value)}
-                                  placeholder="Ronda, Control Acceso..."
+                                  value={dot.customName || ""}
+                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "customName", e.target.value)}
+                                  placeholder={dot.puesto || "Ej: CCTV acceso principal"}
                                   className={`h-8 text-sm ${inputClassName}`}
                                 />
                               </div>
-                              <div className="w-20 space-y-1">
+                            </div>
+
+                            <div className="grid gap-2 sm:grid-cols-4">
+                              <div className="space-y-1">
+                                <Label className="text-[10px]">Cargo *</Label>
+                                <select
+                                  className={selectCompactClassName}
+                                  value={dot.cargoId || ""}
+                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "cargoId", e.target.value)}
+                                >
+                                  <option value="">Seleccionar cargo...</option>
+                                  {cpqCargos.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px]">Rol *</Label>
+                                <select
+                                  className={selectCompactClassName}
+                                  value={dot.rolId || ""}
+                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "rolId", e.target.value)}
+                                >
+                                  <option value="">Seleccionar rol...</option>
+                                  {cpqRoles.map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                      {r.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="space-y-1">
                                 <Label className="text-[10px]">Guardias</Label>
                                 <Input
                                   type="number"
@@ -1272,40 +1522,77 @@ export function CrmLeadsClient({
                                   className={`h-8 text-sm text-center ${inputClassName}`}
                                 />
                               </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
-                                onClick={() => removeDotacionFromInst(inst._key, dotIdx)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-
-                            {/* Row 2: Horario */}
-                            <div className="flex items-end gap-2">
-                              <div className="flex-1 space-y-1">
-                                <Label className="text-[10px]">Hora inicio</Label>
+                              <div className="space-y-1">
+                                <Label className="text-[10px]">Sueldo base</Label>
                                 <Input
-                                  type="time"
-                                  value={dot.horaInicio}
-                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "horaInicio", e.target.value)}
-                                  className={`h-8 text-sm ${inputClassName}`}
-                                />
-                              </div>
-                              <div className="flex-1 space-y-1">
-                                <Label className="text-[10px]">Hora fin</Label>
-                                <Input
-                                  type="time"
-                                  value={dot.horaFin}
-                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "horaFin", e.target.value)}
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={formatNumber(dot.baseSalary || 550000, { minDecimals: 0, maxDecimals: 0 })}
+                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "baseSalary", Math.max(0, parseLocalizedNumber(e.target.value) || 0))}
                                   className={`h-8 text-sm ${inputClassName}`}
                                 />
                               </div>
                             </div>
 
-                            {/* Row 3: Días (chips) */}
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Label className="text-[10px]">Horario</Label>
+                                <div className="flex gap-1">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={(dot.shiftType || "day") === "day" ? "default" : "outline"}
+                                    className="h-6 px-2 text-[10px]"
+                                    onClick={() => setDotacionShift(inst._key, dotIdx, "day")}
+                                  >
+                                    Día
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={(dot.shiftType || "day") === "night" ? "default" : "outline"}
+                                    className="h-6 px-2 text-[10px]"
+                                    onClick={() => setDotacionShift(inst._key, dotIdx, "night")}
+                                  >
+                                    Noche
+                                  </Button>
+                                </div>
+                              </div>
+                              {(dot.shiftType || "day") === "day" ? (
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px]">Inicio</Label>
+                                    <select
+                                      className={selectCompactClassName}
+                                      value={dot.horaInicio}
+                                      onChange={(e) => setDotacionDayStart(inst._key, dotIdx, e.target.value)}
+                                    >
+                                      {DAY_START_OPTIONS.map((time) => (
+                                        <option key={time} value={time}>
+                                          {time}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px]">Término</Label>
+                                    <Input value={dot.horaFin} className={`h-8 text-sm ${inputClassName}`} readOnly />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px]">Inicio</Label>
+                                    <Input value="20:00" className={`h-8 text-sm ${inputClassName}`} readOnly />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px]">Término</Label>
+                                    <Input value="08:00" className={`h-8 text-sm ${inputClassName}`} readOnly />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
                             <div className="space-y-1">
                               <Label className="text-[10px]">Días</Label>
                               <div className="flex flex-wrap gap-1">
