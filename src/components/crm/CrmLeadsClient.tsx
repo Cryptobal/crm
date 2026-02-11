@@ -26,8 +26,7 @@ import type { ViewMode } from "./ViewToggle";
 import { AddressAutocomplete, type AddressResult } from "@/components/ui/AddressAutocomplete";
 import { toast } from "sonner";
 import { formatNumber, parseLocalizedNumber } from "@/lib/utils";
-import { resolveDocument } from "@/lib/docs/token-resolver";
-import { tiptapToEmailHtml } from "@/lib/docs/tiptap-to-html";
+import { resolveDocument, tiptapToPlainText } from "@/lib/docs/token-resolver";
 
 /* ─── Dotación & Installation draft types ─── */
 
@@ -261,6 +260,21 @@ function getLeadRejectReasonFromMetadata(metadata: unknown): LeadRejectReason | 
   return validReasons.has(reason as LeadRejectReason) ? (reason as LeadRejectReason) : null;
 }
 
+function getLeadRejectionInfo(metadata: unknown): {
+  emailSent: boolean;
+  emailProviderMessageId: string | null;
+} | null {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const rejection = (metadata as Record<string, unknown>).rejection;
+  if (!rejection || typeof rejection !== "object" || Array.isArray(rejection)) return null;
+  const emailSent = Boolean((rejection as Record<string, unknown>).emailSent);
+  const messageId = (rejection as Record<string, unknown>).emailProviderMessageId;
+  return {
+    emailSent,
+    emailProviderMessageId: typeof messageId === "string" && messageId.trim() ? messageId : null,
+  };
+}
+
 function getLeadFilterLabel(filter: LeadStatusFilter): string | null {
   if (filter === "pending") return "Mostrando leads pendientes";
   if (filter === "approved") return "Mostrando leads aprobados";
@@ -480,7 +494,7 @@ export function CrmLeadsClient({
       }
       const summary = payload?.data?.summary || "";
       const normalizedWebsite = payload?.data?.websiteNormalized || "";
-      const logoUrl = payload?.data?.logoUrl || null;
+      const logoUrl = payload?.data?.localLogoUrl || payload?.data?.logoUrl || null;
       if (normalizedWebsite) updateApproveForm("website", normalizedWebsite);
       if (summary) updateApproveForm("companyInfo", summary);
       setDetectedCompanyLogoUrl(logoUrl);
@@ -733,6 +747,7 @@ export function CrmLeadsClient({
       const payload = {
         ...approveForm,
         accountNotes: approveForm.companyInfo || undefined,
+        accountLogoUrl: detectedCompanyLogoUrl || undefined,
         useExistingAccountId: useExistingAccountId || undefined,
         contactResolution: existingContact ? contactResolution : undefined,
         contactId: (existingContact && (contactResolution === "overwrite" || contactResolution === "use_existing")) ? existingContact.id : undefined,
@@ -904,11 +919,15 @@ export function CrmLeadsClient({
     };
     const { resolvedContent } = resolveDocument(template.content, entities);
     setRejectEmailSubject(template.name);
-    setRejectEmailBody(tiptapToEmailHtml(resolvedContent));
+    setRejectEmailBody(tiptapToPlainText(resolvedContent));
   };
 
   const rejectLead = async () => {
     if (!rejectLeadId) return;
+    if (rejectSendEmail && (!rejectEmailSubject.trim() || !rejectEmailBody.trim())) {
+      toast.error("Asunto y mensaje son obligatorios para enviar el correo.");
+      return;
+    }
     setRejecting(true);
     try {
       const response = await fetch(`/api/crm/leads/${rejectLeadId}/reject`, {
@@ -939,7 +958,7 @@ export function CrmLeadsClient({
       toast.success(rejectSendEmail ? "Lead rechazado y correo enviado" : "Lead rechazado");
     } catch (error) {
       console.error(error);
-      toast.error("No se pudo rechazar el lead.");
+      toast.error(error instanceof Error ? error.message : "No se pudo rechazar el lead.");
     } finally {
       setRejecting(false);
     }
@@ -953,6 +972,7 @@ export function CrmLeadsClient({
   ];
 
   const initialFilterLabel = getLeadFilterLabel(initialStatusFilter);
+  const canConfirmReject = !rejectSendEmail || (rejectEmailSubject.trim().length > 0 && rejectEmailBody.trim().length > 0);
 
   return (
     <div className="space-y-4">
@@ -1296,8 +1316,18 @@ export function CrmLeadsClient({
                     rows={4}
                   />
                   {detectedCompanyLogoUrl && (
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                      <span className="truncate">Logo detectado: {detectedCompanyLogoUrl}</span>
+                    <div className="space-y-2 rounded-md border border-border bg-muted/20 p-2">
+                      <div className="text-[10px] text-muted-foreground">Logo detectado</div>
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={detectedCompanyLogoUrl}
+                          alt="Logo empresa detectado"
+                          className="h-12 w-12 rounded border border-border bg-background object-contain"
+                        />
+                        <span className="truncate text-[10px] text-muted-foreground">
+                          {detectedCompanyLogoUrl}
+                        </span>
+                      </div>
                       <Button
                         type="button"
                         variant="ghost"
@@ -1844,6 +1874,9 @@ export function CrmLeadsClient({
                     className={`w-full min-h-[140px] rounded-md border px-3 py-2 text-sm ${inputClassName}`}
                     rows={6}
                   />
+                  <p className="text-[10px] text-muted-foreground">
+                    La firma configurada en el sistema se agrega automáticamente al momento del envío.
+                  </p>
                 </div>
               </div>
             )}
@@ -1853,7 +1886,7 @@ export function CrmLeadsClient({
             <Button variant="outline" onClick={() => setRejectOpen(false)} disabled={rejecting}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={rejectLead} disabled={rejecting}>
+            <Button variant="destructive" onClick={rejectLead} disabled={rejecting || !canConfirmReject}>
               {rejecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirmar rechazo
             </Button>
@@ -1880,6 +1913,7 @@ export function CrmLeadsClient({
               {filteredLeads.map((lead) => {
                 const meta = lead.metadata as Record<string, unknown> | undefined;
                 const totalGuards = (meta?.totalGuards as number) || 0;
+                const rejectionInfo = getLeadRejectionInfo(lead.metadata);
                 return (
                   <div
                     key={lead.id}
@@ -1909,6 +1943,17 @@ export function CrmLeadsClient({
                       {lead.source && (
                         <span className="text-[10px] text-muted-foreground/80">
                           {lead.source === "web_cotizador" ? "Cotizador Web" : lead.source === "web_cotizador_inteligente" ? "Cotizador IA" : lead.source}
+                        </span>
+                      )}
+                      {lead.status === "rejected" && rejectionInfo && (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            rejectionInfo.emailSent
+                              ? "bg-blue-500/15 text-blue-400"
+                              : "bg-amber-500/15 text-amber-400"
+                          }`}
+                        >
+                          {rejectionInfo.emailSent ? "Correo enviado" : "Sin correo enviado"}
                         </span>
                       )}
                     </div>
@@ -1950,6 +1995,7 @@ export function CrmLeadsClient({
                 const meta = lead.metadata as Record<string, unknown> | undefined;
                 const dotacion = (meta?.dotacion as { puesto: string; cantidad: number; dias?: string[]; horaInicio?: string; horaFin?: string }[] | undefined);
                 const totalGuards = (meta?.totalGuards as number) || 0;
+                const rejectionInfo = getLeadRejectionInfo(lead.metadata);
 
                 return (
                   <div
@@ -1976,6 +2022,17 @@ export function CrmLeadsClient({
                           {totalGuards > 0 && (
                             <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
                               {totalGuards} guardia{totalGuards > 1 ? "s" : ""}
+                            </span>
+                          )}
+                          {lead.status === "rejected" && rejectionInfo && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                rejectionInfo.emailSent
+                                  ? "bg-blue-500/15 text-blue-400"
+                                  : "bg-amber-500/15 text-amber-400"
+                              }`}
+                            >
+                              {rejectionInfo.emailSent ? "Correo enviado" : "Sin correo enviado"}
                             </span>
                           )}
                         </div>

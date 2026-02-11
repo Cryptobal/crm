@@ -40,6 +40,47 @@ function buildRawEmail({
   return Buffer.from(raw).toString("base64url");
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function stripHtml(value: string): string {
+  return value
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function plainTextToHtml(value: string): string {
+  const lines = value.split(/\r?\n/);
+  return lines
+    .map((line) => {
+      const clean = escapeHtml(line.trim());
+      return clean ? `<p style="margin:0 0 8px;">${clean}</p>` : `<p style="margin:0 0 8px;">&nbsp;</p>`;
+    })
+    .join("");
+}
+
+function normalizeEmailBody(body: string): { html: string; text: string } {
+  const trimmed = body.trim();
+  const hasHtmlTags = /<\/?[a-z][\s\S]*>/i.test(trimmed);
+  if (hasHtmlTags) {
+    return {
+      html: trimmed,
+      text: stripHtml(trimmed),
+    };
+  }
+  return {
+    html: plainTextToHtml(trimmed),
+    text: trimmed,
+  };
+}
+
 type LeadMetadata = Record<string, unknown>;
 
 function parseLeadMetadata(value: unknown): LeadMetadata {
@@ -146,7 +187,8 @@ export async function POST(
         ? decryptText(emailAccount.refreshTokenEncrypted, tokenSecret)
         : undefined;
 
-      let finalHtml = finalBody;
+      const normalizedBody = normalizeEmailBody(finalBody);
+      let finalHtml = normalizedBody.html;
       let signatureId: string | null = null;
 
       const signature =
@@ -177,6 +219,7 @@ export async function POST(
         to: emailTo,
         subject: finalSubject,
         html: finalHtml,
+        text: normalizedBody.text,
       });
 
       const response = await gmail.users.messages.send({
@@ -205,7 +248,7 @@ export async function POST(
           bccEmails: [],
           subject: finalSubject,
           htmlBody: finalHtml,
-          textBody: null,
+          textBody: normalizedBody.text || null,
           sentAt: new Date(),
           createdBy: ctx.userId,
           status: "sent",
