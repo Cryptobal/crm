@@ -106,23 +106,30 @@ export async function POST(request: NextRequest) {
       data: { isActive: false, endDate: monthStart },
     });
 
-    await prisma.opsSerieAsignacion.create({
-      data: {
-        tenantId: ctx.tenantId,
-        puesto: { connect: { id: body.puestoId } },
-        slotNumber: body.slotNumber,
-        guardia: asignacion?.guardiaId
-          ? { connect: { id: asignacion.guardiaId } }
-          : undefined,
-        patternCode: body.patternCode,
-        patternWork: body.patternWork,
-        patternOff: body.patternOff,
-        startDate,
-        startPosition: body.startPosition,
-        isActive: true,
-        createdBy: ctx.userId,
-      },
-    });
+    // Use $executeRawUnsafe to bypass Prisma's checked create which conflicts
+    // when mixing required (puesto) and optional (guardia) connect syntax.
+    await prisma.$executeRaw`
+      INSERT INTO ops.serie_asignaciones
+        (id, tenant_id, puesto_id, slot_number, guardia_id, pattern_code,
+         pattern_work, pattern_off, start_date, start_position, is_active,
+         created_by, created_at, updated_at)
+      VALUES (
+        uuid_generate_v4(),
+        ${ctx.tenantId},
+        ${body.puestoId}::uuid,
+        ${body.slotNumber},
+        ${asignacion?.guardiaId ?? null}::uuid,
+        ${body.patternCode},
+        ${body.patternWork},
+        ${body.patternOff},
+        ${startDate},
+        ${body.startPosition},
+        true,
+        ${ctx.userId},
+        NOW(),
+        NOW()
+      )
+    `;
 
     // Determine plannedGuardiaId: only set if guard is assigned AND date >= assignment start
     const getPlannedGuardiaId = (entry: { date: Date; shiftCode: string }) => {
