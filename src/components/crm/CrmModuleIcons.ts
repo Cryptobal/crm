@@ -245,6 +245,7 @@ export const DETAIL_SECTION_ORDER: CrmSectionKey[] = [
  * Secciones visibles por módulo de detalle.
  */
 export const MODULE_DETAIL_SECTIONS: Record<string, CrmSectionKey[]> = {
+  leads: ["general", "account", "contacts", "deals", "installations", "files"],
   accounts: ["general", "contacts", "installations", "deals", "quotes", "communication", "notes"],
   contacts: ["general", "account", "deals", "communication", "notes"],
   deals: ["general", "account", "contacts", "installations", "quotes", "followup", "communication", "notes"],

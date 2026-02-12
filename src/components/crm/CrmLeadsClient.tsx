@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,161 +17,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { CrmLead } from "@/types";
-import { Plus, Loader2, AlertTriangle, Trash2, ChevronRight, UserPlus, Phone, Mail, MessageSquare, Clock, Users, Calendar, Briefcase, MapPin, X, Copy, ExternalLink, Mailbox, Sparkles } from "lucide-react";
+import { Plus, Loader2, Trash2, ChevronRight, UserPlus, Phone, Mail, MessageSquare, Clock, Users, Calendar, Briefcase } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { StatusBadge } from "@/components/opai/StatusBadge";
 import { EmptyState } from "@/components/opai/EmptyState";
 import { CrmDates } from "@/components/crm/CrmDates";
 import { CrmToolbar } from "./CrmToolbar";
 import type { ViewMode } from "./ViewToggle";
-import { AddressAutocomplete, type AddressResult } from "@/components/ui/AddressAutocomplete";
 import { toast } from "sonner";
-import { formatNumber, parseLocalizedNumber } from "@/lib/utils";
-import { resolveDocument, tiptapToPlainText } from "@/lib/docs/token-resolver";
-import { FileAttachments } from "./FileAttachments";
-
-/* ─── Dotación & Installation draft types ─── */
-
-type DotacionItem = {
-  puestoTrabajoId?: string;
-  puesto: string;
-  customName?: string;
-  cargoId?: string;
-  rolId?: string;
-  baseSalary?: number;
-  shiftType?: "day" | "night";
-  cantidad: number;
-  horaInicio: string;
-  horaFin: string;
-  dias: string[];
-};
-
-type InstallationDraft = {
-  _key: string; // client-side key
-  name: string;
-  address: string;
-  city: string;
-  commune: string;
-  lat?: number;
-  lng?: number;
-  dotacion: DotacionItem[];
-};
-
-const WEEKDAYS = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
-const WEEKDAYS_SHORT: Record<string, string> = {
-  lunes: "Lu", martes: "Ma", miercoles: "Mi", jueves: "Ju", viernes: "Vi", sabado: "Sa", domingo: "Do",
-};
-
-/** Grupos de costos para preselección en modal de aprobación (alineado con CpqCatalogConfig) */
-const COST_GROUPS_DIRECTOS = [
-  { id: "uniform", label: "Uniformes" },
-  { id: "exam", label: "Exámenes" },
-  { id: "meal", label: "Alimentación" },
-] as const;
-const COST_GROUPS_INDIRECTOS = [
-  { id: "equipment", label: "Equipos operativos" },
-  { id: "transport", label: "Costos de transporte" },
-  { id: "vehicle", label: "Vehículos" },
-  { id: "infrastructure", label: "Infraestructura" },
-  { id: "system", label: "Sistemas" },
-] as const;
-const DAY_START_OPTIONS = ["07:00", "07:30", "08:00", "08:30", "09:00", "09:30"] as const;
-
-type CpqCatalogOption = { id: string; name: string };
-
-function normalizeCatalogLabel(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-/** Normaliza días que vienen del lead (ej. "Lunes", "Miércoles") al formato interno (minúsculas, sin tilde). */
-function normalizeLeadDias(dias: string[] | undefined): string[] {
-  if (!dias || dias.length === 0) return [...WEEKDAYS];
-  const map: Record<string, string> = {
-    lunes: "lunes", Lunes: "lunes", LUNES: "lunes",
-    martes: "martes", Martes: "martes", MARTES: "martes",
-    miercoles: "miercoles", Miercoles: "miercoles", "Miércoles": "miercoles", MIERCOLES: "miercoles",
-    jueves: "jueves", Jueves: "jueves", JUEVES: "jueves",
-    viernes: "viernes", Viernes: "viernes", VIERNES: "viernes",
-    sabado: "sabado", Sabado: "sabado", "Sábado": "sabado", SABADO: "sabado",
-    domingo: "domingo", Domingo: "domingo", DOMINGO: "domingo",
-  };
-  const normalized = dias
-    .map((d) => (d != null && typeof d === "string" ? map[d.trim()] : undefined))
-    .filter((x): x is string => Boolean(x));
-  const unique = [...new Set(normalized)];
-  return unique.length > 0 ? unique : [...WEEKDAYS];
-}
-
-function toMinutes(value: string): number | null {
-  const [h, m] = value.split(":").map(Number);
-  if (Number.isNaN(h) || Number.isNaN(m)) return null;
-  return h * 60 + m;
-}
-
-function minutesToTime(total: number): string {
-  const normalized = ((total % 1440) + 1440) % 1440;
-  const h = Math.floor(normalized / 60);
-  const m = normalized % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-function normalizeTimeToHHmm(value: unknown, fallback = "08:00"): string {
-  if (typeof value !== "string" || !value.trim()) return fallback;
-  const raw = value.trim().toLowerCase();
-  const match = raw.match(/^(\d{1,2}):(\d{2})(?:\s*(a\.?\s*m\.?|p\.?\s*m\.?))?$/i);
-  if (!match) return fallback;
-  let hour = Number(match[1]);
-  const minute = Number(match[2]);
-  const suffix = match[3]?.toLowerCase().replace(/\s|\./g, "") || "";
-  if (Number.isNaN(hour) || Number.isNaN(minute) || minute < 0 || minute > 59) return fallback;
-  if (suffix === "pm" && hour < 12) hour += 12;
-  if (suffix === "am" && hour === 12) hour = 0;
-  if (hour < 0 || hour > 23) return fallback;
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-}
-
-function inferShiftType(horaInicio: string, horaFin: string): "day" | "night" {
-  const start = normalizeTimeToHHmm(horaInicio, "08:00");
-  const end = normalizeTimeToHHmm(horaFin, "20:00");
-  if (start === "20:00" && end === "08:00") return "night";
-  const startMin = toMinutes(start);
-  const endMin = toMinutes(end);
-  if (startMin == null || endMin == null) return "day";
-  if (endMin <= startMin) return "night";
-  return "day";
-}
-
-let _installationCounter = 0;
-function newInstallationKey() { return `inst_${++_installationCounter}_${Date.now()}`; }
-
-function createEmptyInstallation(name = "", address = "", city = "", commune = ""): InstallationDraft {
-  return { _key: newInstallationKey(), name, address, city, commune, dotacion: [] };
-}
-
-function createEmptyDotacion(
-  defaultCargoId = "",
-  defaultRolId = "",
-  defaultPuestoTrabajoId = "",
-  defaultPuestoName = "Control de Acceso"
-): DotacionItem {
-  return {
-    puestoTrabajoId: defaultPuestoTrabajoId,
-    puesto: defaultPuestoName,
-    customName: "",
-    cargoId: defaultCargoId,
-    rolId: defaultRolId,
-    baseSalary: 550000,
-    shiftType: "day",
-    cantidad: 1,
-    horaInicio: "08:00",
-    horaFin: "20:00",
-    dias: [...WEEKDAYS],
-  };
-}
 
 /* ─── Form types ─── */
 
@@ -183,58 +37,6 @@ type LeadFormState = {
   source: string;
 };
 
-// Dominios genéricos que NO deben usarse como página web de la empresa
-const GENERIC_EMAIL_DOMAINS = new Set([
-  "gmail.com", "googlemail.com", "hotmail.com", "outlook.com", "outlook.es",
-  "yahoo.com", "yahoo.es", "live.com", "live.cl", "msn.com",
-  "icloud.com", "me.com", "mac.com", "protonmail.com", "proton.me",
-  "mail.com", "aol.com", "zoho.com", "yandex.com", "tutanota.com",
-]);
-
-/** Extrae dominio del email y retorna URL si no es genérico */
-function extractWebsiteFromEmail(email: string): string {
-  if (!email) return "";
-  const domain = email.split("@")[1]?.toLowerCase();
-  if (!domain || GENERIC_EMAIL_DOMAINS.has(domain)) return "";
-  return `https://${domain}`;
-}
-
-/** Normaliza teléfono para tel: (solo dígitos) */
-function telHref(phone: string | null | undefined): string {
-  if (!phone) return "";
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length === 0) return "";
-  return `tel:${digits.length <= 9 ? "+56" + digits : "+" + digits}`;
-}
-
-/** URL WhatsApp Chile: +56 9 XXXXXXXX */
-function whatsappHref(phone: string | null | undefined): string {
-  if (!phone) return "";
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length === 0) return "";
-  const withCountry = digits.length === 9 && digits.startsWith("9") ? "56" + digits : digits.length >= 10 ? digits : "56" + digits;
-  return `https://wa.me/${withCountry}`;
-}
-
-type ApproveFormState = {
-  accountName: string;
-  legalName: string;
-  legalRepresentativeName: string;
-  legalRepresentativeRut: string;
-  contactFirstName: string;
-  contactLastName: string;
-  email: string;
-  phone: string;
-  dealTitle: string;
-  rut: string;
-  industry: string;
-  segment: string;
-  roleTitle: string;
-  website: string;
-  companyInfo: string;
-  notes: string;
-};
-
 const DEFAULT_FORM: LeadFormState = {
   companyName: "",
   firstName: "",
@@ -243,11 +45,6 @@ const DEFAULT_FORM: LeadFormState = {
   phone: "",
   source: "",
 };
-
-type DuplicateAccount = { id: string; name: string; rut?: string | null; type?: string };
-type ExistingContact = { id: string; firstName: string | null; lastName: string | null; email: string | null };
-type InstallationConflict = { name: string; id: string };
-type DocTemplateForReject = { id: string; name: string; content: unknown; module: string };
 
 type LeadStatusFilter = "all" | "pending" | "in_review" | "approved" | "rejected";
 type LeadRejectReason =
@@ -280,31 +77,21 @@ function getLeadRejectReasonFromMetadata(metadata: unknown): LeadRejectReason | 
   if (!rejection || typeof rejection !== "object" || Array.isArray(rejection)) return null;
   const reason = (rejection as Record<string, unknown>).reason;
   if (typeof reason !== "string") return null;
-  const validReasons = new Set<LeadRejectReason>([
-    "spot_service",
-    "out_of_scope",
-    "no_budget",
-    "duplicate",
-    "no_response",
-    "other",
-  ]);
+  const validReasons = new Set<LeadRejectReason>(["spot_service", "out_of_scope", "no_budget", "duplicate", "no_response", "other"]);
   return validReasons.has(reason as LeadRejectReason) ? (reason as LeadRejectReason) : null;
 }
 
 function getLeadRejectionInfo(metadata: unknown): {
   emailSent: boolean;
-  emailProviderMessageId: string | null;
   note: string | null;
 } | null {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
   const rejection = (metadata as Record<string, unknown>).rejection;
   if (!rejection || typeof rejection !== "object" || Array.isArray(rejection)) return null;
   const emailSent = Boolean((rejection as Record<string, unknown>).emailSent);
-  const messageId = (rejection as Record<string, unknown>).emailProviderMessageId;
   const note = (rejection as Record<string, unknown>).note;
   return {
     emailSent,
-    emailProviderMessageId: typeof messageId === "string" && messageId.trim() ? messageId : null,
     note: typeof note === "string" && note.trim() ? note.trim() : null,
   };
 }
@@ -316,6 +103,25 @@ function getLeadFilterLabel(filter: LeadStatusFilter): string | null {
   if (filter === "rejected") return "Mostrando leads rechazados";
   return null;
 }
+
+/** Normaliza teléfono para tel: (solo dígitos) */
+function telHref(phone: string | null | undefined): string {
+  if (!phone) return "";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 0) return "";
+  return `tel:${digits.length <= 9 ? "+56" + digits : "+" + digits}`;
+}
+
+/** URL WhatsApp Chile */
+function whatsappHref(phone: string | null | undefined): string {
+  if (!phone) return "";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 0) return "";
+  const withCountry = digits.length === 9 && digits.startsWith("9") ? "56" + digits : digits.length >= 10 ? digits : "56" + digits;
+  return `https://wa.me/${withCountry}`;
+}
+
+/* ─── Component ─── */
 
 export function CrmLeadsClient({
   initialLeads,
@@ -332,151 +138,10 @@ export function CrmLeadsClient({
   const [statusFilter, setStatusFilter] = useState<LeadStatusFilter>(initialStatusFilter);
   const [sort, setSort] = useState("newest");
   const [view, setView] = useState<ViewMode>("cards");
-
-  // Approve modal state
-  const [approveOpen, setApproveOpen] = useState(false);
-  const [approveLeadId, setApproveLeadId] = useState<string | null>(null);
-  const [approving, setApproving] = useState(false);
-  const [savingLead, setSavingLead] = useState(false);
-  const [duplicates, setDuplicates] = useState<DuplicateAccount[]>([]);
-  const [existingContact, setExistingContact] = useState<ExistingContact | null>(null);
-  const [installationConflicts, setInstallationConflicts] = useState<InstallationConflict[]>([]);
-  const [duplicateChecked, setDuplicateChecked] = useState(false);
-  const [useExistingAccountId, setUseExistingAccountId] = useState<string | null>(null);
-  const [contactResolution, setContactResolution] = useState<"create" | "overwrite" | "use_existing">("create");
-  const [installationUseExisting, setInstallationUseExisting] = useState<Record<string, string>>({}); // instKey -> installation id to use
-  const [approveForm, setApproveForm] = useState<ApproveFormState>({
-    accountName: "",
-    legalName: "",
-    legalRepresentativeName: "",
-    legalRepresentativeRut: "",
-    contactFirstName: "",
-    contactLastName: "",
-    email: "",
-    phone: "",
-    dealTitle: "",
-    rut: "",
-    industry: "",
-    segment: "",
-    roleTitle: "",
-    website: "",
-    companyInfo: "",
-    notes: "",
-  });
-  const [selectedCostGroups, setSelectedCostGroups] = useState<string[]>([]);
-  const [inferringCosts, setInferringCosts] = useState(false);
-  const [installations, setInstallations] = useState<InstallationDraft[]>([]);
-
-  const [industries, setIndustries] = useState<{ id: string; name: string }[]>([]);
-  const [docTemplatesReject, setDocTemplatesReject] = useState<DocTemplateForReject[]>([]);
-  const [cpqPuestos, setCpqPuestos] = useState<CpqCatalogOption[]>([]);
-  const [cpqCargos, setCpqCargos] = useState<CpqCatalogOption[]>([]);
-  const [cpqRoles, setCpqRoles] = useState<CpqCatalogOption[]>([]);
-
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [rejectLeadId, setRejectLeadId] = useState<string | null>(null);
-  const [rejectLeadData, setRejectLeadData] = useState<CrmLead | null>(null);
-  const [rejecting, setRejecting] = useState(false);
-  const [rejectReason, setRejectReason] = useState<LeadRejectReason>("other");
-  const [rejectNote, setRejectNote] = useState("");
-  const [rejectSendEmail, setRejectSendEmail] = useState(false);
-  const [rejectTemplateId, setRejectTemplateId] = useState<string>("");
-  const [rejectEmailSubject, setRejectEmailSubject] = useState("");
-  const [rejectEmailBody, setRejectEmailBody] = useState("");
   const [rejectReasonFilter, setRejectReasonFilter] = useState<LeadRejectReasonFilter>("all");
-  const [enrichingCompanyInfo, setEnrichingCompanyInfo] = useState(false);
-  const [detectedCompanyLogoUrl, setDetectedCompanyLogoUrl] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string }>({ open: false, id: "" });
 
-  useEffect(() => {
-    fetch("/api/crm/industries?active=true")
-      .then((r) => r.json())
-      .then((res) => res.success && setIndustries(res.data || []))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/docs/templates?active=true")
-      .then((r) => r.json())
-      .then((res) => {
-        if (res?.success) {
-          const all = (res.data || []) as DocTemplateForReject[];
-          const forReject = all.filter((t) => t.module === "crm" || t.module === "mail");
-          setDocTemplatesReject(forReject);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/cpq/puestos?active=true").then((r) => r.json()),
-      fetch("/api/cpq/cargos?active=true").then((r) => r.json()),
-      fetch("/api/cpq/roles?active=true").then((r) => r.json()),
-    ])
-      .then(([puestosRes, cargosRes, rolesRes]) => {
-        if (puestosRes?.success) setCpqPuestos(puestosRes.data || []);
-        if (cargosRes?.success) setCpqCargos(cargosRes.data || []);
-        if (rolesRes?.success) setCpqRoles(rolesRes.data || []);
-      })
-      .catch(() => {});
-  }, []);
-
-  const defaultPuesto = useMemo(() => {
-    const byControlAcceso = cpqPuestos.find((p) => {
-      const normalized = normalizeCatalogLabel(p.name);
-      return normalized.includes("control") && normalized.includes("acceso");
-    });
-    const byAcceso = cpqPuestos.find((p) =>
-      normalizeCatalogLabel(p.name).includes("acceso")
-    );
-    const selected = byControlAcceso || byAcceso || cpqPuestos[0];
-    return selected
-      ? { id: selected.id, name: selected.name }
-      : { id: "", name: "Control de Acceso" };
-  }, [cpqPuestos]);
-
-  const defaultCargoId = useMemo(() => {
-    const byGuardiaExact = cpqCargos.find(
-      (c) => normalizeCatalogLabel(c.name) === "guardia"
-    );
-    const byGuardiaContains = cpqCargos.find((c) =>
-      normalizeCatalogLabel(c.name).includes("guardia")
-    );
-    return byGuardiaExact?.id || byGuardiaContains?.id || cpqCargos[0]?.id || "";
-  }, [cpqCargos]);
-
-  const defaultRolId = useMemo(() => {
-    const by4x4 = cpqRoles.find(
-      (r) => normalizeCatalogLabel(r.name).replace(/\s+/g, "") === "4x4"
-    );
-    return by4x4?.id || cpqRoles[0]?.id || "";
-  }, [cpqRoles]);
-
-  const inputClassName =
-    "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
-  const selectClassName =
-    "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
-  const selectCompactClassName =
-    "flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
-
-  useEffect(() => {
-    if (!approveOpen) return;
-    if (!defaultPuesto.id && !defaultCargoId && !defaultRolId) return;
-    setInstallations((prev) =>
-      prev.map((inst) => ({
-        ...inst,
-        dotacion: inst.dotacion.map((dot) => ({
-          ...dot,
-          puestoTrabajoId: dot.puestoTrabajoId || defaultPuesto.id,
-          puesto: dot.puesto || defaultPuesto.name,
-          cargoId: dot.cargoId || defaultCargoId,
-          rolId: dot.rolId || defaultRolId,
-          baseSalary: dot.baseSalary || 550000,
-          shiftType: dot.shiftType || inferShiftType(dot.horaInicio, dot.horaFin),
-        })),
-      }))
-    );
-  }, [approveOpen, defaultPuesto.id, defaultPuesto.name, defaultCargoId, defaultRolId]);
+  const inputClassName = "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
 
   const counts = useMemo(() => ({
     total: leads.filter((l) => l.status !== "approved").length,
@@ -486,15 +151,9 @@ export function CrmLeadsClient({
     rejected: leads.filter((l) => l.status === "rejected").length,
   }), [leads]);
 
-  const approvingLead = useMemo(
-    () => (approveLeadId ? leads.find((l) => l.id === approveLeadId) ?? null : null),
-    [approveLeadId, leads]
-  );
-
   const filteredLeads = useMemo(() => {
     const q = search.trim().toLowerCase();
     let result = leads.filter((lead) => {
-      // "all" muestra solo pendientes + rechazados (aprobados ya son cuentas)
       if (statusFilter === "all" && lead.status === "approved") return false;
       if (statusFilter !== "all" && lead.status !== statusFilter) return false;
       if (q) {
@@ -505,22 +164,16 @@ export function CrmLeadsClient({
     });
 
     if (statusFilter === "rejected" && rejectReasonFilter !== "all") {
-      result = result.filter(
-        (lead) => getLeadRejectReasonFromMetadata(lead.metadata) === rejectReasonFilter
-      );
+      result = result.filter((lead) => getLeadRejectReasonFromMetadata(lead.metadata) === rejectReasonFilter);
     }
 
     result = [...result].sort((a, b) => {
       switch (sort) {
-        case "oldest":
-          return (a.createdAt || "").localeCompare(b.createdAt || "");
-        case "az":
-          return (a.companyName || "").localeCompare(b.companyName || "");
-        case "za":
-          return (b.companyName || "").localeCompare(a.companyName || "");
+        case "oldest": return (a.createdAt || "").localeCompare(b.createdAt || "");
+        case "az": return (a.companyName || "").localeCompare(b.companyName || "");
+        case "za": return (b.companyName || "").localeCompare(a.companyName || "");
         case "newest":
-        default:
-          return (b.createdAt || "").localeCompare(a.createdAt || "");
+        default: return (b.createdAt || "").localeCompare(a.createdAt || "");
       }
     });
 
@@ -529,90 +182,6 @@ export function CrmLeadsClient({
 
   const updateForm = (key: keyof LeadFormState, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const updateApproveForm = (key: keyof ApproveFormState, value: string) => {
-    setApproveForm((prev) => ({ ...prev, [key]: value }));
-    if (key === "accountName") {
-      setDuplicateChecked(false);
-      setDuplicates([]);
-      setExistingContact(null);
-      setUseExistingAccountId(null);
-      setInstallationConflicts([]);
-      setInstallationUseExisting({});
-    }
-  };
-
-  const shouldReplaceEnriched = (currentValue: string): boolean => {
-    const normalized = currentValue.trim().toLowerCase();
-    return !normalized || normalized === "not available" || normalized === "n/a" || normalized === "no disponible";
-  };
-
-  const enrichCompanyInfoFromWebsite = async () => {
-    const website = approveForm.website.trim();
-    if (!website) {
-      toast.error("Primero ingresa la página web de la empresa.");
-      return;
-    }
-    setEnrichingCompanyInfo(true);
-    try {
-      const response = await fetch("/api/crm/company-enrich", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          website,
-          companyName: approveForm.accountName,
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload?.success) {
-        throw new Error(payload?.error || "No se pudo obtener información del sitio.");
-      }
-      const summary = payload?.data?.summary || "";
-      const normalizedWebsite = payload?.data?.websiteNormalized || "";
-      const companyNameDetected = payload?.data?.companyNameDetected || "";
-      const logoUrl = payload?.data?.localLogoUrl || payload?.data?.logoUrl || null;
-      const industry = payload?.data?.industry || "";
-      const segment = payload?.data?.segment || "";
-      const legalName = payload?.data?.legalName || "";
-      const companyRut = payload?.data?.companyRut || "";
-      const legalRepresentativeName = payload?.data?.legalRepresentativeName || "";
-      const legalRepresentativeRut = payload?.data?.legalRepresentativeRut || "";
-      if (normalizedWebsite) updateApproveForm("website", normalizedWebsite);
-      if (summary) updateApproveForm("companyInfo", summary);
-      setApproveForm((prev) => ({
-        ...prev,
-        accountName:
-          companyNameDetected &&
-          !["not available", "n/a", "no disponible"].includes(companyNameDetected.trim().toLowerCase())
-            ? companyNameDetected
-            : prev.accountName,
-        dealTitle:
-          companyNameDetected &&
-          (prev.dealTitle.trim() === "" || prev.dealTitle.trim().startsWith("Oportunidad "))
-            ? `Oportunidad ${companyNameDetected}`.trim()
-            : prev.dealTitle,
-        industry: shouldReplaceEnriched(prev.industry) && industry ? industry : prev.industry,
-        segment: shouldReplaceEnriched(prev.segment) && segment ? segment : prev.segment,
-        legalName: shouldReplaceEnriched(prev.legalName) && legalName ? legalName : prev.legalName,
-        rut: shouldReplaceEnriched(prev.rut) && companyRut ? companyRut : prev.rut,
-        legalRepresentativeName:
-          shouldReplaceEnriched(prev.legalRepresentativeName) && legalRepresentativeName
-            ? legalRepresentativeName
-            : prev.legalRepresentativeName,
-        legalRepresentativeRut:
-          shouldReplaceEnriched(prev.legalRepresentativeRut) && legalRepresentativeRut
-            ? legalRepresentativeRut
-            : prev.legalRepresentativeRut,
-      }));
-      setDetectedCompanyLogoUrl(logoUrl);
-      toast.success("Información de la empresa completada desde la web.");
-    } catch (error) {
-      console.error(error);
-      toast.error("No se pudo traer datos de la empresa.");
-    } finally {
-      setEnrichingCompanyInfo(false);
-    }
   };
 
   const createLead = async () => {
@@ -624,9 +193,7 @@ export function CrmLeadsClient({
         body: JSON.stringify(form),
       });
       const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload?.error || "Error creando prospecto");
-      }
+      if (!response.ok) throw new Error(payload?.error || "Error creando prospecto");
       setLeads((prev) => [payload.data, ...prev]);
       setForm(DEFAULT_FORM);
       setOpen(false);
@@ -639,464 +206,10 @@ export function CrmLeadsClient({
     }
   };
 
-  const openApproveModal = (lead: CrmLead) => {
-    setApproveLeadId(lead.id);
-    setDuplicates([]);
-    setExistingContact(null);
-    setInstallationConflicts([]);
-    setDuplicateChecked(false);
-    setUseExistingAccountId(null);
-    setContactResolution("create");
-    setInstallationUseExisting({});
-    const fullName = [lead.firstName, lead.lastName].filter(Boolean).join(" ");
-    const meta = lead.metadata as Record<string, unknown> | undefined;
-    const companyEnrichment =
-      meta?.companyEnrichment && typeof meta.companyEnrichment === "object" && !Array.isArray(meta.companyEnrichment)
-        ? (meta.companyEnrichment as Record<string, unknown>)
-        : null;
-    const emailExtracted =
-      meta?.extracted && typeof meta.extracted === "object" && !Array.isArray(meta.extracted)
-        ? (meta.extracted as Record<string, unknown>)
-        : null;
-    const leadDotacion = (meta?.dotacion as DotacionItem[] | undefined) || [];
-
-    const str = (source: Record<string, unknown> | null, key: string): string =>
-      source && typeof source[key] === "string" ? (source[key] as string) : "";
-
-    // Restore draft fields if lead was previously saved in review
-    const draft =
-      meta?.approveFormDraft && typeof meta.approveFormDraft === "object" && !Array.isArray(meta.approveFormDraft)
-        ? (meta.approveFormDraft as Record<string, unknown>)
-        : null;
-
-    setApproveForm({
-      accountName: lead.companyName || "",
-      legalName: str(draft, "legalName") || str(companyEnrichment, "legalName") || str(emailExtracted, "legalName") || "",
-      legalRepresentativeName:
-        str(draft, "legalRepresentativeName") || str(companyEnrichment, "legalRepresentativeName") || str(emailExtracted, "legalRepresentativeName") || "",
-      legalRepresentativeRut:
-        str(draft, "legalRepresentativeRut") || str(companyEnrichment, "legalRepresentativeRut") || "",
-      contactFirstName: lead.firstName || "",
-      contactLastName: lead.lastName || "",
-      email: lead.email || "",
-      phone: lead.phone || "",
-      dealTitle: str(draft, "dealTitle") || `Oportunidad ${lead.companyName || fullName || ""}`.trim(),
-      rut:
-        str(draft, "rut") || str(companyEnrichment, "accountRut") || str(emailExtracted, "rut") || "",
-      industry:
-        str(draft, "industry") || str(companyEnrichment, "industry") ||
-        lead.industry ||
-        "",
-      segment:
-        str(draft, "segment") || str(companyEnrichment, "segment") || "",
-      roleTitle: str(draft, "roleTitle") || str(emailExtracted, "contactRole") || "",
-      website: (lead as any).website || extractWebsiteFromEmail(lead.email || ""),
-      companyInfo: str(draft, "companyInfo") || "",
-      notes: lead.notes || "",
-    });
-    const draftCostGroups = draft?.selectedCostGroups;
-    const restoredCostGroups =
-      Array.isArray(draftCostGroups) && draftCostGroups.every((x) => typeof x === "string")
-        ? (draftCostGroups as string[])
-        : [];
-    setSelectedCostGroups(restoredCostGroups);
-    setDetectedCompanyLogoUrl(null);
-
-    // Pre-crear una instalación con la dirección, coordenadas y dotación del lead
-    const leadLat = meta?.lat as number | undefined;
-    const leadLng = meta?.lng as number | undefined;
-    const firstInst = createEmptyInstallation(
-      lead.companyName || "",
-      (lead as any).address || "",
-      (lead as any).city || "",
-      (lead as any).commune || "",
-    );
-    if (leadLat != null) firstInst.lat = leadLat;
-    if (leadLng != null) firstInst.lng = leadLng;
-    const hasUsefulSchedule = (d: DotacionItem): boolean => {
-      const start = normalizeTimeToHHmm(d.horaInicio, "");
-      const end = normalizeTimeToHHmm(d.horaFin, "");
-      if (!start || !end) return false;
-      if (start === "00:00" && end === "00:00") return false;
-      return true;
-    };
-    firstInst.dotacion = leadDotacion.map((d) => {
-      const useLeadSchedule = hasUsefulSchedule(d);
-      const shiftType = useLeadSchedule ? inferShiftType(d.horaInicio || "08:00", d.horaFin || "20:00") : "day";
-      return {
-        puestoTrabajoId: defaultPuesto.id,
-        puesto: defaultPuesto.name,
-        customName:
-          typeof d.customName === "string" && d.customName.trim().length > 0
-            ? d.customName
-            : defaultPuesto.name,
-        cargoId: defaultCargoId,
-        rolId: defaultRolId,
-        baseSalary: typeof d.baseSalary === "number" && d.baseSalary > 0 ? d.baseSalary : 550000,
-        shiftType,
-        cantidad: d.cantidad || 1,
-        horaInicio: useLeadSchedule ? normalizeTimeToHHmm(d.horaInicio, "08:00") : "08:00",
-        horaFin: useLeadSchedule ? normalizeTimeToHHmm(d.horaFin, "20:00") : "20:00",
-        dias: useLeadSchedule ? normalizeLeadDias(d.dias) : [...WEEKDAYS],
-      };
-    });
-    setInstallations([firstInst]);
-    setApproveOpen(true);
-  };
-
-  // Helpers para editar instalaciones
-  const updateInstallation = (key: string, field: keyof InstallationDraft, value: unknown) => {
-    setInstallations((prev) => prev.map((inst) => inst._key === key ? { ...inst, [field]: value } : inst));
-  };
-  const removeInstallation = (key: string) => {
-    setInstallations((prev) => prev.filter((inst) => inst._key !== key));
-  };
-  const addInstallation = () => {
-    setInstallations((prev) => [...prev, createEmptyInstallation()]);
-  };
-  const handleAddressChange = (key: string, result: AddressResult) => {
-    setInstallations((prev) => prev.map((inst) => inst._key === key ? { ...inst, address: result.address, city: result.city, commune: result.commune, lat: result.lat, lng: result.lng } : inst));
-  };
-
-  // Dotación helpers
-  const addDotacionToInst = (instKey: string) => {
-    setInstallations((prev) =>
-      prev.map((inst) =>
-        inst._key === instKey
-          ? {
-              ...inst,
-              dotacion: [
-                ...inst.dotacion,
-                createEmptyDotacion(
-                  defaultCargoId,
-                  defaultRolId,
-                  defaultPuesto.id,
-                  defaultPuesto.name
-                ),
-              ],
-            }
-          : inst
-      )
-    );
-  };
-  const updateDotacionField = (instKey: string, dotIdx: number, field: keyof DotacionItem, value: unknown) => {
-    setInstallations((prev) => prev.map((inst) => {
-      if (inst._key !== instKey) return inst;
-      const newDot = [...inst.dotacion];
-      newDot[dotIdx] = { ...newDot[dotIdx], [field]: value };
-      return { ...inst, dotacion: newDot };
-    }));
-  };
-  const removeDotacionFromInst = (instKey: string, dotIdx: number) => {
-    setInstallations((prev) => prev.map((inst) => {
-      if (inst._key !== instKey) return inst;
-      return { ...inst, dotacion: inst.dotacion.filter((_, i) => i !== dotIdx) };
-    }));
-  };
-  const cloneDotacionInInst = (instKey: string, dotIdx: number) => {
-    setInstallations((prev) =>
-      prev.map((inst) => {
-        if (inst._key !== instKey) return inst;
-        const original = inst.dotacion[dotIdx];
-        if (!original) return inst;
-        const clone: DotacionItem = { ...original, dias: [...original.dias], cantidad: original.cantidad || 1 };
-        const nextDotacion = [...inst.dotacion];
-        nextDotacion.splice(dotIdx + 1, 0, clone);
-        return { ...inst, dotacion: nextDotacion };
-      })
-    );
-  };
-  const setDotacionShift = (instKey: string, dotIdx: number, shiftType: "day" | "night") => {
-    setInstallations((prev) =>
-      prev.map((inst) => {
-        if (inst._key !== instKey) return inst;
-        const nextDot = [...inst.dotacion];
-        const current = nextDot[dotIdx];
-        if (!current) return inst;
-        nextDot[dotIdx] =
-          shiftType === "night"
-            ? { ...current, shiftType, horaInicio: "20:00", horaFin: "08:00" }
-            : {
-                ...current,
-                shiftType,
-                horaInicio: DAY_START_OPTIONS.includes(current.horaInicio as (typeof DAY_START_OPTIONS)[number])
-                  ? current.horaInicio
-                  : "08:00",
-                horaFin: "20:00",
-              };
-        return { ...inst, dotacion: nextDot };
-      })
-    );
-  };
-  const setDotacionDayStart = (instKey: string, dotIdx: number, startTime: string) => {
-    setInstallations((prev) =>
-      prev.map((inst) => {
-        if (inst._key !== instKey) return inst;
-        const nextDot = [...inst.dotacion];
-        const current = nextDot[dotIdx];
-        if (!current) return inst;
-        const normalizedStart = normalizeTimeToHHmm(startTime, "08:00");
-        nextDot[dotIdx] = {
-          ...current,
-          shiftType: "day",
-          horaInicio: normalizedStart,
-          horaFin: minutesToTime((toMinutes(normalizedStart) ?? 480) + 12 * 60),
-        };
-        return { ...inst, dotacion: nextDot };
-      })
-    );
-  };
-  const toggleDotacionDay = (instKey: string, dotIdx: number, day: string) => {
-    setInstallations((prev) => prev.map((inst) => {
-      if (inst._key !== instKey) return inst;
-      const newDot = [...inst.dotacion];
-      const d = newDot[dotIdx];
-      newDot[dotIdx] = { ...d, dias: d.dias.includes(day) ? d.dias.filter((x) => x !== day) : [...d.dias, day] };
-      return { ...inst, dotacion: newDot };
-    }));
-  };
-
-  const installationNamesKey = useMemo(
-    () => installations.map((i) => i.name).join("|"),
-    [installations]
-  );
-
-  // Al elegir "usar cuenta existente", cargar conflictos de instalaciones para esa cuenta
-  useEffect(() => {
-    if (!approveOpen || !approveLeadId || !useExistingAccountId) {
-      setInstallationConflicts([]);
-      return;
-    }
-    const instPayload = installations
-      .filter((i) => i.name.trim())
-      .map(({ _key, ...r }) => r);
-    if (instPayload.length === 0) return;
-    fetch(`/api/crm/leads/${approveLeadId}/approve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...approveForm,
-        checkDuplicates: true,
-        useExistingAccountId,
-        installations: instPayload,
-      }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.installationConflicts && data.installationConflicts.length > 0) {
-          setInstallationConflicts(data.installationConflicts);
-        } else {
-          setInstallationConflicts([]);
-        }
-      })
-      .catch(() => setInstallationConflicts([]));
-  }, [approveOpen, approveLeadId, useExistingAccountId, approveForm.accountName, installationNamesKey]);
-
-  // ── Guardar cambios del lead sin aprobar (estado → in_review) ──
-  const saveLeadDraft = async () => {
-    if (!approveLeadId) return;
-    setSavingLead(true);
-    try {
-      const payload: Record<string, unknown> = {
-        companyName: approveForm.accountName.trim() || null,
-        firstName: approveForm.contactFirstName.trim() || null,
-        lastName: approveForm.contactLastName.trim() || null,
-        email: approveForm.email.trim() || null,
-        phone: approveForm.phone.trim() || null,
-        notes: approveForm.notes.trim() || null,
-        industry: approveForm.industry.trim() || null,
-        website: approveForm.website.trim() || null,
-        status: "in_review",
-        metadata: {
-          ...(approvingLead?.metadata && typeof approvingLead.metadata === "object" ? approvingLead.metadata : {}),
-          approveFormDraft: {
-            rut: approveForm.rut,
-            legalName: approveForm.legalName,
-            legalRepresentativeName: approveForm.legalRepresentativeName,
-            legalRepresentativeRut: approveForm.legalRepresentativeRut,
-            segment: approveForm.segment,
-            roleTitle: approveForm.roleTitle,
-            dealTitle: approveForm.dealTitle,
-            companyInfo: approveForm.companyInfo,
-            selectedCostGroups,
-          },
-        },
-      };
-      const res = await fetch(`/api/crm/leads/${approveLeadId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || "Error al guardar");
-      setLeads((prev) =>
-        prev.map((l) => (l.id === approveLeadId ? { ...l, ...data.data } : l))
-      );
-      setApproveOpen(false);
-      toast.success("Lead guardado en revisión");
-    } catch (error) {
-      console.error(error);
-      toast.error(error instanceof Error ? error.message : "No se pudo guardar el lead");
-    } finally {
-      setSavingLead(false);
-    }
-  };
-
-  const approveLead = async () => {
-    if (!approveLeadId) return;
-    const accountNameToUse = useExistingAccountId ? "" : approveForm.accountName.trim();
-    if (!useExistingAccountId && !accountNameToUse) {
-      toast.error("El nombre de la empresa es obligatorio o elige una cuenta existente.");
-      return;
-    }
-
-    setApproving(true);
-    try {
-      const instPayload = installations
-        .filter((inst) => inst.name.trim())
-        .map((inst) => {
-          const { _key, ...rest } = inst;
-          const useExistingInstallationId = installationUseExisting[_key] || undefined;
-          return { ...rest, ...(useExistingInstallationId ? { useExistingInstallationId } : {}) };
-        });
-
-      const payload = {
-        ...approveForm,
-        accountNotes: approveForm.companyInfo || undefined,
-        accountLogoUrl: detectedCompanyLogoUrl || undefined,
-        legalName: approveForm.legalName || undefined,
-        legalRepresentativeName: approveForm.legalRepresentativeName || undefined,
-        legalRepresentativeRut: approveForm.legalRepresentativeRut || undefined,
-        useExistingAccountId: useExistingAccountId || undefined,
-        contactResolution: existingContact ? contactResolution : undefined,
-        contactId: (existingContact && (contactResolution === "overwrite" || contactResolution === "use_existing")) ? existingContact.id : undefined,
-        installations: instPayload,
-        selectedCostGroups,
-      };
-
-      if (!duplicateChecked) {
-        const checkRes = await fetch(`/api/crm/leads/${approveLeadId}/approve`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...payload, checkDuplicates: true }),
-        });
-        const checkData = await checkRes.json();
-        if (!checkData.success) {
-          setApproving(false);
-          return;
-        }
-        setDuplicates(checkData.duplicates || []);
-        const exContact = checkData.existingContact ?? null;
-        setExistingContact(exContact);
-        if (exContact) setContactResolution("overwrite");
-        const conflicts: InstallationConflict[] = checkData.installationConflicts || [];
-        setInstallationConflicts(conflicts);
-        setInstallationUseExisting((prev) => {
-          const next = { ...prev };
-          for (const conf of conflicts) {
-            for (const inst of installations) {
-              if (inst.name.trim().toLowerCase() === conf.name.toLowerCase()) {
-                next[inst._key] = conf.id;
-              }
-            }
-          }
-          return next;
-        });
-        setDuplicateChecked(true);
-        const hasAccountOrContactConflict = (checkData.duplicates?.length > 0) || checkData.existingContact;
-        const hasInstallationConflictOnly = conflicts.length > 0 && !hasAccountOrContactConflict;
-        if (hasAccountOrContactConflict) {
-          setApproving(false);
-          return;
-        }
-        if (hasInstallationConflictOnly) {
-          const resolvedInstPayload = installations
-            .filter((inst) => inst.name.trim())
-            .map((inst) => {
-              const conf = conflicts.find((c) => c.name.toLowerCase() === inst.name.trim().toLowerCase());
-              const useExistingInstallationId = conf ? conf.id : (installationUseExisting[inst._key] || undefined);
-              const { _key, ...rest } = inst;
-              return { ...rest, ...(useExistingInstallationId ? { useExistingInstallationId } : {}) };
-            });
-          const resolvedPayload = { ...payload, installations: resolvedInstPayload };
-          const response = await fetch(`/api/crm/leads/${approveLeadId}/approve`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(resolvedPayload),
-          });
-          const result = await response.json();
-          if (response.status === 409 && result.conflict === "installation") {
-            toast.error(`Instalación "${result.installationName || ""}" ya existe. Elige "Usar existente" o otro nombre.`);
-            setApproving(false);
-            return;
-          }
-          if (!response.ok) {
-            setApproving(false);
-            throw new Error(result?.error || "Error aprobando lead");
-          }
-          setLeads((prev) =>
-            prev.map((lead) =>
-              lead.id === approveLeadId ? { ...lead, status: "approved" } : lead
-            )
-          );
-          setApproveOpen(false);
-          setApproveLeadId(null);
-          setDuplicates([]);
-          setExistingContact(null);
-          setInstallationConflicts([]);
-          setDuplicateChecked(false);
-          setUseExistingAccountId(null);
-          setContactResolution("create");
-          setInstallationUseExisting({});
-          toast.success("Lead aprobado — Cuenta, contacto y negocio creados");
-          setApproving(false);
-          return;
-        }
-      }
-
-      const response = await fetch(`/api/crm/leads/${approveLeadId}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      if (response.status === 409 && result.conflict === "installation") {
-        toast.error(`Instalación "${result.installationName || ""}" ya existe. Elige "Usar existente" o otro nombre.`);
-        setApproving(false);
-        return;
-      }
-      if (!response.ok) {
-        throw new Error(result?.error || "Error aprobando lead");
-      }
-      setLeads((prev) =>
-        prev.map((lead) =>
-          lead.id === approveLeadId ? { ...lead, status: "approved" } : lead
-        )
-      );
-      setApproveOpen(false);
-      setApproveLeadId(null);
-      setDuplicates([]);
-      setExistingContact(null);
-      setInstallationConflicts([]);
-      setDuplicateChecked(false);
-      setUseExistingAccountId(null);
-      setContactResolution("create");
-      setInstallationUseExisting({});
-      toast.success("Lead aprobado — Cuenta, contacto y negocio creados");
-    } catch (error) {
-      console.error(error);
-      toast.error("No se pudo aprobar el lead.");
-    } finally {
-      setApproving(false);
-    }
-  };
-
   const leadDisplayName = (lead: CrmLead) => {
     const parts = [lead.firstName, lead.lastName].filter(Boolean);
     return parts.length > 0 ? parts.join(" ") : "Sin contacto";
   };
-
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string }>({ open: false, id: "" });
 
   const deleteLead = async (id: string) => {
     try {
@@ -1110,80 +223,6 @@ export function CrmLeadsClient({
     }
   };
 
-  const openRejectModal = (lead: CrmLead) => {
-    setRejectLeadId(lead.id);
-    setRejectLeadData(lead);
-    setRejectReason("other");
-    setRejectNote("");
-    setRejectSendEmail(false);
-    setRejectTemplateId("");
-    setRejectEmailSubject("");
-    setRejectEmailBody("");
-    setRejectOpen(true);
-  };
-
-  const applyRejectTemplate = (templateId: string) => {
-    setRejectTemplateId(templateId);
-    if (!templateId) return;
-    const template = docTemplatesReject.find((t) => t.id === templateId);
-    const lead = rejectLeadData;
-    if (!template?.content || !lead) return;
-    const entities = {
-      contact: {
-        firstName: lead.firstName || "",
-        lastName: lead.lastName || "",
-        email: lead.email || "",
-        phone: lead.phone || "",
-      },
-      account: { name: lead.companyName || "" },
-    };
-    const { resolvedContent } = resolveDocument(template.content, entities);
-    setRejectEmailSubject(template.name);
-    setRejectEmailBody(tiptapToPlainText(resolvedContent));
-  };
-
-  const rejectLead = async () => {
-    if (!rejectLeadId) return;
-    if (rejectSendEmail && (!rejectEmailSubject.trim() || !rejectEmailBody.trim())) {
-      toast.error("Asunto y mensaje son obligatorios para enviar el correo.");
-      return;
-    }
-    setRejecting(true);
-    try {
-      const response = await fetch(`/api/crm/leads/${rejectLeadId}/reject`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reason: rejectReason,
-          note: rejectNote || undefined,
-          sendEmail: rejectSendEmail,
-          emailSubject: rejectEmailSubject || undefined,
-          emailBody: rejectEmailBody || undefined,
-        }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload?.error || "No se pudo rechazar el lead");
-      }
-
-      setLeads((prev) =>
-        prev.map((lead) =>
-          lead.id === rejectLeadId ? { ...lead, status: "rejected", metadata: payload?.data?.metadata ?? lead.metadata } : lead
-        )
-      );
-      setRejectOpen(false);
-      setRejectLeadId(null);
-      setRejectLeadData(null);
-      toast.success(rejectSendEmail ? "Lead rechazado y correo enviado" : "Lead rechazado");
-    } catch (error) {
-      console.error(error);
-      toast.error(error instanceof Error ? error.message : "No se pudo rechazar el lead.");
-    } finally {
-      setRejecting(false);
-    }
-  };
-
   const statusFilters = [
     { key: "all", label: "Todos", count: counts.total },
     { key: "pending", label: "Pendientes", count: counts.pending },
@@ -1193,7 +232,6 @@ export function CrmLeadsClient({
   ];
 
   const initialFilterLabel = getLeadFilterLabel(initialStatusFilter);
-  const canConfirmReject = !rejectSendEmail || (rejectEmailSubject.trim().length > 0 && rejectEmailBody.trim().length > 0);
 
   return (
     <div className="space-y-4">
@@ -1232,57 +270,27 @@ export function CrmLeadsClient({
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2 md:col-span-2">
                   <Label>Empresa</Label>
-                  <Input
-                    value={form.companyName}
-                    onChange={(event) => updateForm("companyName", event.target.value)}
-                    placeholder="Nombre de la empresa"
-                    className={inputClassName}
-                  />
+                  <Input value={form.companyName} onChange={(event) => updateForm("companyName", event.target.value)} placeholder="Nombre de la empresa" className={inputClassName} />
                 </div>
                 <div className="space-y-2">
                   <Label>Nombre</Label>
-                  <Input
-                    value={form.firstName}
-                    onChange={(event) => updateForm("firstName", event.target.value)}
-                    placeholder="Nombre"
-                    className={inputClassName}
-                  />
+                  <Input value={form.firstName} onChange={(event) => updateForm("firstName", event.target.value)} placeholder="Nombre" className={inputClassName} />
                 </div>
                 <div className="space-y-2">
                   <Label>Apellido</Label>
-                  <Input
-                    value={form.lastName}
-                    onChange={(event) => updateForm("lastName", event.target.value)}
-                    placeholder="Apellido"
-                    className={inputClassName}
-                  />
+                  <Input value={form.lastName} onChange={(event) => updateForm("lastName", event.target.value)} placeholder="Apellido" className={inputClassName} />
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
-                  <Input
-                    value={form.email}
-                    onChange={(event) => updateForm("email", event.target.value)}
-                    placeholder="correo@empresa.com"
-                    className={inputClassName}
-                  />
+                  <Input value={form.email} onChange={(event) => updateForm("email", event.target.value)} placeholder="correo@empresa.com" className={inputClassName} />
                 </div>
                 <div className="space-y-2">
                   <Label>Teléfono</Label>
-                  <Input
-                    value={form.phone}
-                    onChange={(event) => updateForm("phone", event.target.value)}
-                    placeholder="+56 9 1234 5678"
-                    className={inputClassName}
-                  />
+                  <Input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="+56 9 1234 5678" className={inputClassName} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label>Fuente</Label>
-                  <Input
-                    value={form.source}
-                    onChange={(event) => updateForm("source", event.target.value)}
-                    placeholder="Formulario web, referido, inbound, etc."
-                    className={inputClassName}
-                  />
+                  <Input value={form.source} onChange={(event) => updateForm("source", event.target.value)} placeholder="Formulario web, referido, inbound, etc." className={inputClassName} />
                 </div>
               </div>
               <DialogFooter>
@@ -1321,980 +329,6 @@ export function CrmLeadsClient({
         </div>
       )}
 
-      {/* ── Approve Modal ── */}
-      <Dialog open={approveOpen} onOpenChange={setApproveOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-[90vw] lg:max-w-[1100px] xl:max-w-[1300px] max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6">
-          <DialogHeader>
-            <DialogTitle>Aprobar lead</DialogTitle>
-            <DialogDescription>
-              Revisa y edita los datos antes de crear la cuenta, contacto y negocio.
-            </DialogDescription>
-          </DialogHeader>
-
-          {duplicates.length > 0 && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
-              <div className="flex items-center gap-2 text-amber-400 text-sm font-medium">
-                <AlertTriangle className="h-4 w-4" />
-                Cuenta con el mismo nombre ya existe
-              </div>
-              <div className="flex flex-col gap-2 pl-6">
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <input
-                    type="radio"
-                    name="accountResolution"
-                    checked={!useExistingAccountId}
-                    onChange={() => { setUseExistingAccountId(null); setInstallationConflicts([]); setInstallationUseExisting({}); }}
-                    className="rounded border-input"
-                  />
-                  Crear nueva cuenta
-                </label>
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <input
-                    type="radio"
-                    name="accountResolution"
-                    checked={!!useExistingAccountId}
-                    onChange={() => setUseExistingAccountId(duplicates[0]?.id ?? null)}
-                    className="rounded border-input"
-                  />
-                  Usar cuenta existente:
-                </label>
-                <select
-                  className="ml-6 mt-1 max-w-xs rounded border border-input bg-background px-2 py-1.5 text-xs text-foreground"
-                  value={useExistingAccountId ?? ""}
-                  onChange={(e) => { setUseExistingAccountId(e.target.value || null); setInstallationUseExisting({}); }}
-                >
-                  <option value="">Seleccionar cuenta...</option>
-                  {duplicates.map((dup) => (
-                    <option key={dup.id} value={dup.id}>
-                      {dup.name} {dup.rut ? `(${dup.rut})` : ""} — {dup.type === "client" ? "Cliente" : "Prospecto"}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
-
-          {existingContact && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
-              <div className="flex items-center gap-2 text-amber-400 text-sm font-medium">
-                <AlertTriangle className="h-4 w-4" />
-                Ya existe un contacto con este email
-              </div>
-              <p className="text-xs text-muted-foreground pl-6">
-                {existingContact.firstName} {existingContact.lastName} — {existingContact.email}
-              </p>
-              <div className="flex flex-col gap-1.5 pl-6">
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <input
-                    type="radio"
-                    name="contactResolution"
-                    checked={contactResolution === "overwrite"}
-                    onChange={() => setContactResolution("overwrite")}
-                    className="rounded border-input"
-                  />
-                  Sobrescribir con los datos de este lead
-                </label>
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <input
-                    type="radio"
-                    name="contactResolution"
-                    checked={contactResolution === "use_existing"}
-                    onChange={() => setContactResolution("use_existing")}
-                    className="rounded border-input"
-                  />
-                  Mantener el contacto existente
-                </label>
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <input
-                    type="radio"
-                    name="contactResolution"
-                    checked={contactResolution === "create"}
-                    onChange={() => setContactResolution("create")}
-                    className="rounded border-input"
-                  />
-                  Crear nuevo contacto (otro email)
-                </label>
-              </div>
-            </div>
-          )}
-
-          {installationConflicts.length > 0 && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
-              <div className="flex items-center gap-2 text-amber-400 text-sm font-medium">
-                <AlertTriangle className="h-4 w-4" />
-                Instalación con el mismo nombre ya existe en esta cuenta
-              </div>
-              <p className="text-xs text-muted-foreground pl-6">
-                Se usará la instalación existente (ya marcado). Puedes cambiar el nombre abajo si quieres crear otra.
-              </p>
-              {installationConflicts.map((conf) => (
-                <div key={conf.id} className="pl-6 flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-muted-foreground">&quot;{conf.name}&quot;</span>
-                  {installations.filter((i) => i.name.trim().toLowerCase() === conf.name.toLowerCase()).map((inst) => (
-                    <Button
-                      key={inst._key}
-                      type="button"
-                      variant={installationUseExisting[inst._key] === conf.id ? "default" : "outline"}
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => setInstallationUseExisting((prev) => {
-                        if (prev[inst._key] === conf.id) {
-                          const next = { ...prev };
-                          delete next[inst._key];
-                          return next;
-                        }
-                        return { ...prev, [inst._key]: conf.id };
-                      })}
-                    >
-                      {installationUseExisting[inst._key] === conf.id ? "Usar existente ✓" : "Usar esta existente"}
-                    </Button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {approvingLead?.source === "email_forward" && approvingLead?.metadata && typeof approvingLead.metadata === "object" && !Array.isArray(approvingLead.metadata) && (
-            <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3 min-w-0 overflow-hidden">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                <Mailbox className="h-3.5 w-3.5" />
-                Correo original
-              </h4>
-              {(() => {
-                const meta = approvingLead.metadata as { inboundEmail?: { subject?: string; from?: string; text?: string; html?: string; receivedAt?: string } };
-                const email = meta?.inboundEmail;
-                if (!email) return null;
-                return (
-                  <div className="space-y-2 text-sm min-w-0 overflow-hidden">
-                    {email.subject && <p className="break-words"><span className="text-muted-foreground">Asunto:</span> {email.subject}</p>}
-                    {email.from && <p className="break-words"><span className="text-muted-foreground">De:</span> {email.from}</p>}
-                    {email.receivedAt && <p className="text-muted-foreground text-xs">{new Date(email.receivedAt).toLocaleString()}</p>}
-                    <div className="rounded border border-border bg-background/80 p-3 max-h-48 overflow-y-auto overflow-x-hidden text-xs whitespace-pre-wrap break-all [overflow-wrap:anywhere]">
-                      {email.text ? email.text : email.html ? email.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 2000) : "Sin contenido"}
-                    </div>
-                  </div>
-                );
-              })()}
-              <FileAttachments entityType="lead" entityId={approvingLead.id} readOnly title="Archivos adjuntos del correo" />
-            </div>
-          )}
-
-          <div className="space-y-5">
-            <div className="space-y-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Cuenta (Prospecto)
-              </h4>
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-1.5 md:col-span-2 lg:col-span-3">
-                  <Label className="text-xs">Nombre de empresa *</Label>
-                  <Input
-                    value={approveForm.accountName}
-                    onChange={(e) => updateApproveForm("accountName", e.target.value)}
-                    placeholder="Nombre de la empresa"
-                    className={inputClassName}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">RUT</Label>
-                  <Input
-                    value={approveForm.rut}
-                    onChange={(e) => updateApproveForm("rut", e.target.value)}
-                    placeholder="76.123.456-7"
-                    className={inputClassName}
-                  />
-                </div>
-                <div className="space-y-1.5 md:col-span-2">
-                  <Label className="text-xs">Razón social (empresa)</Label>
-                  <Input
-                    value={approveForm.legalName}
-                    onChange={(e) => updateApproveForm("legalName", e.target.value)}
-                    placeholder="Empresa SpA / Ltda / S.A."
-                    className={inputClassName}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Representante legal</Label>
-                  <Input
-                    value={approveForm.legalRepresentativeName}
-                    onChange={(e) => updateApproveForm("legalRepresentativeName", e.target.value)}
-                    placeholder="Nombre completo o Not Available"
-                    className={inputClassName}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">RUT representante legal</Label>
-                  <Input
-                    value={approveForm.legalRepresentativeRut}
-                    onChange={(e) => updateApproveForm("legalRepresentativeRut", e.target.value)}
-                    placeholder="12.345.678-9 o Not Available"
-                    className={inputClassName}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Industria</Label>
-                  <select
-                    className={selectClassName}
-                    value={approveForm.industry}
-                    onChange={(e) => updateApproveForm("industry", e.target.value)}
-                  >
-                    <option value="">Seleccionar industria</option>
-                    {industries.map((i) => (
-                      <option key={i.id} value={i.name}>
-                        {i.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Segmento</Label>
-                  <Input
-                    value={approveForm.segment}
-                    onChange={(e) => updateApproveForm("segment", e.target.value)}
-                    placeholder="Corporativo, PYME..."
-                    className={inputClassName}
-                  />
-                </div>
-                <div className="space-y-1.5 md:col-span-2 lg:col-span-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <Label className="text-xs">Página web</Label>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs"
-                      onClick={enrichCompanyInfoFromWebsite}
-                      disabled={enrichingCompanyInfo || !approveForm.website.trim()}
-                    >
-                      {enrichingCompanyInfo && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                      Traer datos de la empresa
-                    </Button>
-                  </div>
-                  <Input
-                    value={approveForm.website}
-                    onChange={(e) => updateApproveForm("website", e.target.value)}
-                    placeholder="https://www.empresa.cl"
-                    className={inputClassName}
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    Se detecta automáticamente desde el dominio del email. Se asocia a la cuenta.
-                  </p>
-                </div>
-                <div className="space-y-1.5 md:col-span-2 lg:col-span-3">
-                  <Label className="text-xs">Información de la empresa</Label>
-                  <textarea
-                    value={approveForm.companyInfo}
-                    onChange={(e) => updateApproveForm("companyInfo", e.target.value)}
-                    placeholder="Resumen comercial de qué hace la empresa, a qué se dedica y contexto útil para cotización..."
-                    className={`w-full min-h-[96px] resize-y rounded-md border px-3 py-2 text-sm ${inputClassName}`}
-                    rows={4}
-                  />
-                  {detectedCompanyLogoUrl && (
-                    <div className="space-y-2 rounded-md border border-border bg-muted/20 p-2">
-                      <div className="text-[10px] text-muted-foreground">Logo detectado</div>
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={detectedCompanyLogoUrl}
-                          alt="Logo empresa detectado"
-                          className="h-12 w-12 rounded border border-border bg-background object-contain"
-                        />
-                        <span className="truncate text-[10px] text-muted-foreground">
-                          {detectedCompanyLogoUrl}
-                        </span>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-[10px]"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(detectedCompanyLogoUrl);
-                            toast.success("URL del logo copiada.");
-                          } catch {
-                            toast.error("No se pudo copiar la URL del logo.");
-                          }
-                        }}
-                      >
-                        Copiar URL
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-border" />
-
-            <div className="space-y-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Contacto principal
-              </h4>
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Nombre *</Label>
-                  <Input
-                    value={approveForm.contactFirstName}
-                    onChange={(e) => updateApproveForm("contactFirstName", e.target.value)}
-                    placeholder="Nombre"
-                    className={inputClassName}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Apellido</Label>
-                  <Input
-                    value={approveForm.contactLastName}
-                    onChange={(e) => updateApproveForm("contactLastName", e.target.value)}
-                    placeholder="Apellido"
-                    className={inputClassName}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Cargo</Label>
-                  <Input
-                    value={approveForm.roleTitle}
-                    onChange={(e) => updateApproveForm("roleTitle", e.target.value)}
-                    placeholder="Gerente, jefe..."
-                    className={inputClassName}
-                  />
-                </div>
-                <div className="space-y-1.5 md:col-span-2 lg:col-span-1">
-                  <Label className="text-xs">Email</Label>
-                  <Input
-                    value={approveForm.email}
-                    onChange={(e) => updateApproveForm("email", e.target.value)}
-                    placeholder="correo@empresa.com"
-                    className={inputClassName}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Teléfono</Label>
-                  <Input
-                    value={approveForm.phone}
-                    onChange={(e) => updateApproveForm("phone", e.target.value)}
-                    placeholder="+56 9 1234 5678"
-                    className={inputClassName}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-border" />
-
-            <div className="space-y-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Negocio
-              </h4>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Título del negocio</Label>
-                <Input
-                  value={approveForm.dealTitle}
-                  onChange={(e) => updateApproveForm("dealTitle", e.target.value)}
-                  placeholder="Oportunidad para..."
-                  className={inputClassName}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Notas iniciales</Label>
-                <textarea
-                  value={approveForm.notes}
-                  onChange={(e) => updateApproveForm("notes", e.target.value)}
-                  placeholder="Notas sobre este negocio (se copiarán al negocio y cotización)..."
-                  className={`w-full min-h-[64px] resize-none rounded-md border px-3 py-2 text-sm ${inputClassName}`}
-                  rows={2}
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Estas notas se agregarán al negocio y a las cotizaciones creadas.
-                </p>
-              </div>
-            </div>
-
-            <div className="border-t border-border" />
-
-            {/* ── Instalaciones y Dotación ── */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Instalaciones y Dotación
-                </h4>
-                <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addInstallation}>
-                  <Plus className="h-3 w-3" /> Nueva instalación
-                </Button>
-              </div>
-
-              {installations.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-4">
-                  Sin instalaciones. Agrega una para asignar dotación.
-                </p>
-              )}
-
-              <div className="space-y-4">
-                {installations.map((inst, instIdx) => (
-                  <div
-                    key={inst._key}
-                    className="rounded-lg border border-border bg-muted/10 overflow-hidden"
-                  >
-                    {/* Installation header */}
-                    <div className="px-3 py-2 bg-muted/30 border-b border-border/60 flex items-center gap-2">
-                      <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span className="text-xs font-semibold flex-1">
-                        Instalación {instIdx + 1}
-                      </span>
-                      {installations.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-destructive hover:text-destructive"
-                          onClick={() => removeInstallation(inst._key)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="p-3 space-y-3">
-                      {/* Name */}
-                      <div className="space-y-1">
-                        <Label className="text-[11px]">Nombre *</Label>
-                        <Input
-                          value={inst.name}
-                          onChange={(e) => updateInstallation(inst._key, "name", e.target.value)}
-                          placeholder="Bodega central, Sucursal norte..."
-                          className={`h-9 text-sm ${inputClassName}`}
-                        />
-                      </div>
-
-                      {/* Address via Google Maps */}
-                      <div className="space-y-1">
-                        <Label className="text-[11px]">Dirección (Google Maps)</Label>
-                        <div className="flex gap-2 items-center">
-                          <AddressAutocomplete
-                            value={inst.address}
-                            onChange={(result) => handleAddressChange(inst._key, result)}
-                            placeholder="Buscar dirección..."
-                            className={`h-9 text-sm flex-1 ${inputClassName}`}
-                            showMap={false}
-                          />
-                          {(inst.address || (inst.lat != null && inst.lng != null)) && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-9 w-9 shrink-0"
-                              title="Abrir en Google Maps"
-                              asChild
-                            >
-                              <a
-                                href={
-                                  inst.lat != null && inst.lng != null
-                                    ? `https://www.google.com/maps/@${inst.lat},${inst.lng},17z`
-                                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(inst.address)}`
-                                }
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </a>
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Comuna & Ciudad (auto-filled, editable) */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label className="text-[11px]">Comuna</Label>
-                          <Input
-                            value={inst.commune}
-                            onChange={(e) => updateInstallation(inst._key, "commune", e.target.value)}
-                            placeholder="Las Condes"
-                            className={`h-9 text-sm ${inputClassName}`}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-[11px]">Ciudad</Label>
-                          <Input
-                            value={inst.city}
-                            onChange={(e) => updateInstallation(inst._key, "city", e.target.value)}
-                            placeholder="Santiago"
-                            className={`h-9 text-sm ${inputClassName}`}
-                          />
-                        </div>
-                      </div>
-
-                      {/* ── Dotación de esta instalación ── */}
-                      <div className="space-y-2 pt-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                            <Users className="h-3 w-3" /> Dotación
-                            {inst.dotacion.length > 0 && (
-                              <span className="ml-1 text-[10px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                                {inst.dotacion.reduce((s, d) => s + d.cantidad, 0)} guardia{inst.dotacion.reduce((s, d) => s + d.cantidad, 0) !== 1 ? "s" : ""}
-                              </span>
-                            )}
-                          </span>
-                          <Button type="button" variant="ghost" size="sm" className="h-6 text-[10px] gap-1 px-2" onClick={() => addDotacionToInst(inst._key)}>
-                            <Plus className="h-2.5 w-2.5" /> Posición
-                          </Button>
-                        </div>
-
-                        {inst.dotacion.length === 0 && (
-                          <button
-                            type="button"
-                            onClick={() => addDotacionToInst(inst._key)}
-                            className="w-full py-3 rounded-md border border-dashed border-border text-xs text-muted-foreground hover:bg-muted/30 transition-colors"
-                          >
-                            + Agregar posición de guardia
-                          </button>
-                        )}
-
-                        {inst.dotacion.map((dot, dotIdx) => (
-                          <div
-                            key={dotIdx}
-                            className="rounded-md border border-border/60 bg-background p-2.5 space-y-2"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-semibold text-muted-foreground">
-                                Posición {dotIdx + 1}
-                              </span>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-7 text-[10px] px-2 gap-1"
-                                  onClick={() => cloneDotacionInInst(inst._key, dotIdx)}
-                                >
-                                  <Copy className="h-3 w-3" />
-                                  Clonar
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
-                                  onClick={() => removeDotacionFromInst(inst._key, dotIdx)}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              <div className="space-y-1">
-                                <Label className="text-[10px]">Tipo de puesto *</Label>
-                                <select
-                                  className={selectCompactClassName}
-                                  value={dot.puestoTrabajoId || ""}
-                                  onChange={(e) => {
-                                    const puestoTrabajoId = e.target.value;
-                                    const selected = cpqPuestos.find((p) => p.id === puestoTrabajoId);
-                                    updateDotacionField(inst._key, dotIdx, "puestoTrabajoId", puestoTrabajoId);
-                                    updateDotacionField(inst._key, dotIdx, "puesto", selected?.name || dot.puesto || "");
-                                  }}
-                                >
-                                  <option value="">Seleccionar puesto...</option>
-                                  {cpqPuestos.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                      {p.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-[10px]">Nombre personalizado</Label>
-                                <Input
-                                  value={dot.customName || ""}
-                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "customName", e.target.value)}
-                                  placeholder={dot.puesto || "Ej: CCTV acceso principal"}
-                                  className={`h-8 text-sm ${inputClassName}`}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="grid gap-2 sm:grid-cols-4">
-                              <div className="space-y-1">
-                                <Label className="text-[10px]">Cargo *</Label>
-                                <select
-                                  className={selectCompactClassName}
-                                  value={dot.cargoId || ""}
-                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "cargoId", e.target.value)}
-                                >
-                                  <option value="">Seleccionar cargo...</option>
-                                  {cpqCargos.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                      {c.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-[10px]">Rol *</Label>
-                                <select
-                                  className={selectCompactClassName}
-                                  value={dot.rolId || ""}
-                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "rolId", e.target.value)}
-                                >
-                                  <option value="">Seleccionar rol...</option>
-                                  {cpqRoles.map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                      {r.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-[10px]">Guardias</Label>
-                                <select
-                                  className={selectCompactClassName}
-                                  value={Math.min(10, Math.max(1, dot.cantidad ?? 1))}
-                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "cantidad", Number(e.target.value))}
-                                >
-                                  {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                                    <option key={n} value={n}>{n}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-[10px]">Sueldo base</Label>
-                                <Input
-                                  type="text"
-                                  inputMode="numeric"
-                                  value={formatNumber(dot.baseSalary || 550000, { minDecimals: 0, maxDecimals: 0 })}
-                                  onChange={(e) => updateDotacionField(inst._key, dotIdx, "baseSalary", Math.max(0, parseLocalizedNumber(e.target.value) || 0))}
-                                  className={`h-8 text-sm ${inputClassName}`}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <Label className="text-[10px]">Horario</Label>
-                                <div className="flex gap-1">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={(dot.shiftType || "day") === "day" ? "default" : "outline"}
-                                    className="h-6 px-2 text-[10px]"
-                                    onClick={() => setDotacionShift(inst._key, dotIdx, "day")}
-                                  >
-                                    Día
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={(dot.shiftType || "day") === "night" ? "default" : "outline"}
-                                    className="h-6 px-2 text-[10px]"
-                                    onClick={() => setDotacionShift(inst._key, dotIdx, "night")}
-                                  >
-                                    Noche
-                                  </Button>
-                                </div>
-                              </div>
-                              {(dot.shiftType || "day") === "day" ? (
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px]">Inicio</Label>
-                                    <select
-                                      className={selectCompactClassName}
-                                      value={dot.horaInicio}
-                                      onChange={(e) => setDotacionDayStart(inst._key, dotIdx, e.target.value)}
-                                    >
-                                      {DAY_START_OPTIONS.map((time) => (
-                                        <option key={time} value={time}>
-                                          {time}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px]">Término</Label>
-                                    <Input value={dot.horaFin} className={`h-8 text-sm ${inputClassName}`} readOnly />
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px]">Inicio</Label>
-                                    <Input value="20:00" className={`h-8 text-sm ${inputClassName}`} readOnly />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Label className="text-[10px]">Término</Label>
-                                    <Input value="08:00" className={`h-8 text-sm ${inputClassName}`} readOnly />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="space-y-1">
-                              <Label className="text-[10px]">Días</Label>
-                              <div className="flex flex-wrap gap-1">
-                                {WEEKDAYS.map((day) => {
-                                  const active = dot.dias.includes(day);
-                                  return (
-                                    <button
-                                      key={day}
-                                      type="button"
-                                      onClick={() => toggleDotacionDay(inst._key, dotIdx, day)}
-                                      className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
-                                        active
-                                          ? "bg-primary/15 text-primary border border-primary/30"
-                                          : "bg-muted text-muted-foreground border border-transparent hover:border-border"
-                                      }`}
-                                    >
-                                      {WEEKDAYS_SHORT[day]}
-                                    </button>
-                                  );
-                                })}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const allSelected = dot.dias.length === 7;
-                                    updateDotacionField(inst._key, dotIdx, "dias", allSelected ? [] : [...WEEKDAYS]);
-                                  }}
-                                  className="px-2 py-1 rounded text-[10px] font-medium text-muted-foreground hover:text-foreground border border-dashed border-border"
-                                >
-                                  {dot.dias.length === 7 ? "Ninguno" : "Todos"}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <p className="text-[10px] text-muted-foreground">
-                Solo se crearán instalaciones con nombre. La dotación se guarda como referencia para el negocio.
-              </p>
-
-              {/* Costos incluidos - preselección para la cotización */}
-              <div className="space-y-3 pt-4 border-t border-border/60">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Briefcase className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Costos incluidos
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                    disabled={!approveLeadId || inferringCosts}
-                    onClick={async () => {
-                      if (!approveLeadId) return;
-                      setInferringCosts(true);
-                      try {
-                        const res = await fetch("/api/ai/lead-cost-inference", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ leadId: approveLeadId }),
-                        });
-                        const data = await res.json();
-                        if (data.success && Array.isArray(data.groupIds)) {
-                          setSelectedCostGroups(data.groupIds);
-                          toast.success("Sugerencia aplicada. Puedes ajustar los checkboxes.");
-                        } else {
-                          toast.error(data?.error || "No se pudo obtener la sugerencia");
-                        }
-                      } catch {
-                        toast.error("Error al sugerir costos");
-                      } finally {
-                        setInferringCosts(false);
-                      }
-                    }}
-                  >
-                    {inferringCosts ? (
-                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                    )}
-                    Sugerir con IA
-                  </Button>
-                </div>
-                <p className="text-[10px] text-muted-foreground">
-                  Marca qué ítems de costo incluir en la cotización. Los montos se configuran después en el cotizador.
-                </p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2 rounded-md border border-border/60 bg-muted/10 p-3">
-                    <span className="text-[10px] font-medium uppercase text-muted-foreground">Directos</span>
-                    <div className="flex flex-wrap gap-3">
-                      {COST_GROUPS_DIRECTOS.map((g) => (
-                        <label key={g.id} className="flex items-center gap-2 cursor-pointer text-sm">
-                          <input
-                            type="checkbox"
-                            checked={selectedCostGroups.includes(g.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedCostGroups((prev) => [...prev, g.id]);
-                              } else {
-                                setSelectedCostGroups((prev) => prev.filter((id) => id !== g.id));
-                              }
-                            }}
-                            className="rounded border-border"
-                          />
-                          {g.label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2 rounded-md border border-border/60 bg-muted/10 p-3">
-                    <span className="text-[10px] font-medium uppercase text-muted-foreground">Indirectos</span>
-                    <div className="flex flex-wrap gap-3">
-                      {COST_GROUPS_INDIRECTOS.map((g) => (
-                        <label key={g.id} className="flex items-center gap-2 cursor-pointer text-sm">
-                          <input
-                            type="checkbox"
-                            checked={selectedCostGroups.includes(g.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedCostGroups((prev) => [...prev, g.id]);
-                              } else {
-                                setSelectedCostGroups((prev) => prev.filter((id) => id !== g.id));
-                              }
-                            }}
-                            className="rounded border-border"
-                          />
-                          {g.label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="mt-4 flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setApproveOpen(false)} disabled={approving || savingLead}>
-              Cancelar
-            </Button>
-            <div className="flex gap-2 sm:ml-auto">
-              <Button variant="secondary" onClick={saveLeadDraft} disabled={approving || savingLead}>
-                {savingLead && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Guardar en revisión
-              </Button>
-              <Button onClick={approveLead} disabled={approving || savingLead}>
-                {approving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {duplicates.length > 0 ? "Crear de todos modos" : "Confirmar aprobación"}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Reject Modal ── */}
-      <Dialog
-        open={rejectOpen}
-        onOpenChange={(open) => {
-          setRejectOpen(open);
-          if (!open) setRejectLeadData(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Rechazar lead</DialogTitle>
-            <DialogDescription>
-              El lead se mantiene en CRM Leads con estado rechazado. Puedes enviar una respuesta por correo.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Motivo *</Label>
-              <select
-                className={selectClassName}
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value as LeadRejectReason)}
-              >
-                {REJECTION_REASON_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs">Nota interna</Label>
-              <textarea
-                value={rejectNote}
-                onChange={(e) => setRejectNote(e.target.value)}
-                placeholder="Contexto interno del rechazo..."
-                className={`w-full min-h-[80px] resize-none rounded-md border px-3 py-2 text-sm ${inputClassName}`}
-                rows={3}
-              />
-            </div>
-
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={rejectSendEmail}
-                onChange={(e) => setRejectSendEmail(e.target.checked)}
-              />
-              Enviar correo de respuesta
-            </label>
-
-            {rejectSendEmail && (
-              <div className="space-y-3 rounded-md border border-border p-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Template (opcional)</Label>
-                  <select
-                    className={selectClassName}
-                    value={rejectTemplateId}
-                    onChange={(e) => applyRejectTemplate(e.target.value)}
-                  >
-                    <option value="">Sin template</option>
-                    {docTemplatesReject.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Asunto *</Label>
-                  <Input
-                    value={rejectEmailSubject}
-                    onChange={(e) => setRejectEmailSubject(e.target.value)}
-                    placeholder="Asunto del correo"
-                    className={inputClassName}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Mensaje *</Label>
-                  <textarea
-                    value={rejectEmailBody}
-                    onChange={(e) => setRejectEmailBody(e.target.value)}
-                    placeholder="Contenido del correo..."
-                    className={`w-full min-h-[140px] rounded-md border px-3 py-2 text-sm ${inputClassName}`}
-                    rows={6}
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    La firma configurada en el sistema se agrega automáticamente al momento del envío.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectOpen(false)} disabled={rejecting}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={rejectLead} disabled={rejecting || !canConfirmReject}>
-              {rejecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Confirmar rechazo
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* ── Lead list ── */}
       <Card>
         <CardContent className="pt-5">
@@ -2316,9 +350,10 @@ export function CrmLeadsClient({
                 const totalGuards = (meta?.totalGuards as number) || 0;
                 const rejectionInfo = getLeadRejectionInfo(lead.metadata);
                 return (
-                  <div
+                  <Link
                     key={lead.id}
-                    className="rounded-lg border p-4 transition-colors hover:border-primary/30 hover:bg-accent/30 group space-y-2"
+                    href={`/crm/leads/${lead.id}`}
+                    className="block rounded-lg border p-4 transition-colors hover:border-primary/30 hover:bg-accent/30 group space-y-2"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium text-sm truncate">{lead.companyName || "Empresa sin nombre"}</p>
@@ -2347,18 +382,10 @@ export function CrmLeadsClient({
                         </span>
                       )}
                       {lead.source === "email_forward" && (
-                        <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-400">
-                          Email
-                        </span>
+                        <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-400">Email</span>
                       )}
                       {lead.status === "rejected" && rejectionInfo && (
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                            rejectionInfo.emailSent
-                              ? "bg-blue-500/15 text-blue-400"
-                              : "bg-amber-500/15 text-amber-400"
-                          }`}
-                        >
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${rejectionInfo.emailSent ? "bg-blue-500/15 text-blue-400" : "bg-amber-500/15 text-amber-400"}`}>
                           {rejectionInfo.emailSent ? "Correo enviado" : "Sin correo enviado"}
                         </span>
                       )}
@@ -2371,32 +398,18 @@ export function CrmLeadsClient({
                     <div className="flex items-center justify-between pt-1">
                       <CrmDates createdAt={lead.createdAt} />
                       <div className="flex items-center gap-1">
-                        {(lead.status === "pending" || lead.status === "in_review") && (
-                          <>
-                            <Button onClick={() => openApproveModal(lead)} size="sm" className="h-7 text-xs">
-                              {lead.status === "in_review" ? "Revisar" : "Aprobar"}
-                            </Button>
-                            <Button
-                              onClick={() => openRejectModal(lead)}
-                              size="sm"
-                              variant="destructive"
-                              className="h-7 text-xs"
-                            >
-                              Rechazar
-                            </Button>
-                          </>
-                        )}
                         <Button
                           size="icon"
                           variant="ghost"
                           className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => setDeleteConfirm({ open: true, id: lead.id })}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteConfirm({ open: true, id: lead.id }); }}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -2409,31 +422,24 @@ export function CrmLeadsClient({
                 const rejectionInfo = getLeadRejectionInfo(lead.metadata);
 
                 return (
-                  <div
+                  <Link
                     key={lead.id}
-                    className="rounded-lg border p-3 sm:p-4 transition-colors hover:bg-accent/30 group"
+                    href={`/crm/leads/${lead.id}`}
+                    className="block rounded-lg border p-3 sm:p-4 transition-colors hover:bg-accent/30 group"
                   >
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium text-sm">
-                            {lead.companyName || "Empresa sin nombre"}
-                          </p>
+                          <p className="font-medium text-sm">{lead.companyName || "Empresa sin nombre"}</p>
                           <StatusBadge status={lead.status} />
                           {lead.source === "web_cotizador" && (
-                            <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                              Web
-                            </span>
+                            <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-400">Web</span>
                           )}
                           {lead.source === "web_cotizador_inteligente" && (
-                            <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[10px] font-medium text-teal-400">
-                              Cotizador Inteligente
-                            </span>
+                            <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[10px] font-medium text-teal-400">Cotizador Inteligente</span>
                           )}
                           {lead.source === "email_forward" && (
-                            <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-400">
-                              Correo reenviado
-                            </span>
+                            <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-400">Correo reenviado</span>
                           )}
                           {totalGuards > 0 && (
                             <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
@@ -2441,13 +447,7 @@ export function CrmLeadsClient({
                             </span>
                           )}
                           {lead.status === "rejected" && rejectionInfo && (
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                rejectionInfo.emailSent
-                                  ? "bg-blue-500/15 text-blue-400"
-                                  : "bg-amber-500/15 text-amber-400"
-                              }`}
-                            >
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${rejectionInfo.emailSent ? "bg-blue-500/15 text-blue-400" : "bg-amber-500/15 text-amber-400"}`}>
                               {rejectionInfo.emailSent ? "Correo enviado" : "Sin correo enviado"}
                             </span>
                           )}
@@ -2455,26 +455,16 @@ export function CrmLeadsClient({
                         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span className="text-xs text-muted-foreground">{leadDisplayName(lead)}</span>
                           {lead.email ? (
-                            <a
-                              href={`mailto:${lead.email}`}
-                              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Mail className="h-3 w-3" />
-                              {lead.email}
-                            </a>
+                            <span className="text-xs text-primary inline-flex items-center gap-1">
+                              <Mail className="h-3 w-3" />{lead.email}
+                            </span>
                           ) : (
                             <span className="text-xs text-muted-foreground">Sin email</span>
                           )}
                           {lead.phone && (
-                            <a
-                              href={telHref(lead.phone)}
-                              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Phone className="h-3 w-3" />
-                              {lead.phone}
-                            </a>
+                            <span className="text-xs text-primary inline-flex items-center gap-1">
+                              <Phone className="h-3 w-3" />{lead.phone}
+                            </span>
                           )}
                           {lead.status === "rejected" && rejectionInfo?.note && (
                             <span className="inline-flex items-center rounded border border-border/70 bg-muted/20 px-2 py-0.5 text-[11px] text-muted-foreground max-w-full truncate">
@@ -2483,39 +473,18 @@ export function CrmLeadsClient({
                           )}
                           <div className="flex items-center gap-1 ml-1">
                             {lead.phone && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                                asChild
-                              >
-                                <a href={telHref(lead.phone)} onClick={(e) => e.stopPropagation()} aria-label="Llamar">
-                                  <Phone className="h-3.5 w-3.5" />
-                                </a>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" asChild>
+                                <a href={telHref(lead.phone)} onClick={(e) => e.stopPropagation()} aria-label="Llamar"><Phone className="h-3.5 w-3.5" /></a>
                               </Button>
                             )}
                             {lead.email && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                                asChild
-                              >
-                                <a href={`mailto:${lead.email}`} onClick={(e) => e.stopPropagation()} aria-label="Enviar email">
-                                  <Mail className="h-3.5 w-3.5" />
-                                </a>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" asChild>
+                                <a href={`mailto:${lead.email}`} onClick={(e) => e.stopPropagation()} aria-label="Enviar email"><Mail className="h-3.5 w-3.5" /></a>
                               </Button>
                             )}
                             {lead.phone && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-muted-foreground hover:text-emerald-600"
-                                asChild
-                              >
-                                <a href={whatsappHref(lead.phone)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label="WhatsApp">
-                                  <MessageSquare className="h-3.5 w-3.5" />
-                                </a>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-emerald-600" asChild>
+                                <a href={whatsappHref(lead.phone)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label="WhatsApp"><MessageSquare className="h-3.5 w-3.5" /></a>
                               </Button>
                             )}
                           </div>
@@ -2523,54 +492,37 @@ export function CrmLeadsClient({
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5 items-center">
                           <CrmDates createdAt={lead.createdAt} updatedAt={(lead as { updatedAt?: string }).updatedAt} showTime />
                           {lead.source && lead.source !== "web_cotizador" && lead.source !== "web_cotizador_inteligente" && lead.source !== "email_forward" && (
-                            <span className="text-[11px] text-muted-foreground/80">
-                              Fuente: {lead.source}
-                            </span>
+                            <span className="text-[11px] text-muted-foreground/80">Fuente: {lead.source}</span>
                           )}
                           {lead.industry && (
-                            <span className="text-[11px] text-muted-foreground/80">
-                              Industria: {lead.industry}
-                            </span>
+                            <span className="text-[11px] text-muted-foreground/80">Industria: {lead.industry}</span>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {(lead.status === "pending" || lead.status === "in_review") && (
-                          <>
-                            <Button
-                              onClick={() => openApproveModal(lead)}
-                              size="sm"
-                            >
-                              {lead.status === "in_review" ? "Revisar" : "Revisar y aprobar"}
-                            </Button>
-                            <Button
-                              onClick={() => openRejectModal(lead)}
-                              size="sm"
-                              variant="destructive"
-                            >
-                              Rechazar
-                            </Button>
-                          </>
+                          <span className="text-xs text-primary font-medium group-hover:underline">
+                            {lead.status === "in_review" ? "Revisar" : "Revisar y aprobar"}
+                          </span>
                         )}
                         <Button
                           size="icon"
                           variant="ghost"
                           className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ open: true, id: lead.id }); }}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteConfirm({ open: true, id: lead.id }); }}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                       </div>
                     </div>
 
-                    {/* Dotación solicitada — UI mejorada */}
+                    {/* Dotación solicitada */}
                     {dotacion && dotacion.length > 0 && (
                       <div className="mt-3 rounded-lg border border-border/80 bg-muted/20 overflow-hidden">
                         <div className="px-3 py-2 border-b border-border/60 bg-muted/30 flex items-center gap-2">
                           <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                            Dotación solicitada
-                          </span>
+                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Dotación solicitada</span>
                           {totalGuards > 0 && (
                             <span className="text-[10px] font-medium text-foreground bg-primary/10 text-primary px-1.5 py-0.5 rounded">
                               {totalGuards} guardia{totalGuards > 1 ? "s" : ""} total
@@ -2585,21 +537,12 @@ export function CrmLeadsClient({
                                 <span className="text-sm font-medium text-foreground truncate">{d.puesto}</span>
                               </div>
                               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground pl-5 sm:pl-0">
-                                <span className="inline-flex items-center gap-1">
-                                  <Users className="h-3 w-3 shrink-0" />
-                                  {d.cantidad} guardia{d.cantidad > 1 ? "s" : ""}
-                                </span>
+                                <span className="inline-flex items-center gap-1"><Users className="h-3 w-3 shrink-0" />{d.cantidad} guardia{d.cantidad > 1 ? "s" : ""}</span>
                                 {d.horaInicio && d.horaFin && (
-                                  <span className="inline-flex items-center gap-1">
-                                    <Clock className="h-3 w-3 shrink-0" />
-                                    {d.horaInicio} – {d.horaFin}
-                                  </span>
+                                  <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3 shrink-0" />{d.horaInicio} – {d.horaFin}</span>
                                 )}
                                 {d.dias && d.dias.length > 0 && (
-                                  <span className="inline-flex items-center gap-1">
-                                    <Calendar className="h-3 w-3 shrink-0" />
-                                    {d.dias.length === 7 ? "Todos los días" : d.dias.join(", ")}
-                                  </span>
+                                  <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3 shrink-0" />{d.dias.length === 7 ? "Todos los días" : d.dias.join(", ")}</span>
                                 )}
                               </div>
                             </div>
@@ -2610,11 +553,9 @@ export function CrmLeadsClient({
 
                     {/* Notes preview */}
                     {lead.notes && !dotacion && (
-                      <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                        {lead.notes}
-                      </p>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{lead.notes}</p>
                     )}
-                  </div>
+                  </Link>
                 );
               })}
             </div>

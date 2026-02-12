@@ -1,4 +1,5 @@
 export * from "./CrmLeadsClient";
+export * from "./CrmLeadDetailClient";
 export * from "./CrmDealsClient";
 export * from "./CrmAccountsClient";
 export * from "./CrmAccountDetailClient";
