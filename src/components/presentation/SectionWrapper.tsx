@@ -36,14 +36,14 @@ export function SectionWrapper({
     rootMargin: '-50px 0px',
   });
   
-  // PDF mode: sección plana sin animaciones, con estilos de slide
+  // PDF mode: sección plana sin animaciones, empieza en página nueva
   if (pdfMode) {
     return (
       <section
         id={id}
         className={cn(
           'section-container pdf-slide',
-          'py-10 md:py-14',
+          'py-8 md:py-10',
           theme.text,
           className
         )}

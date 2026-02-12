@@ -95,9 +95,10 @@ export async function POST(request: NextRequest) {
       ] : chromiumPkg.args,
     });
     
-    // Viewport: 1440x1018 = ratio exacto A4 landscape (297:210)
+    // Viewport: 1280px ancho (desktop breakpoint xl:) × 900px alto
+    // Portrait A4: el contenido fluye vertical como en la web
     const context = await browser.newContext({
-      viewport: { width: 1440, height: 1018 },
+      viewport: { width: 1280, height: 900 },
       deviceScaleFactor: 1,
       // Headers en TODAS las requests del browser:
       // - x-vercel-protection-bypass: pasa la protección de deployment
@@ -189,16 +190,19 @@ export async function POST(request: NextRequest) {
     await page.waitForTimeout(1500);
     
     // ── Generar PDF ──
+    // Portrait A4, con márgenes mínimos y backgrounds
+    // scale: 0.85 reduce un poco el contenido = más contenido por página = menos páginas
     const pdfBuffer = await page.pdf({
       format: 'A4',
-      landscape: true,
+      landscape: false,
       printBackground: true,
       preferCSSPageSize: true,
+      scale: 0.82,
       margin: {
-        top: '0mm',
-        right: '0mm',
-        bottom: '0mm',
-        left: '0mm',
+        top: '8mm',
+        right: '6mm',
+        bottom: '8mm',
+        left: '6mm',
       },
     });
     

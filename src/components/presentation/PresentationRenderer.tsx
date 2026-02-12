@@ -48,16 +48,12 @@ import { Section27Implementacion } from './sections/Section27Implementacion';
 import { Section28Cierre } from './sections/Section28Cierre';
 import { PlaceholderSection } from './sections/PlaceholderSection';
 
-// CSS para modo PDF: cada sección ocupa mínimo una página landscape completa
-// Cambios clave vs. versión anterior:
-// 1. min-height en vez de height/max-height: secciones largas (pricing) pueden fluir a página siguiente
-// 2. Sin overflow:hidden: no se recorta contenido
-// 3. [style] override: fuerza visibilidad de elementos que Framer Motion deja en opacity:0
-// 4. Deshabilita animaciones CSS para estado estático limpio
+// CSS para modo PDF: Portrait A4, cada sección empieza en página nueva,
+// contenido fluye naturalmente (sin recortes).
 const PDF_MODE_STYLES = `
   @page {
-    size: A4 landscape;
-    margin: 0;
+    size: A4 portrait;
+    margin: 8mm 10mm;
   }
   html, body {
     margin: 0;
@@ -67,35 +63,41 @@ const PDF_MODE_STYLES = `
     background: #0f172a;
   }
   
-  /* ── Cada sección = mínimo una página ── */
+  /* ── Cada sección empieza en página nueva ── */
   .pdf-mode .pdf-slide {
     width: 100%;
-    min-height: 100vh;
-    page-break-after: always;
-    break-after: page;
     position: relative;
     box-sizing: border-box;
+    page-break-before: always;
+    break-before: page;
   }
-  .pdf-mode .pdf-slide:last-of-type {
-    page-break-after: auto;
-    break-after: auto;
+  /* La primera sección NO necesita salto (ya está al inicio) */
+  .pdf-mode .pdf-slide:first-of-type {
+    page-break-before: auto;
+    break-before: auto;
+  }
+  
+  /* ── Evitar cortes dentro de elementos clave ── */
+  .pdf-mode .glass-card,
+  .pdf-mode table,
+  .pdf-mode tr,
+  .pdf-mode .grid > *,
+  .pdf-mode [class*="rounded-xl"],
+  .pdf-mode [class*="rounded-2xl"] {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   
   /* ── Forzar visibilidad de elementos Framer Motion ──
    * FM aplica inline style="opacity:0; transform:translateY(80px)"
-   * a elementos que no han entrado en viewport.
-   * Este override los hace visibles en su posición final.
-   * Es seguro porque:
-   * - Solo FM usa inline opacity/transform en este proyecto
-   * - Tailwind usa CSS classes (no inline styles) para transforms
-   * - Next/Image inline styles no usan opacity ni transform
+   * a elementos fuera del viewport. Este override los hace visibles.
    */
   .pdf-mode [style] {
     opacity: 1 !important;
     transform: none !important;
   }
   
-  /* ── Deshabilitar todas las animaciones CSS ── */
+  /* ── Deshabilitar animaciones CSS ── */
   .pdf-mode * {
     animation: none !important;
     animation-delay: 0s !important;
@@ -103,9 +105,26 @@ const PDF_MODE_STYLES = `
     transition-delay: 0s !important;
   }
   
-  /* ── Ocultar elementos interactivos que no tienen sentido en PDF ── */
+  /* ── Ocultar elementos interactivos ── */
   .pdf-mode .pdf-hide {
     display: none !important;
+  }
+  
+  /* ── Optimización visual para PDF ── */
+  /* Reducir blur/glows que pesan mucho en PDF */
+  .pdf-mode [class*="blur-3xl"] {
+    filter: blur(40px) !important;
+    opacity: 0.15 !important;
+  }
+  .pdf-mode [class*="blur-2xl"] {
+    filter: blur(20px) !important;
+    opacity: 0.15 !important;
+  }
+  /* Cards: simplificar backdrop-filter que pesa en PDF */
+  .pdf-mode .glass-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(255,255,255,0.05) !important;
   }
 `;
 
