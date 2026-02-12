@@ -24,10 +24,21 @@ import { toSentenceCase } from "@/lib/text-format";
 const INBOUND_LEADS_TO = process.env.INBOUND_LEADS_EMAIL || "leads@inbound.gard.cl";
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
+/** GET: health check para confirmar que la URL del webhook responde */
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    endpoint: "inbound-email",
+    expectedRecipient: INBOUND_LEADS_TO,
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { type, data } = body;
+
+    console.log("[inbound-email] Webhook received:", { type, emailId: data?.email_id, to: data?.to });
 
     if (type !== "email.received") {
       return NextResponse.json({ success: true, skipped: "not_email.received" });
@@ -46,6 +57,7 @@ export async function POST(request: NextRequest) {
       (addr: string) => addr.toLowerCase().replace(/\s/g, "") === INBOUND_LEADS_TO.toLowerCase().replace(/\s/g, "")
     );
     if (!isForLeads) {
+      console.log("[inbound-email] Skipped: recipient not matched", { toList, expected: INBOUND_LEADS_TO });
       return NextResponse.json({ success: true, skipped: "wrong_recipient" });
     }
 
@@ -80,6 +92,10 @@ export async function POST(request: NextRequest) {
     if (extracted.summary) notesParts.push(extracted.summary);
     if (extracted.coverageDetails) notesParts.push(`Cobertura: ${extracted.coverageDetails}`);
     if (extracted.serviceDuration) notesParts.push(`Duración: ${extracted.serviceDuration}`);
+    if (extracted.guardsPerShift) notesParts.push(`Guardias por turno: ${extracted.guardsPerShift}`);
+    if (extracted.numberOfLocations) notesParts.push(`Puntos a cubrir: ${extracted.numberOfLocations}`);
+    if (extracted.startDate) notesParts.push(`Inicio estimado: ${extracted.startDate}`);
+    if (extracted.businessActivity) notesParts.push(`Giro: ${extracted.businessActivity}`);
     const notes = notesParts.length > 0 ? notesParts.join("\n\n") : null;
 
     const lead = await prisma.crmLead.create({
@@ -108,6 +124,16 @@ export async function POST(request: NextRequest) {
             to: toList,
             receivedAt: email.created_at,
             resendEmailId: emailId,
+          },
+          extracted: {
+            rut: extracted.rut || null,
+            legalName: extracted.legalName || null,
+            businessActivity: extracted.businessActivity || null,
+            legalRepresentativeName: extracted.legalRepresentativeName || null,
+            contactRole: extracted.contactRole || null,
+            guardsPerShift: extracted.guardsPerShift || null,
+            numberOfLocations: extracted.numberOfLocations || null,
+            startDate: extracted.startDate || null,
           },
         },
       },

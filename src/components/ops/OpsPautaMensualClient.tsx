@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -220,6 +221,7 @@ export function OpsPautaMensualClient({
         slotNumber: number;
         requiredGuards: number;
         cells: Map<string, PautaItem>;
+        guardiaId?: string;
         guardiaName?: string;
         patternCode?: string;
       }
@@ -240,29 +242,23 @@ export function OpsPautaMensualClient({
       }
       const row = rows.get(key)!;
       row.cells.set(toDateKey(item.date), item);
-      // Track guard name from first work day
-      if (item.plannedGuardia && !row.guardiaName) {
-        row.guardiaName = `${item.plannedGuardia.persona.firstName} ${item.plannedGuardia.persona.lastName}`;
-      }
     }
 
-    // Enrich with serie info
+    // Enrich with serie info (pattern code only)
     for (const s of series) {
       const key: RowKey = `${s.puestoId}|${s.slotNumber}`;
       const row = rows.get(key);
       if (row) {
         row.patternCode = s.patternCode;
-        if (s.guardia && !row.guardiaName) {
-          row.guardiaName = `${s.guardia.persona.firstName} ${s.guardia.persona.lastName}`;
-        }
       }
     }
 
-    // Enrich with active guard assignments (from OpsAsignacionGuardia)
+    // Guard name comes ONLY from active assignments (source of truth)
     for (const a of slotAsignaciones) {
       const key: RowKey = `${a.puestoId}|${a.slotNumber}`;
       const row = rows.get(key);
-      if (row && !row.guardiaName && a.guardia) {
+      if (row && a.guardia) {
+        row.guardiaId = a.guardiaId;
         row.guardiaName = `${a.guardia.persona.firstName} ${a.guardia.persona.lastName}`;
       }
     }
@@ -533,9 +529,18 @@ export function OpsPautaMensualClient({
                               S{row.slotNumber}
                             </span>
                             {row.guardiaName ? (
-                              <span className="text-foreground font-medium truncate max-w-[120px]">
-                                {row.guardiaName}
-                              </span>
+                              row.guardiaId ? (
+                                <Link
+                                  href={`/personas/guardias/${row.guardiaId}`}
+                                  className="text-foreground font-medium truncate max-w-[120px] hover:text-primary hover:underline underline-offset-2 transition-colors"
+                                >
+                                  {row.guardiaName}
+                                </Link>
+                              ) : (
+                                <span className="text-foreground font-medium truncate max-w-[120px]">
+                                  {row.guardiaName}
+                                </span>
+                              )
                             ) : (
                               <span className="text-amber-400/60 italic text-[9px]">sin asignar</span>
                             )}

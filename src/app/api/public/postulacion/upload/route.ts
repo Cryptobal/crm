@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-import crypto from "node:crypto";
 import { isValidPostulacionToken } from "@/lib/postulacion-token";
+import { uploadFile } from "@/lib/storage";
 
 const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
@@ -12,17 +10,6 @@ const ALLOWED_MIME = new Set([
   "image/webp",
   "image/gif",
 ]);
-
-function getExtension(fileName: string, mimeType: string): string {
-  const parsed = path.extname(fileName || "").toLowerCase();
-  if (parsed) return parsed;
-  if (mimeType === "application/pdf") return ".pdf";
-  if (mimeType === "image/jpeg") return ".jpg";
-  if (mimeType === "image/png") return ".png";
-  if (mimeType === "image/webp") return ".webp";
-  if (mimeType === "image/gif") return ".gif";
-  return ".bin";
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,20 +43,15 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const uploadsDir = path.join(process.cwd(), "public", "uploads", "guardias");
-    await mkdir(uploadsDir, { recursive: true });
-    const extension = getExtension(file.name, mimeType);
-    const safeName = `${Date.now()}-${crypto.randomUUID()}${extension}`;
-    const diskPath = path.join(uploadsDir, safeName);
-    await writeFile(diskPath, buffer);
+    const result = await uploadFile(buffer, file.name, mimeType, "guardias");
 
     return NextResponse.json({
       success: true,
       data: {
-        url: `/uploads/guardias/${safeName}`,
-        fileName: file.name,
-        mimeType,
-        size: file.size,
+        url: result.publicUrl,
+        fileName: result.fileName,
+        mimeType: result.mimeType,
+        size: result.size,
       },
     });
   } catch (error) {

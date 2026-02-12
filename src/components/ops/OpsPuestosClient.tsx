@@ -19,6 +19,10 @@ import {
 import { Building2, ExternalLink, UserPlus, UserMinus, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
+function toDateInput(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 /* ── constants ─────────────────────────────────── */
 
 const LIFECYCLE_COLORS: Record<string, string> = {
@@ -106,12 +110,19 @@ export function OpsPuestosClient({
   const [assignTarget, setAssignTarget] = useState<{ puestoId: string; slotNumber: number; puestoName: string } | null>(null);
   const [assignGuardiaId, setAssignGuardiaId] = useState("");
   const [assignSearch, setAssignSearch] = useState("");
+  const [assignDate, setAssignDate] = useState(toDateInput(new Date()));
+  const [assignWarning, setAssignWarning] = useState<{
+    puestoName: string;
+    installationName: string;
+    accountName?: string | null;
+  } | null>(null);
   const [assignSaving, setAssignSaving] = useState(false);
 
   // Unassign modal
   const [unassignConfirm, setUnassignConfirm] = useState<{ open: boolean; asignacionId: string; guardiaName: string }>({
     open: false, asignacionId: "", guardiaName: "",
   });
+  const [unassignDate, setUnassignDate] = useState(toDateInput(new Date()));
   const [unassignSaving, setUnassignSaving] = useState(false);
 
   const currentClient = useMemo(() => clients.find((c) => c.id === clientId), [clients, clientId]);
@@ -181,8 +192,39 @@ export function OpsPuestosClient({
     setAssignTarget({ puestoId, slotNumber, puestoName });
     setAssignGuardiaId("");
     setAssignSearch("");
+    setAssignDate(toDateInput(new Date()));
+    setAssignWarning(null);
     setAssignModalOpen(true);
   };
+
+  // Check if selected guardia has existing assignment
+  useEffect(() => {
+    if (!assignGuardiaId) {
+      setAssignWarning(null);
+      return;
+    }
+    const controller = new AbortController();
+    fetch("/api/ops/asignaciones", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "check", guardiaId: assignGuardiaId }),
+      signal: controller.signal,
+    })
+      .then((r) => r.json())
+      .then((payload) => {
+        if (payload.success && payload.data?.hasActiveAssignment) {
+          setAssignWarning({
+            puestoName: payload.data.assignment.puestoName,
+            installationName: payload.data.assignment.installationName,
+            accountName: payload.data.assignment.accountName,
+          });
+        } else {
+          setAssignWarning(null);
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [assignGuardiaId]);
 
   // Assign guardia
   const handleAssign = async () => {
@@ -199,6 +241,7 @@ export function OpsPuestosClient({
           guardiaId: assignGuardiaId,
           puestoId: assignTarget.puestoId,
           slotNumber: assignTarget.slotNumber,
+          startDate: assignDate,
         }),
       });
       const payload = await res.json();
@@ -223,6 +266,7 @@ export function OpsPuestosClient({
         body: JSON.stringify({
           action: "desasignar",
           asignacionId: unassignConfirm.asignacionId,
+          endDate: unassignDate,
           reason: "Desasignado manualmente",
         }),
       });
@@ -427,6 +471,21 @@ export function OpsPuestosClient({
           </DialogHeader>
 
           <div className="space-y-3 py-2">
+            {/* Date */}
+            <div className="space-y-1.5">
+              <Label>Fecha efectiva</Label>
+              <input
+                type="date"
+                value={assignDate}
+                onChange={(e) => setAssignDate(e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                El guardia será asignado desde esta fecha. La pauta anterior no se modifica.
+              </p>
+            </div>
+
+            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -437,7 +496,19 @@ export function OpsPuestosClient({
               />
             </div>
 
-            <div className="max-h-[300px] overflow-y-auto space-y-1 rounded-md border border-border p-1">
+            {/* Warning */}
+            {assignWarning && (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-300">
+                Este guardia ya está asignado a <span className="font-semibold">{assignWarning.puestoName}</span> en{" "}
+                <span className="font-semibold">{assignWarning.installationName}</span>
+                {assignWarning.accountName && ` (${assignWarning.accountName})`}.
+                <br />
+                Al confirmar, se cerrará esa asignación y se limpiará la pauta desde la fecha indicada.
+              </div>
+            )}
+
+            {/* Guard list */}
+            <div className="max-h-[250px] overflow-y-auto space-y-1 rounded-md border border-border p-1">
               {availableGuardias.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-4">
                   No hay guardias disponibles
@@ -486,14 +557,31 @@ export function OpsPuestosClient({
       </Dialog>
 
       {/* Unassign confirmation */}
-      <Dialog open={unassignConfirm.open} onOpenChange={(open) => setUnassignConfirm((p) => ({ ...p, open }))}>
+      <Dialog open={unassignConfirm.open} onOpenChange={(open) => {
+        if (open) setUnassignDate(toDateInput(new Date()));
+        setUnassignConfirm((p) => ({ ...p, open }));
+      }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Desasignar guardia</DialogTitle>
             <DialogDescription>
-              ¿Desasignar a {unassignConfirm.guardiaName} de este puesto? El slot quedará vacante (PPC).
+              ¿Desasignar a {unassignConfirm.guardiaName} de este puesto?
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label>Fecha efectiva</Label>
+              <input
+                type="date"
+                value={unassignDate}
+                onChange={(e) => setUnassignDate(e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Se limpiará la pauta desde esta fecha. El slot quedará vacante (PPC).
+              </p>
+            </div>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setUnassignConfirm((p) => ({ ...p, open: false }))}>
               Cancelar

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { parseBody, requireAuth, unauthorized } from "@/lib/api-auth";
+import { requireAuth, unauthorized } from "@/lib/api-auth";
 import { createOpsAuditLog, ensureOpsAccess, parseDateOnly, toISODate } from "@/lib/ops";
+import type { AuthContext } from "@/lib/api-auth";
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -20,9 +21,58 @@ const desasignarSchema = z.object({
   reason: z.string().max(500).optional().nullable(),
 });
 
+/* Check action: return existing assignment info without modifying */
+const checkSchema = z.object({
+  guardiaId: z.string().uuid(),
+});
+
+/**
+ * Cleans pauta mensual entries for a guard from a date forward.
+ * Removes the guard from planned slots (sets plannedGuardiaId to null, shiftCode to null).
+ */
+async function cleanPautaFromDate(
+  tenantId: string,
+  puestoId: string,
+  slotNumber: number,
+  guardiaId: string,
+  fromDate: Date
+) {
+  // Clean entries where the guard is assigned (work days)
+  const cleaned1 = await prisma.opsPautaMensual.updateMany({
+    where: {
+      tenantId,
+      puestoId,
+      slotNumber,
+      plannedGuardiaId: guardiaId,
+      date: { gte: fromDate },
+    },
+    data: {
+      plannedGuardiaId: null,
+      shiftCode: null,
+    },
+  });
+
+  // Also clean rest days ("-") for this slot that have no guard but have a shiftCode
+  // These are the descanso days from the painted serie
+  const cleaned2 = await prisma.opsPautaMensual.updateMany({
+    where: {
+      tenantId,
+      puestoId,
+      slotNumber,
+      plannedGuardiaId: null,
+      shiftCode: { not: null },
+      date: { gte: fromDate },
+    },
+    data: {
+      shiftCode: null,
+    },
+  });
+
+  return cleaned1.count + cleaned2.count;
+}
+
 /**
  * GET /api/ops/asignaciones
- * Query params: installationId, puestoId, guardiaId, activeOnly
  */
 export async function GET(request: NextRequest) {
   try {
@@ -88,7 +138,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/ops/asignaciones
- * Action: "asignar" or "desasignar"
+ * Actions: "asignar" (default), "desasignar", "check"
  */
 export async function POST(request: NextRequest) {
   try {
@@ -103,6 +153,9 @@ export async function POST(request: NextRequest) {
     if (action === "desasignar") {
       return handleDesasignar(ctx, rawBody);
     }
+    if (action === "check") {
+      return handleCheck(ctx, rawBody);
+    }
 
     // Default: asignar
     const parsed = asignarSchema.safeParse(rawBody);
@@ -114,7 +167,7 @@ export async function POST(request: NextRequest) {
     }
     const body = parsed.data;
 
-    // Validate guardia exists and is assignable
+    // Validate guardia
     const guardia = await prisma.opsGuardia.findFirst({
       where: { id: body.guardiaId, tenantId: ctx.tenantId },
       select: { id: true, status: true, lifecycleStatus: true, isBlacklisted: true },
@@ -135,7 +188,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate puesto exists
+    // Validate puesto
     const puesto = await prisma.opsPuestoOperativo.findFirst({
       where: { id: body.puestoId, tenantId: ctx.tenantId },
       select: { id: true, installationId: true, requiredGuards: true },
@@ -150,12 +203,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if guardia already has active assignment → close it
+    const startDate = body.startDate
+      ? parseDateOnly(body.startDate)
+      : parseDateOnly(toISODate(new Date()));
+
+    // 1. If guardia already has active assignment → close it + clean pauta
     const existingGuardiaAssignment = await prisma.opsAsignacionGuardia.findFirst({
       where: { guardiaId: body.guardiaId, tenantId: ctx.tenantId, isActive: true },
     });
-
-    const startDate = body.startDate ? parseDateOnly(body.startDate) : parseDateOnly(toISODate(new Date()));
 
     if (existingGuardiaAssignment) {
       await prisma.opsAsignacionGuardia.update({
@@ -167,14 +222,24 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Clean pauta from startDate forward for the OLD assignment
+      await cleanPautaFromDate(
+        ctx.tenantId,
+        existingGuardiaAssignment.puestoId,
+        existingGuardiaAssignment.slotNumber,
+        body.guardiaId,
+        startDate
+      );
+
       await createOpsAuditLog(ctx, "ops.asignacion.closed", "ops_asignacion", existingGuardiaAssignment.id, {
         guardiaId: body.guardiaId,
         previousPuestoId: existingGuardiaAssignment.puestoId,
         reason: body.reason || "Traslado a otro puesto",
+        pautaCleaned: true,
       });
     }
 
-    // Check if slot is already occupied → close that assignment
+    // 2. If slot is already occupied → close that assignment + clean pauta
     const existingSlotAssignment = await prisma.opsAsignacionGuardia.findFirst({
       where: {
         puestoId: body.puestoId,
@@ -193,9 +258,18 @@ export async function POST(request: NextRequest) {
           reason: "Reemplazado por otro guardia",
         },
       });
+
+      // Clean pauta for the displaced guard
+      await cleanPautaFromDate(
+        ctx.tenantId,
+        existingSlotAssignment.puestoId,
+        existingSlotAssignment.slotNumber,
+        existingSlotAssignment.guardiaId,
+        startDate
+      );
     }
 
-    // Create new assignment
+    // 3. Create new assignment
     const asignacion = await prisma.opsAsignacionGuardia.create({
       data: {
         tenantId: ctx.tenantId,
@@ -237,7 +311,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleDesasignar(ctx: any, rawBody: any) {
+/**
+ * Desasignar: close assignment + clean pauta from endDate forward
+ */
+async function handleDesasignar(ctx: AuthContext, rawBody: unknown) {
   const parsed = desasignarSchema.safeParse(rawBody);
   if (!parsed.success) {
     return NextResponse.json(
@@ -257,8 +334,11 @@ async function handleDesasignar(ctx: any, rawBody: any) {
     );
   }
 
-  const endDate = body.endDate ? parseDateOnly(body.endDate) : parseDateOnly(toISODate(new Date()));
+  const endDate = body.endDate
+    ? parseDateOnly(body.endDate)
+    : parseDateOnly(toISODate(new Date()));
 
+  // Close assignment
   const updated = await prisma.opsAsignacionGuardia.update({
     where: { id: asignacion.id },
     data: {
@@ -268,11 +348,65 @@ async function handleDesasignar(ctx: any, rawBody: any) {
     },
   });
 
+  // Clean pauta from endDate forward
+  const cleanedCount = await cleanPautaFromDate(
+    ctx.tenantId,
+    asignacion.puestoId,
+    asignacion.slotNumber,
+    asignacion.guardiaId,
+    endDate
+  );
+
   await createOpsAuditLog(ctx, "ops.asignacion.closed", "ops_asignacion", asignacion.id, {
     guardiaId: asignacion.guardiaId,
     puestoId: asignacion.puestoId,
     reason: body.reason || "Desasignado manualmente",
+    pautaCleaned: cleanedCount,
   });
 
-  return NextResponse.json({ success: true, data: updated });
+  return NextResponse.json({ success: true, data: { ...updated, pautaCleaned: cleanedCount } });
+}
+
+/**
+ * Check: returns existing assignment info for a guard (for UI warnings)
+ */
+async function handleCheck(ctx: AuthContext, rawBody: unknown) {
+  const parsed = checkSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { success: false, error: "guardiaId inválido" },
+      { status: 400 }
+    );
+  }
+
+  const existing = await prisma.opsAsignacionGuardia.findFirst({
+    where: { guardiaId: parsed.data.guardiaId, tenantId: ctx.tenantId, isActive: true },
+    include: {
+      puesto: { select: { id: true, name: true } },
+      installation: {
+        select: {
+          id: true,
+          name: true,
+          account: { select: { name: true } },
+        },
+      },
+    },
+  });
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      hasActiveAssignment: !!existing,
+      assignment: existing
+        ? {
+            id: existing.id,
+            puestoName: existing.puesto.name,
+            installationName: existing.installation.name,
+            accountName: existing.installation.account?.name ?? null,
+            slotNumber: existing.slotNumber,
+            startDate: existing.startDate,
+          }
+        : null,
+    },
+  });
 }

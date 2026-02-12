@@ -635,33 +635,36 @@ export function CrmLeadsClient({
       meta?.companyEnrichment && typeof meta.companyEnrichment === "object" && !Array.isArray(meta.companyEnrichment)
         ? (meta.companyEnrichment as Record<string, unknown>)
         : null;
+    const emailExtracted =
+      meta?.extracted && typeof meta.extracted === "object" && !Array.isArray(meta.extracted)
+        ? (meta.extracted as Record<string, unknown>)
+        : null;
     const leadDotacion = (meta?.dotacion as DotacionItem[] | undefined) || [];
+
+    const str = (source: Record<string, unknown> | null, key: string): string =>
+      source && typeof source[key] === "string" ? (source[key] as string) : "";
 
     setApproveForm({
       accountName: lead.companyName || "",
-      legalName: (typeof companyEnrichment?.legalName === "string" ? companyEnrichment.legalName : "") || "",
+      legalName: str(companyEnrichment, "legalName") || str(emailExtracted, "legalName") || "",
       legalRepresentativeName:
-        (typeof companyEnrichment?.legalRepresentativeName === "string"
-          ? companyEnrichment.legalRepresentativeName
-          : "") || "",
+        str(companyEnrichment, "legalRepresentativeName") || str(emailExtracted, "legalRepresentativeName") || "",
       legalRepresentativeRut:
-        (typeof companyEnrichment?.legalRepresentativeRut === "string"
-          ? companyEnrichment.legalRepresentativeRut
-          : "") || "",
+        str(companyEnrichment, "legalRepresentativeRut") || "",
       contactFirstName: lead.firstName || "",
       contactLastName: lead.lastName || "",
       email: lead.email || "",
       phone: lead.phone || "",
       dealTitle: `Oportunidad ${lead.companyName || fullName || ""}`.trim(),
       rut:
-        (typeof companyEnrichment?.accountRut === "string" ? companyEnrichment.accountRut : "") || "",
+        str(companyEnrichment, "accountRut") || str(emailExtracted, "rut") || "",
       industry:
-        (typeof companyEnrichment?.industry === "string" ? companyEnrichment.industry : "") ||
+        str(companyEnrichment, "industry") ||
         lead.industry ||
         "",
       segment:
-        (typeof companyEnrichment?.segment === "string" ? companyEnrichment.segment : "") || "",
-      roleTitle: "",
+        str(companyEnrichment, "segment") || "",
+      roleTitle: str(emailExtracted, "contactRole") || "",
       website: (lead as any).website || extractWebsiteFromEmail(lead.email || ""),
       companyInfo: "",
       notes: lead.notes || "",

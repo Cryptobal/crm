@@ -278,7 +278,7 @@ export const createGuardiaDocumentSchema = z.object({
   type: z.enum(DOCUMENT_TYPES),
   fileUrl: z.string().trim().max(3000000).refine(
     (value) => /^https?:\/\//i.test(value) || value.startsWith("/uploads/guardias/"),
-    "fileUrl inválido"
+    "fileUrl inválido (debe ser URL https o path /uploads/guardias/)"
   ),
   status: z.enum(DOCUMENT_STATUS).default("pendiente"),
   issuedAt: z.string().regex(dateRegex, "issuedAt debe tener formato YYYY-MM-DD").optional().nullable(),

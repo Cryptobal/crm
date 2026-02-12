@@ -96,7 +96,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate guard is assigned to this puesto+slot
+    const asignacion = await prisma.opsAsignacionGuardia.findFirst({
+      where: {
+        tenantId: ctx.tenantId,
+        guardiaId: body.guardiaId,
+        puestoId: body.puestoId,
+        slotNumber: body.slotNumber,
+        isActive: true,
+      },
+    });
+    if (!asignacion) {
+      return NextResponse.json(
+        { success: false, error: "El guardia no está asignado a este puesto/slot. Asígnalo primero en Puestos operativos." },
+        { status: 400 }
+      );
+    }
+
     const startDate = parseDateOnly(body.startDate);
+
+    // Don't allow painting before the assignment start date
+    if (startDate < asignacion.startDate) {
+      const assignDateStr = asignacion.startDate.toISOString().slice(0, 10);
+      return NextResponse.json(
+        { success: false, error: `No se puede pintar antes de la fecha de asignación (${assignDateStr}). El guardia fue asignado desde esa fecha.` },
+        { status: 400 }
+      );
+    }
+
     const { start: monthStart, end: monthEnd } = getMonthDateRange(body.year, body.month);
     const monthDates = listDatesBetween(monthStart, monthEnd);
 

@@ -33,6 +33,7 @@ import {
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { NotesSection } from "./NotesSection";
+import { FileAttachments } from "./FileAttachments";
 
 const ACCOUNT_LOGO_MARKER_PREFIX = "[[ACCOUNT_LOGO_URL:";
 const ACCOUNT_LOGO_MARKER_SUFFIX = "]]";
@@ -749,6 +750,10 @@ export function CrmAccountDetailClient({
     {
       key: "notes",
       children: <NotesSection entityType="account" entityId={account.id} currentUserId={currentUserId} />,
+    },
+    {
+      key: "files",
+      children: <FileAttachments entityType="account" entityId={account.id} title="Archivos" />,
     },
   ];
 

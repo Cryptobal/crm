@@ -63,3 +63,46 @@ Cuando llegue un correo a cualquier dirección **@inbound.gard.cl** (incluida **
 3. En unos segundos deberías ver en la app un **nuevo lead** en CRM → Leads, con origen “Correo reenviado” y los datos extraídos por IA.
 
 Si no aparece el lead, revisa en Vercel los logs del deployment (o la pestaña “Functions” / “Logs”) para ver si llegó el POST a `/api/webhook/inbound-email` y si hubo algún error.
+
+---
+
+## 6. Error "no se ha encontrado el dominio inbound.gard.cl"
+
+Si al enviar a **leads@inbound.gard.cl** tu cliente de correo dice que no encuentra el dominio:
+
+- **Causa:** El registro **MX de recepción** para `inbound.gard.cl` no está verificado en Resend (en Domains → inbound.gard.cl aparece "Enable Receiving (MX)" en **Pending**).
+- **Qué hacer:**
+  1. En Resend → **Domains** → **inbound.gard.cl**, en la sección **"Enable Receiving (MX)"** verás el registro MX que debes crear (nombre y valor / mail server).
+  2. En tu proveedor DNS (p. ej. Cloudflare → gard.cl → DNS), crea un registro **MX**:
+     - **Name:** `inbound` (para que aplique a inbound.gard.cl).
+     - **Mail server:** el valor exacto que muestra Resend (p. ej. `feedback-smtp.xxx.amazonses.com`).
+     - **Priority:** la que indique Resend (ej. 10).
+  3. En Resend, pulsa **"I've added the record"** (o "Verify") y espera a que el estado pase a **Verified**.
+  4. La propagación DNS puede tardar unos minutos; si sigue en Pending, espera 15–30 min y vuelve a verificar en Resend.
+
+Cuando el MX esté **Verified**, los correos a leads@inbound.gard.cl llegarán a Resend y se activará el webhook.
+
+---
+
+## 7. El correo no rebota pero no aparece el lead
+
+Si el correo **ya no rebota** (Gmail lo envía bien) pero **no se crea el lead** en la app:
+
+1. **Resend → Webhooks**  
+   Abre el webhook de `email.received` y mira la sección de eventos. Si aparece un evento **email.received** tras enviar el correo, Resend sí recibió el correo y llamó a tu API. Si no hay eventos, el correo no está llegando a Resend (revisa MX y propagación).
+
+2. **URL del webhook**  
+   Debe ser exactamente:  
+   `https://opai.gard.cl/api/webhook/inbound-email`  
+   (no barra final, HTTPS). Comprueba que responde: abre en el navegador  
+   `https://opai.gard.cl/api/webhook/inbound-email`  
+   — debe devolver JSON con `ok: true` y `expectedRecipient: "leads@inbound.gard.cl"`.
+
+3. **Vercel → Logs**  
+   En el proyecto en Vercel, ve a **Logs** (o **Functions** → elegir la función) y filtra por `/api/webhook/inbound-email`. Busca líneas `[inbound-email] Webhook received:` tras enviar el correo.  
+   - Si no hay ninguna petición: Resend no está llamando (revisa URL del webhook y que el evento sea `email.received`).  
+   - Si hay petición pero `skipped: wrong_recipient`: la variable **INBOUND_LEADS_EMAIL** en Vercel debe ser exactamente `leads@inbound.gard.cl` (mismo valor que en Resend).  
+   - Si hay error 502/500: revisa el mensaje en el log (p. ej. Resend API, base de datos, R2).
+
+4. **Variable en Vercel**  
+   En el proyecto → **Settings** → **Environment Variables**, confirma que **INBOUND_LEADS_EMAIL** = `leads@inbound.gard.cl` en Production (y Preview si pruebas en preview).

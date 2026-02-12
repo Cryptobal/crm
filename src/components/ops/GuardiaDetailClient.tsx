@@ -37,6 +37,15 @@ import {
 } from "@/lib/personas";
 import { hasOpsCapability } from "@/lib/ops-rbac";
 
+/** Format a date-only value using UTC to avoid timezone shift */
+function formatDateUTC(value: string | Date): string {
+  const d = typeof value === "string" ? new Date(value) : value;
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const year = d.getUTCFullYear();
+  return `${day}-${month}-${year}`;
+}
+
 const SECTIONS = [
   { id: "asignacion", label: "Asignación", icon: MapPin },
   { id: "datos", label: "Datos personales", icon: User },
@@ -651,7 +660,7 @@ export function GuardiaDetailClient({ initialGuardia, asignaciones = [], userRol
                           {current.installation.account && ` · ${current.installation.account.name}`}
                         </p>
                         <p className="text-xs text-emerald-200/60 mt-0.5">
-                          {current.puesto.shiftStart} - {current.puesto.shiftEnd} · Desde {new Date(current.startDate).toLocaleDateString("es-CL")}
+                          {current.puesto.shiftStart} - {current.puesto.shiftEnd} · Desde {formatDateUTC(current.startDate)}
                         </p>
                       </div>
                       <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/30">
@@ -682,8 +691,8 @@ export function GuardiaDetailClient({ initialGuardia, asignaciones = [], userRol
                             </div>
                           </div>
                           <p className="text-muted-foreground mt-0.5">
-                            {new Date(h.startDate).toLocaleDateString("es-CL")}
-                            {h.endDate && ` → ${new Date(h.endDate).toLocaleDateString("es-CL")}`}
+                            {formatDateUTC(h.startDate)}
+                            {h.endDate && ` → ${formatDateUTC(h.endDate)}`}
                             {h.reason && ` · ${h.reason}`}
                           </p>
                         </div>
