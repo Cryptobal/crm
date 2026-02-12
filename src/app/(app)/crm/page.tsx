@@ -1,42 +1,27 @@
 /**
- * CRM - Dashboard ejecutivo: reportes, métricas, visión comercial + operaciones
+ * CRM - Dashboard ejecutivo con reportes y métricas
  */
 
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { hasCrmSubmoduleAccess } from '@/lib/module-access';
-import { hasAppAccess } from '@/lib/app-access';
 import { getDefaultTenantId } from '@/lib/tenant';
 import { prisma } from '@/lib/prisma';
 import { PageHeader } from '@/components/opai';
-import { KpiCard } from '@/components/opai/KpiCard';
 import { CrmSubnav } from '@/components/crm/CrmSubnav';
 import {
   LeadsByMonthChart,
   QuotesByMonthChart,
   LeadsBySourceChart,
-  GuardsByStatusChart,
   type LeadByMonthRow,
   type QuotesByMonthRow,
   type LeadBySourceRow,
-  type GuardsByStatusRow,
 } from '@/components/crm/CrmDashboardCharts';
-import { CRM_SUBMODULE_NAV_ITEMS } from '@/lib/module-access';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import {
-  Users,
-  UserPlus,
-  Building2,
-  MapPin,
-  BriefcaseBusiness,
-  Send,
-  Target,
-  CheckCircle2,
-  Shield,
-  ClipboardList,
-  Clock3,
-  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -46,7 +31,7 @@ const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'S
 
 function formatMonthLabel(dateStr: string): string {
   const d = new Date(dateStr);
-  return `${MONTH_LABELS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  return `${MONTH_LABELS[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}`;
 }
 
 function formatLeadSource(source: string | null): string {
@@ -81,42 +66,49 @@ export default async function CRMPage() {
   const thirtyDaysAgo = new Date(now);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
 
-  const canSeeOps = hasAppAccess(role, 'ops');
-
-  // KPIs + funnel + chart data in parallel
+  // All queries in parallel
   const [
     leadsThisMonth,
+    leadsPrevMonth,
     leadsPending,
+    leadsInReview,
+    leadsApproved12m,
+    leadsRejected12m,
     accountsActive,
     installationsActive,
-    guardsContratados,
     openDealsCount,
-    openDealsAmount,
+    openDealsAmountResult,
     // Funnel 30d
     leadsCreated30,
     leadsConverted30,
     proposalsSent30,
     wonDealsWithProposal30Rows,
-    // Leads by month (raw)
+    // Chart data
     leadsByMonthRaw,
-    // Quotes by month (raw)
     quotesByMonthRaw,
-    // Leads by source
     leadsBySourceGroup,
-    // Ops (conditional)
-    guardsByLifecycle,
-    puestosActive,
-    tePending,
-    ppcToday,
-    pautaCountThisMonth,
-    asistenciaCoveredThisMonth,
   ] = await Promise.all([
+    // KPIs
     prisma.crmLead.count({
       where: { tenantId, createdAt: { gte: startOfThisMonth } },
     }),
     prisma.crmLead.count({
+      where: { tenantId, createdAt: { gte: startOfPrevMonth, lte: endOfPrevMonth } },
+    }),
+    prisma.crmLead.count({
       where: { tenantId, status: 'pending' },
+    }),
+    prisma.crmLead.count({
+      where: { tenantId, status: 'in_review' },
+    }),
+    prisma.crmLead.count({
+      where: { tenantId, status: 'approved', createdAt: { gte: twelveMonthsAgo } },
+    }),
+    prisma.crmLead.count({
+      where: { tenantId, status: 'rejected', createdAt: { gte: twelveMonthsAgo } },
     }),
     prisma.crmAccount.count({
       where: { tenantId, status: 'client_active' },
@@ -124,11 +116,6 @@ export default async function CRMPage() {
     prisma.crmInstallation.count({
       where: { tenantId, isActive: true },
     }),
-    canSeeOps
-      ? prisma.opsGuardia.count({
-          where: { tenantId, lifecycleStatus: 'contratado_activo' },
-        })
-      : Promise.resolve(0),
     prisma.crmDeal.count({
       where: { tenantId, status: 'open' },
     }),
@@ -136,21 +123,15 @@ export default async function CRMPage() {
       where: { tenantId, status: 'open' },
       _sum: { amount: true },
     }),
+    // Funnel
     prisma.crmLead.count({
       where: { tenantId, createdAt: { gte: thirtyDaysAgo } },
     }),
     prisma.crmLead.count({
-      where: {
-        tenantId,
-        createdAt: { gte: thirtyDaysAgo },
-        convertedDealId: { not: null },
-      },
+      where: { tenantId, createdAt: { gte: thirtyDaysAgo }, convertedDealId: { not: null } },
     }),
     prisma.crmDeal.count({
-      where: {
-        tenantId,
-        proposalSentAt: { gte: thirtyDaysAgo },
-      },
+      where: { tenantId, proposalSentAt: { gte: thirtyDaysAgo } },
     }),
     prisma.crmDealStageHistory.findMany({
       where: {
@@ -162,17 +143,14 @@ export default async function CRMPage() {
       select: { dealId: true },
       distinct: ['dealId'],
     }),
-    prisma.$queryRaw<
-      Array<{ month: Date; status: string; count: bigint }>
-    >`
+    // Charts
+    prisma.$queryRaw<Array<{ month: Date; status: string; count: bigint }>>`
       SELECT date_trunc('month', created_at)::date as month, status, COUNT(*)::bigint as count
       FROM crm.leads
       WHERE tenant_id = ${tenantId} AND created_at >= ${twelveMonthsAgo}
       GROUP BY 1, 2 ORDER BY 1
     `,
-    prisma.$queryRaw<
-      Array<{ month: Date; count: bigint }>
-    >`
+    prisma.$queryRaw<Array<{ month: Date; count: bigint }>>`
       SELECT date_trunc('month', proposal_sent_at)::date as month, COUNT(*)::bigint as count
       FROM crm.deals
       WHERE tenant_id = ${tenantId} AND proposal_sent_at >= ${twentyFourMonthsAgo}
@@ -183,368 +161,236 @@ export default async function CRMPage() {
       where: { tenantId, createdAt: { gte: twelveMonthsAgo } },
       _count: true,
     }),
-    canSeeOps
-      ? prisma.opsGuardia.groupBy({
-          by: ['lifecycleStatus'],
-          where: { tenantId },
-          _count: true,
-        })
-      : Promise.resolve([]),
-    canSeeOps
-      ? prisma.opsPuestoOperativo.count({ where: { tenantId, active: true } })
-      : Promise.resolve(0),
-    canSeeOps
-      ? prisma.opsTurnoExtra.count({ where: { tenantId, status: 'pending' } })
-      : Promise.resolve(0),
-    canSeeOps
-      ? (() => {
-          const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          const endOfToday = new Date(startOfToday);
-          endOfToday.setDate(endOfToday.getDate() + 1);
-          return prisma.opsPautaMensual.count({
-            where: {
-              tenantId,
-              date: { gte: startOfToday, lt: endOfToday },
-              puesto: { active: true },
-              OR: [
-                { plannedGuardiaId: null, shiftCode: null },
-                { plannedGuardiaId: null, shiftCode: { notIn: ['-'] } },
-                { shiftCode: { in: ['V', 'L', 'P'] } },
-              ],
-            },
-          });
-        })()
-      : Promise.resolve(0),
-    canSeeOps
-      ? (() => {
-          const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-          const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-          return prisma.opsPautaMensual.count({
-            where: {
-              tenantId,
-              date: { gte: startMonth, lte: endMonth },
-              puesto: { active: true },
-              shiftCode: { not: '-' },
-            },
-          });
-        })()
-      : Promise.resolve(0),
-    canSeeOps
-      ? (() => {
-          const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-          const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-          return prisma.opsAsistenciaDiaria.count({
-            where: {
-              tenantId,
-              date: { gte: startMonth, lte: endMonth },
-              attendanceStatus: { in: ['asistio', 'reemplazo'] },
-            },
-          });
-        })()
-      : Promise.resolve(0),
   ]);
 
+  // Derived metrics
   const wonDealsWithProposal30 = wonDealsWithProposal30Rows.length;
   const leadToDealRate30 = toPercent(leadsConverted30, leadsCreated30);
   const proposalToWonRate30 = toPercent(wonDealsWithProposal30, proposalsSent30);
+  const leadsMonthDelta = leadsPrevMonth > 0 ? Math.round(((leadsThisMonth - leadsPrevMonth) / leadsPrevMonth) * 100) : 0;
   const openDealsAmountFormatted =
-    openDealsAmount._sum.amount != null
-      ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(
-          Number(openDealsAmount._sum.amount)
-        )
-      : '—';
+    openDealsAmountResult._sum.amount != null
+      ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(openDealsAmountResult._sum.amount))
+      : '$0';
 
+  // Funnel
   const funnel = [
-    { label: 'Leads nuevos', value: leadsCreated30, href: '/crm/leads', rateFromPrev: null as number | null },
-    {
-      label: 'Leads convertidos',
-      value: leadsConverted30,
-      href: '/crm/leads',
-      rateFromPrev: toPercent(leadsConverted30, leadsCreated30),
-    },
-    {
-      label: 'Propuestas enviadas',
-      value: proposalsSent30,
-      href: '/crm/deals',
-      rateFromPrev: toPercent(proposalsSent30, leadsConverted30),
-    },
-    {
-      label: 'Negocios ganados',
-      value: wonDealsWithProposal30,
-      href: '/crm/deals',
-      rateFromPrev: toPercent(wonDealsWithProposal30, proposalsSent30),
-    },
+    { label: 'Leads nuevos', value: leadsCreated30, rate: null as number | null },
+    { label: 'Convertidos', value: leadsConverted30, rate: toPercent(leadsConverted30, leadsCreated30) },
+    { label: 'Propuestas', value: proposalsSent30, rate: toPercent(proposalsSent30, leadsConverted30) },
+    { label: 'Ganados', value: wonDealsWithProposal30, rate: proposalToWonRate30 },
   ];
 
-  const statusOrder = ['pending', 'in_review', 'approved', 'rejected'];
+  // Process leads by month
   const monthMap = new Map<string, { pending: number; in_review: number; approved: number; rejected: number }>();
   for (const row of leadsByMonthRaw) {
     const key = row.month instanceof Date ? row.month.toISOString().slice(0, 7) : String(row.month).slice(0, 7);
-    const count = Number(row.count);
     if (!monthMap.has(key)) monthMap.set(key, { pending: 0, in_review: 0, approved: 0, rejected: 0 });
-    const status = row.status ?? 'pending';
-    const prev = monthMap.get(key)!;
-    if (status === 'pending') prev.pending = count;
-    else if (status === 'in_review') prev.in_review = count;
-    else if (status === 'approved') prev.approved = count;
-    else if (status === 'rejected') prev.rejected = count;
+    const counts = monthMap.get(key)!;
+    const c = Number(row.count);
+    const s = row.status ?? 'pending';
+    if (s === 'pending') counts.pending = c;
+    else if (s === 'in_review') counts.in_review = c;
+    else if (s === 'approved') counts.approved = c;
+    else if (s === 'rejected') counts.rejected = c;
   }
   const leadsByMonthData: LeadByMonthRow[] = Array.from(monthMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([monthKey, counts]) => {
-      const total = counts.pending + counts.in_review + counts.approved + counts.rejected;
-      const [y, m] = monthKey.split('-').map(Number);
-      const monthLabel = `${MONTH_LABELS[(m ?? 1) - 1]} ${y}`;
-      return {
-        month: monthKey,
-        monthLabel,
-        pending: counts.pending,
-        in_review: counts.in_review,
-        approved: counts.approved,
-        rejected: counts.rejected,
-        total,
-      };
-    });
+    .map(([monthKey, c]) => ({
+      month: monthKey,
+      monthLabel: formatMonthLabel(monthKey + '-01'),
+      ...c,
+      total: c.pending + c.in_review + c.approved + c.rejected,
+    }));
 
+  // Process quotes by month
   const quotesByMonthData: QuotesByMonthRow[] = quotesByMonthRaw.map((row) => {
     const d = row.month instanceof Date ? row.month : new Date(row.month);
-    const monthKey = d.toISOString().slice(0, 7);
-    const monthLabel = formatMonthLabel(monthKey + '-01');
-    return { month: monthKey, monthLabel, count: Number(row.count) };
+    const mk = d.toISOString().slice(0, 7);
+    return { month: mk, monthLabel: formatMonthLabel(mk + '-01'), count: Number(row.count) };
   });
 
+  // Process leads by source
   const getSourceCount = (r: (typeof leadsBySourceGroup)[number]) =>
     typeof r._count === 'number' ? r._count : (r._count as Record<string, number>)['source'] ?? 0;
-  const leadsBySourceData: LeadBySourceRow[] = leadsBySourceGroup.map((r) => ({
+  const leadsBySourceUnsorted: LeadBySourceRow[] = leadsBySourceGroup.map((r) => ({
     source: r.source ?? 'otros',
     sourceLabel: formatLeadSource(r.source),
     count: getSourceCount(r),
     percent: 0,
   }));
-  const totalLeadsSource = leadsBySourceData.reduce((s, r) => s + r.count, 0);
-  leadsBySourceData.forEach((r) => {
-    r.percent = toPercent(r.count, totalLeadsSource);
-  });
+  const totalSrc = leadsBySourceUnsorted.reduce((s, r) => s + r.count, 0);
+  const leadsBySourceData = leadsBySourceUnsorted
+    .map((r) => ({ ...r, percent: toPercent(r.count, totalSrc) }))
+    .sort((a, b) => b.count - a.count);
 
-  const getGuardCount = (g: (typeof guardsByLifecycle)[number]) =>
-    typeof g._count === 'number' ? g._count : (g._count as Record<string, number>)['lifecycleStatus'] ?? 0;
-  const guardLifecycleOrder = ['contratado_activo', 'postulante', 'seleccionado', 'inactivo', 'desvinculado'];
-  const guardsByStatusData: GuardsByStatusRow[] = guardLifecycleOrder
-    .map((status) => ({
-      status,
-      label:
-        status === 'contratado_activo'
-          ? 'Contratados'
-          : status === 'postulante'
-            ? 'Postulantes'
-            : status === 'seleccionado'
-              ? 'Seleccionados'
-              : status === 'inactivo'
-                ? 'Inactivos'
-                : 'Desvinculados',
-      count: getGuardCount(guardsByLifecycle.find((g) => g.lifecycleStatus === status) ?? { _count: 0, lifecycleStatus: '' }),
-    }))
-    .filter((r) => r.count > 0);
-
-  const coveragePercent = pautaCountThisMonth > 0 ? toPercent(asistenciaCoveredThisMonth, pautaCountThisMonth) : 0;
-
-  const visibleNavItems = CRM_SUBMODULE_NAV_ITEMS.filter((item) => hasCrmSubmoduleAccess(role, item.key));
+  // Total leads in 12m
+  const totalLeads12m = leadsByMonthData.reduce((s, r) => s + r.total, 0);
+  const totalQuotes24m = quotesByMonthData.reduce((s, r) => s + r.count, 0);
 
   return (
     <div className="space-y-6">
       <PageHeader title="CRM" description="Pipeline comercial y gestión de clientes" />
       <CrmSubnav role={role} />
 
-      {/* KPIs ejecutivos */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 2xl:grid-cols-6">
-        <Link href="/crm/leads" className="min-w-0">
-          <KpiCard
-            title="Leads este mes"
-            value={leadsThisMonth}
-            icon={<UserPlus className="h-4 w-4" />}
-            variant="sky"
-            className="h-full transition-all hover:ring-2 hover:ring-primary/25"
-          />
+      {/* ─── Resumen ejecutivo ─── */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
+        <Link href="/crm/leads" className="group">
+          <div className="rounded-xl border border-border/60 bg-card p-4 transition-all hover:border-primary/30 hover:bg-primary/[0.03]">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Leads este mes</p>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-3xl font-semibold tabular-nums tracking-tight">{leadsThisMonth}</span>
+              {leadsMonthDelta !== 0 && (
+                <span className={`flex items-center gap-0.5 text-xs font-medium ${leadsMonthDelta > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {leadsMonthDelta > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  {leadsMonthDelta > 0 ? '+' : ''}{leadsMonthDelta}%
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground/60">{leadsPrevMonth} mes anterior</p>
+          </div>
         </Link>
-        <Link href="/crm/leads?status=pending" className="min-w-0">
-          <KpiCard
-            title="Leads pendientes"
-            value={leadsPending}
-            icon={<Users className="h-4 w-4" />}
-            variant="amber"
-            className="h-full transition-all hover:ring-2 hover:ring-primary/25"
-          />
+
+        <div className="rounded-xl border border-border/60 bg-card p-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Estado leads</p>
+          <div className="mt-2 flex items-baseline gap-4">
+            <div>
+              <span className="text-2xl font-semibold tabular-nums tracking-tight text-amber-400">{leadsPending}</span>
+              <p className="text-[10px] text-muted-foreground/60">Pendientes</p>
+            </div>
+            <div>
+              <span className="text-2xl font-semibold tabular-nums tracking-tight text-blue-400">{leadsInReview}</span>
+              <p className="text-[10px] text-muted-foreground/60">En revisión</p>
+            </div>
+          </div>
+          <div className="mt-2 flex gap-3 text-xs text-muted-foreground/60">
+            <span><span className="font-medium text-emerald-400/80">{leadsApproved12m}</span> aprobados</span>
+            <span><span className="font-medium text-red-400/80">{leadsRejected12m}</span> rechazados</span>
+          </div>
+        </div>
+
+        <Link href="/crm/accounts" className="group">
+          <div className="rounded-xl border border-border/60 bg-card p-4 transition-all hover:border-primary/30 hover:bg-primary/[0.03]">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Portafolio activo</p>
+            <div className="mt-2 flex items-baseline gap-4">
+              <div>
+                <span className="text-3xl font-semibold tabular-nums tracking-tight">{accountsActive}</span>
+                <p className="text-[10px] text-muted-foreground/60">Cuentas</p>
+              </div>
+              <div>
+                <span className="text-3xl font-semibold tabular-nums tracking-tight">{installationsActive}</span>
+                <p className="text-[10px] text-muted-foreground/60">Instalaciones</p>
+              </div>
+            </div>
+          </div>
         </Link>
-        <Link href="/crm/accounts" className="min-w-0">
-          <KpiCard
-            title="Cuentas activas"
-            value={accountsActive}
-            icon={<Building2 className="h-4 w-4" />}
-            variant="emerald"
-            className="h-full transition-all hover:ring-2 hover:ring-primary/25"
-          />
-        </Link>
-        <Link href="/crm/installations" className="min-w-0">
-          <KpiCard
-            title="Instalaciones activas"
-            value={installationsActive}
-            icon={<MapPin className="h-4 w-4" />}
-            variant="blue"
-            className="h-full transition-all hover:ring-2 hover:ring-primary/25"
-          />
-        </Link>
-        {canSeeOps && (
-          <Link href="/personas/guardias" className="min-w-0">
-            <KpiCard
-              title="Guardias contratados"
-              value={guardsContratados}
-              icon={<Shield className="h-4 w-4" />}
-              variant="purple"
-              className="h-full transition-all hover:ring-2 hover:ring-primary/25"
-            />
-          </Link>
-        )}
-        <Link href="/crm/deals" className="min-w-0">
-          <KpiCard
-            title="Negocios abiertos"
-            value={openDealsCount}
-            description={openDealsAmountFormatted}
-            icon={<BriefcaseBusiness className="h-4 w-4" />}
-            variant="teal"
-            className="h-full transition-all hover:ring-2 hover:ring-primary/25"
-          />
+
+        <Link href="/crm/deals" className="group">
+          <div className="rounded-xl border border-border/60 bg-card p-4 transition-all hover:border-primary/30 hover:bg-primary/[0.03]">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Pipeline abierto</p>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-3xl font-semibold tabular-nums tracking-tight">{openDealsCount}</span>
+              <span className="text-xs text-muted-foreground">negocios</span>
+            </div>
+            <p className="mt-1 text-xs font-medium text-primary/80">{openDealsAmountFormatted}</p>
+          </div>
         </Link>
       </div>
 
-      {/* Gráficos históricos: Leads por mes | Cotizaciones por mes */}
+      {/* ─── Gráficos históricos ─── */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Leads recibidos por mes</CardTitle>
-            <CardDescription>Últimos 12 meses por estado</CardDescription>
+        <Card className="border-border/60">
+          <CardHeader className="pb-2">
+            <div className="flex items-baseline justify-between">
+              <div>
+                <CardTitle className="text-sm font-medium">Leads recibidos</CardTitle>
+                <CardDescription className="text-xs">Últimos 12 meses por estado</CardDescription>
+              </div>
+              <span className="text-2xl font-semibold tabular-nums tracking-tight">{totalLeads12m}</span>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <LeadsByMonthChart data={leadsByMonthData} />
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Cotizaciones enviadas por mes</CardTitle>
-            <CardDescription>Últimos 24 meses</CardDescription>
+
+        <Card className="border-border/60">
+          <CardHeader className="pb-2">
+            <div className="flex items-baseline justify-between">
+              <div>
+                <CardTitle className="text-sm font-medium">Cotizaciones enviadas</CardTitle>
+                <CardDescription className="text-xs">Últimos 24 meses</CardDescription>
+              </div>
+              <span className="text-2xl font-semibold tabular-nums tracking-tight">{totalQuotes24m}</span>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <QuotesByMonthChart data={quotesByMonthData} />
           </CardContent>
         </Card>
       </div>
 
-      {/* Leads por fuente | Embudo comercial */}
+      {/* ─── Fuente + Embudo ─── */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Leads por fuente</CardTitle>
-            <CardDescription>Últimos 12 meses</CardDescription>
+        <Card className="border-border/60">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Origen de leads</CardTitle>
+            <CardDescription className="text-xs">Distribución últimos 12 meses</CardDescription>
           </CardHeader>
           <CardContent>
             <LeadsBySourceChart data={leadsBySourceData} />
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Embudo comercial (30 días)</CardTitle>
-            <CardDescription>Conversión de leads a propuestas y cierre</CardDescription>
+
+        <Card className="border-border/60">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Embudo comercial</CardTitle>
+            <CardDescription className="text-xs">Conversión últimos 30 días</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {funnel.map((step) => (
-                <Link
-                  key={step.label}
-                  href={step.href}
-                  className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/40"
-                >
-                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{step.label}</p>
-                  <p className="mt-1 text-2xl font-semibold">{step.value}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {step.rateFromPrev == null ? 'Base del periodo' : `${step.rateFromPrev}% desde etapa anterior`}
-                  </p>
-                </Link>
-              ))}
+            <div className="space-y-3">
+              {funnel.map((step, i) => {
+                const maxVal = Math.max(1, ...funnel.map((f) => f.value));
+                const widthPct = step.value > 0 ? Math.max(8, (step.value / maxVal) * 100) : 4;
+                return (
+                  <div key={step.label}>
+                    <div className="mb-1 flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{step.label}</span>
+                      <div className="flex items-center gap-2">
+                        {step.rate !== null && (
+                          <span className="text-muted-foreground/50">{step.rate}%</span>
+                        )}
+                        <span className="font-semibold tabular-nums">{step.value}</span>
+                      </div>
+                    </div>
+                    <div className="h-7 w-full overflow-hidden rounded-md bg-muted/30">
+                      <div
+                        className="flex h-full items-center justify-end rounded-md px-2 transition-all"
+                        style={{
+                          width: `${widthPct}%`,
+                          background:
+                            i === 0
+                              ? 'rgba(29,185,144,0.2)'
+                              : i === 1
+                                ? 'rgba(29,185,144,0.35)'
+                                : i === 2
+                                  ? 'rgba(29,185,144,0.5)'
+                                  : 'rgba(29,185,144,0.7)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="mt-4 flex items-center justify-between rounded-lg border border-border/40 px-3 py-2">
+                <span className="text-xs text-muted-foreground">Tasa lead a negocio</span>
+                <span className="text-sm font-semibold text-primary">{leadToDealRate30}%</span>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Snapshot operaciones */}
-      {canSeeOps && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Shield className="h-4 w-4 text-muted-foreground" />
-                Personal operativo
-              </CardTitle>
-              <CardDescription>Guardias por estado de vida</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <GuardsByStatusChart data={guardsByStatusData} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-muted-foreground" />
-                Cobertura operacional
-              </CardTitle>
-              <CardDescription>Puestos, cobertura del mes y pendientes</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-lg border border-border bg-card p-3">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Puestos activos</p>
-                  <p className="mt-1 text-xl font-semibold">{puestosActive}</p>
-                </div>
-                <div className="rounded-lg border border-border bg-card p-3">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Cobertura mes</p>
-                  <p className="mt-1 text-xl font-semibold">{coveragePercent}%</p>
-                </div>
-                <Link href="/ops/turnos-extra" className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/40">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                    <Clock3 className="h-3 w-3" /> TE pendientes
-                  </p>
-                  <p className="mt-1 text-xl font-semibold">{tePending}</p>
-                </Link>
-                <Link href="/ops/ppc" className="rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/40">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> PPC hoy
-                  </p>
-                  <p className="mt-1 text-xl font-semibold">{ppcToday}</p>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Accesos directos a módulos */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Accesos rápidos</CardTitle>
-          <CardDescription>Ir a cada módulo del CRM</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {visibleNavItems.map((item) => (
-              <Link
-                key={item.key}
-                href={item.href}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent/40 hover:border-primary/30"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

@@ -7,25 +7,30 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
   LabelList,
 } from 'recharts';
+/* ─── Paleta coherente con el design system oscuro + teal ─── */
 
-const CHART_COLORS = {
-  pending: 'hsl(38 92% 50%)',      // amber
-  in_review: 'hsl(217 91% 60%)',   // blue
-  approved: 'hsl(142 71% 45%)',    // emerald
-  rejected: 'hsl(0 72% 51%)',      // red
-  quotes: 'hsl(38 92% 50%)',       // amber/dorado ref Pipedrive
-  chart1: 'hsl(var(--chart-1))',
-  chart2: 'hsl(var(--chart-2))',
-  chart3: 'hsl(var(--chart-3))',
-  chart4: 'hsl(var(--chart-4))',
-  chart5: 'hsl(var(--chart-5))',
+const PALETTE = {
+  teal: '#1db990',
+  tealMuted: 'rgba(29,185,144,0.6)',
+  tealSubtle: 'rgba(29,185,144,0.15)',
+  blue: '#3b82f6',
+  blueMuted: 'rgba(59,130,246,0.6)',
+  amber: '#f59e0b',
+  amberMuted: 'rgba(245,158,11,0.6)',
+  red: '#ef4444',
+  redMuted: 'rgba(239,68,68,0.5)',
+  slate: '#64748b',
+  slateMuted: 'rgba(100,116,139,0.5)',
+  // Donut
+  donut: ['#1db990', '#3b82f6', '#8b5cf6', '#f59e0b', '#64748b'],
+  grid: 'rgba(255,255,255,0.04)',
+  axis: 'rgba(255,255,255,0.3)',
 };
 
 const LEAD_STATUS_LABELS: Record<string, string> = {
@@ -35,81 +40,118 @@ const LEAD_STATUS_LABELS: Record<string, string> = {
   rejected: 'Rechazado',
 };
 
-const GUARD_LIFECYCLE_LABELS: Record<string, string> = {
-  contratado_activo: 'Contratados',
-  postulante: 'Postulantes',
-  seleccionado: 'Seleccionados',
-  inactivo: 'Inactivos',
-  desvinculado: 'Desvinculados',
-};
+/* ─── Types ─── */
 
-export type LeadByMonthRow = { month: string; monthLabel: string; pending: number; in_review: number; approved: number; rejected: number; total: number };
+export type LeadByMonthRow = {
+  month: string;
+  monthLabel: string;
+  pending: number;
+  in_review: number;
+  approved: number;
+  rejected: number;
+  total: number;
+};
 export type QuotesByMonthRow = { month: string; monthLabel: string; count: number };
 export type LeadBySourceRow = { source: string; sourceLabel: string; count: number; percent: number };
-export type GuardsByStatusRow = { status: string; label: string; count: number };
+
+/* ─── Custom Tooltip ─── */
+
+function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ color?: string; name?: string; value?: number }>; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-lg border border-border/60 bg-popover/95 px-3 py-2 shadow-xl backdrop-blur-sm">
+      <p className="mb-1.5 text-xs font-medium text-foreground">{label}</p>
+      {payload.map((entry, i) => (
+        <div key={i} className="flex items-center gap-2 text-xs">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: entry.color }} />
+          <span className="text-muted-foreground">{typeof entry.name === 'string' ? (LEAD_STATUS_LABELS[entry.name] ?? entry.name) : ''}</span>
+          <span className="ml-auto font-medium tabular-nums text-foreground">{entry.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Leads por Mes ─── */
 
 interface LeadsByMonthChartProps {
   data: LeadByMonthRow[];
 }
 
 export function LeadsByMonthChart({ data }: LeadsByMonthChartProps) {
+  if (data.length === 0) {
+    return <EmptyChart message="Sin leads en el periodo" />;
+  }
+
   return (
-    <div className="h-[280px] w-full">
+    <div className="h-[300px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 24 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted/40" />
+        <BarChart data={data} margin={{ top: 12, right: 4, left: -12, bottom: 0 }} barCategoryGap="20%">
+          <CartesianGrid stroke={PALETTE.grid} vertical={false} />
           <XAxis
             dataKey="monthLabel"
-            tick={{ fontSize: 11 }}
-            className="text-muted-foreground"
-            angle={-35}
-            textAnchor="end"
-            height={56}
+            tick={{ fontSize: 11, fill: PALETTE.axis }}
+            axisLine={false}
+            tickLine={false}
           />
-          <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" allowDecimals={false} />
-          <Tooltip
-            contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '0.5rem' }}
-            labelStyle={{ color: 'hsl(var(--foreground))' }}
-            formatter={(value: number | undefined) => [value ?? 0, '']}
-            labelFormatter={(label) => label}
+          <YAxis
+            tick={{ fontSize: 11, fill: PALETTE.axis }}
+            axisLine={false}
+            tickLine={false}
+            allowDecimals={false}
           />
-          <Legend wrapperStyle={{ fontSize: 11 }} formatter={(value) => LEAD_STATUS_LABELS[value] ?? value} />
-          <Bar dataKey="pending" stackId="a" fill={CHART_COLORS.pending} name="pending" radius={[0, 0, 0, 0]} />
-          <Bar dataKey="in_review" stackId="a" fill={CHART_COLORS.in_review} name="in_review" radius={[0, 0, 0, 0]} />
-          <Bar dataKey="approved" stackId="a" fill={CHART_COLORS.approved} name="approved" radius={[0, 0, 0, 0]} />
-          <Bar dataKey="rejected" stackId="a" fill={CHART_COLORS.rejected} name="rejected" radius={[0, 4, 4, 0]} />
+          <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+          <Bar dataKey="rejected" stackId="stack" fill={PALETTE.redMuted} name="rejected" />
+          <Bar dataKey="pending" stackId="stack" fill={PALETTE.amber} name="pending" />
+          <Bar dataKey="in_review" stackId="stack" fill={PALETTE.blue} name="in_review" />
+          <Bar dataKey="approved" stackId="stack" fill={PALETTE.teal} name="approved" radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+        <LegendDot color={PALETTE.teal} label="Aprobado" />
+        <LegendDot color={PALETTE.blue} label="En revisión" />
+        <LegendDot color={PALETTE.amber} label="Pendiente" />
+        <LegendDot color={PALETTE.redMuted} label="Rechazado" />
+      </div>
     </div>
   );
 }
+
+/* ─── Cotizaciones por Mes ─── */
 
 interface QuotesByMonthChartProps {
   data: QuotesByMonthRow[];
 }
 
 export function QuotesByMonthChart({ data }: QuotesByMonthChartProps) {
+  if (data.length === 0) {
+    return <EmptyChart message="Sin cotizaciones en el periodo" />;
+  }
+
   return (
-    <div className="h-[280px] w-full">
+    <div className="h-[300px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 24, right: 8, left: 0, bottom: 24 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted/40" />
+        <BarChart data={data} margin={{ top: 24, right: 4, left: -12, bottom: 0 }} barCategoryGap="25%">
+          <CartesianGrid stroke={PALETTE.grid} vertical={false} />
           <XAxis
             dataKey="monthLabel"
-            tick={{ fontSize: 11 }}
-            className="text-muted-foreground"
-            angle={-35}
-            textAnchor="end"
-            height={56}
+            tick={{ fontSize: 11, fill: PALETTE.axis }}
+            axisLine={false}
+            tickLine={false}
           />
-          <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" allowDecimals={false} />
-          <Tooltip
-            contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '0.5rem' }}
-            formatter={(value: number | undefined) => [value ?? 0, 'Cotizaciones']}
-            labelFormatter={(label) => label}
+          <YAxis
+            tick={{ fontSize: 11, fill: PALETTE.axis }}
+            axisLine={false}
+            tickLine={false}
+            allowDecimals={false}
           />
-          <Bar dataKey="count" fill={CHART_COLORS.quotes} name="Cotizaciones" radius={[4, 4, 0, 0]}>
-            <LabelList dataKey="count" position="top" className="fill-foreground" style={{ fontSize: 11 }} />
+          <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+          <Bar dataKey="count" fill={PALETTE.teal} name="Cotizaciones" radius={[4, 4, 0, 0]}>
+            <LabelList
+              dataKey="count"
+              position="top"
+              style={{ fontSize: 10, fill: 'rgba(255,255,255,0.5)', fontWeight: 500 }}
+            />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -117,89 +159,75 @@ export function QuotesByMonthChart({ data }: QuotesByMonthChartProps) {
   );
 }
 
+/* ─── Leads por Fuente ─── */
+
 interface LeadsBySourceChartProps {
   data: LeadBySourceRow[];
 }
 
 export function LeadsBySourceChart({ data }: LeadsBySourceChartProps) {
+  if (data.length === 0) {
+    return <EmptyChart message="Sin datos de fuente" />;
+  }
+
   const pieData = data.map((d) => ({ name: d.sourceLabel, value: d.count }));
-  const colors = [CHART_COLORS.chart1, CHART_COLORS.chart2, CHART_COLORS.chart3, CHART_COLORS.chart4, CHART_COLORS.chart5];
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-      <div className="h-[220px] w-full min-w-[200px] sm:w-[220px] sm:shrink-0">
+      <div className="h-[200px] w-full sm:w-[200px] sm:shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={pieData}
               cx="50%"
               cy="50%"
-              innerRadius={56}
-              outerRadius={80}
-              paddingAngle={2}
+              innerRadius={52}
+              outerRadius={78}
+              paddingAngle={3}
               dataKey="value"
               nameKey="name"
+              stroke="none"
             >
               {pieData.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                <Cell key={index} fill={PALETTE.donut[index % PALETTE.donut.length]} />
               ))}
-              <LabelList dataKey="name" position="outside" style={{ fontSize: 10 }} />
             </Pie>
-            <Tooltip
-              contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '0.5rem' }}
-              formatter={(value, _name, props) => {
-                const p = props?.payload as { name: string; value: number } | undefined;
-                return [Number(value ?? 0), p ? `${p.name}` : ''];
-              }}
-            />
+            <Tooltip content={<ChartTooltip />} />
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <div className="min-w-0 flex-1 space-y-1.5 text-sm">
-        {data.map((row) => (
-          <div key={row.source} className="flex items-center justify-between gap-2">
-            <span className="truncate text-muted-foreground">{row.sourceLabel}</span>
-            <span className="shrink-0 font-medium tabular-nums">
-              {row.count} <span className="text-muted-foreground">({row.percent}%)</span>
-            </span>
+      <div className="min-w-0 flex-1 space-y-2">
+        {data.map((row, i) => (
+          <div key={row.source} className="flex items-center gap-3">
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: PALETTE.donut[i % PALETTE.donut.length] }}
+            />
+            <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{row.sourceLabel}</span>
+            <span className="shrink-0 text-sm font-medium tabular-nums">{row.count}</span>
+            <span className="w-10 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{row.percent}%</span>
           </div>
         ))}
-        {data.length === 0 && <p className="text-muted-foreground">Sin datos en el periodo</p>}
       </div>
     </div>
   );
 }
 
-interface GuardsByStatusChartProps {
-  data: GuardsByStatusRow[];
+/* ─── Helpers ─── */
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+      {label}
+    </div>
+  );
 }
 
-export function GuardsByStatusChart({ data }: GuardsByStatusChartProps) {
-  const colors = [CHART_COLORS.chart1, CHART_COLORS.chart2, CHART_COLORS.chart3, CHART_COLORS.chart4, CHART_COLORS.chart5];
-  const maxCount = Math.max(1, ...data.map((d) => d.count));
-
+function EmptyChart({ message }: { message: string }) {
   return (
-    <div className="space-y-2">
-      {data.map((row, i) => (
-        <div key={row.status} className="flex items-center gap-2">
-          <span className="w-24 shrink-0 truncate text-xs text-muted-foreground" title={row.label}>
-            {row.label}
-          </span>
-          <div className="min-w-0 flex-1">
-            <div
-              className="h-6 rounded-md transition-all"
-              style={{
-                width: `${(row.count / maxCount) * 100}%`,
-                minWidth: row.count > 0 ? 8 : 0,
-                backgroundColor: colors[i % colors.length],
-                opacity: 0.85,
-              }}
-            />
-          </div>
-          <span className="w-8 shrink-0 text-right text-xs font-medium tabular-nums">{row.count}</span>
-        </div>
-      ))}
-      {data.length === 0 && <p className="text-sm text-muted-foreground">Sin datos de guardias</p>}
+    <div className="flex h-[200px] items-center justify-center">
+      <p className="text-sm text-muted-foreground/60">{message}</p>
     </div>
   );
 }
