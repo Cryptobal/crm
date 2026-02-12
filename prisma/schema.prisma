@@ -456,7 +456,8 @@ model CpqPuestoTrabajo {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  positions CpqPosition[]
+  positions      CpqPosition[]
+  opsPuestos     OpsPuestoOperativo[]
 
   @@index([active], map: "idx_cpq_puestos_active")
   @@map("puestos_trabajo")
@@ -472,7 +473,8 @@ model CpqCargo {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  positions CpqPosition[]
+  positions      CpqPosition[]
+  opsPuestos     OpsPuestoOperativo[]
 
   @@index([active], map: "idx_cpq_cargos_active")
   @@map("cargos")
@@ -488,7 +490,8 @@ model CpqRol {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  positions CpqPosition[]
+  positions      CpqPosition[]
+  opsPuestos     OpsPuestoOperativo[]
 
   @@index([active], map: "idx_cpq_roles_active")
   @@map("roles")
@@ -799,7 +802,8 @@ model CrmInstallation {
   opsPuestos    OpsPuestoOperativo[]
   opsPautas     OpsPautaMensual[]
   opsAsistencias OpsAsistenciaDiaria[]
-  opsTurnosExtra OpsTurnoExtra[]
+  opsTurnosExtra       OpsTurnoExtra[]
+  opsAsignacionGuardias OpsAsignacionGuardia[] @relation("ops_asignacion_installation")
 
   @@index([tenantId], map: "idx_crm_installations_tenant")
   @@index([accountId], map: "idx_crm_installations_account")
@@ -1353,6 +1357,8 @@ model OpsGuardia {
   asistenciasReales     OpsAsistenciaDiaria[]  @relation("ops_asistencia_real_guardia")
   asistenciasReemplazo  OpsAsistenciaDiaria[]  @relation("ops_asistencia_reemplazo_guardia")
   turnosExtra           OpsTurnoExtra[]        @relation("ops_turno_extra_guardia")
+  asignaciones          OpsAsignacionGuardia[] @relation("ops_asignacion_guardia")
+  seriesAsignadas       OpsSerieAsignacion[]   @relation("ops_serie_guardia")
   eventosRrhh           OpsEventoRrhh[]
   pagoItems             OpsPagoTeItem[]        @relation("ops_pago_item_guardia")
 
@@ -1469,24 +1475,33 @@ model OpsComentarioGuardia {
 }
 
 model OpsPuestoOperativo {
-  id             String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  tenantId       String   @map("tenant_id")
-  installationId String   @map("installation_id") @db.Uuid
-  name           String
-  shiftStart     String   @map("shift_start")
-  shiftEnd       String   @map("shift_end")
-  weekdays       String[] @default([])
-  requiredGuards Int      @default(1) @map("required_guards")
-  teMontoClp     Decimal? @map("te_monto_clp") @db.Decimal(12, 2)
-  active         Boolean  @default(true)
-  createdBy      String?  @map("created_by")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId        String   @map("tenant_id")
+  installationId  String   @map("installation_id") @db.Uuid
+  name            String
+  puestoTrabajoId String?  @map("puesto_trabajo_id") @db.Uuid
+  cargoId         String?  @map("cargo_id") @db.Uuid
+  rolId           String?  @map("rol_id") @db.Uuid
+  shiftStart      String   @map("shift_start")
+  shiftEnd        String   @map("shift_end")
+  weekdays        String[] @default([])
+  requiredGuards  Int      @default(1) @map("required_guards")
+  baseSalary      Decimal? @map("base_salary") @db.Decimal(12, 2)
+  teMontoClp      Decimal? @map("te_monto_clp") @db.Decimal(12, 2)
+  active          Boolean  @default(true)
+  createdBy       String?  @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  installation CrmInstallation      @relation(fields: [installationId], references: [id], onDelete: Cascade)
-  pautas       OpsPautaMensual[]
-  asistencias  OpsAsistenciaDiaria[]
-  turnosExtra  OpsTurnoExtra[]
+  installation   CrmInstallation      @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  puestoTrabajo  CpqPuestoTrabajo?    @relation(fields: [puestoTrabajoId], references: [id], onDelete: SetNull)
+  cargo          CpqCargo?            @relation(fields: [cargoId], references: [id], onDelete: SetNull)
+  rol            CpqRol?              @relation(fields: [rolId], references: [id], onDelete: SetNull)
+  asignacionGuardias OpsAsignacionGuardia[] @relation("ops_asignacion_puesto")
+  pautas             OpsPautaMensual[]
+  asistencias        OpsAsistenciaDiaria[]
+  turnosExtra        OpsTurnoExtra[]
+  series             OpsSerieAsignacion[]
 
   @@index([tenantId], map: "idx_ops_puestos_tenant")
   @@index([installationId], map: "idx_ops_puestos_installation")
@@ -1500,8 +1515,10 @@ model OpsPautaMensual {
   tenantId        String    @map("tenant_id")
   installationId  String    @map("installation_id") @db.Uuid
   puestoId        String    @map("puesto_id") @db.Uuid
+  slotNumber      Int       @default(1) @map("slot_number")
   date            DateTime  @db.Date
   plannedGuardiaId String?   @map("planned_guardia_id") @db.Uuid
+  shiftCode       String?   @map("shift_code")
   status          String    @default("planificado")
   notes           String?
   createdBy       String?   @map("created_by")
@@ -1512,11 +1529,66 @@ model OpsPautaMensual {
   puesto        OpsPuestoOperativo @relation(fields: [puestoId], references: [id], onDelete: Cascade)
   plannedGuardia OpsGuardia?      @relation("ops_pauta_guardia", fields: [plannedGuardiaId], references: [id], onDelete: SetNull)
 
-  @@unique([puestoId, date], map: "uq_ops_pauta_puesto_fecha")
+  @@unique([puestoId, slotNumber, date], map: "uq_ops_pauta_puesto_slot_fecha")
   @@index([tenantId], map: "idx_ops_pauta_tenant")
   @@index([installationId, date], map: "idx_ops_pauta_installation_date")
   @@index([plannedGuardiaId], map: "idx_ops_pauta_guardia")
   @@map("pauta_mensual")
+  @@schema("ops")
+}
+
+model OpsAsignacionGuardia {
+  id              String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId        String    @map("tenant_id")
+  guardiaId       String    @map("guardia_id") @db.Uuid
+  puestoId        String    @map("puesto_id") @db.Uuid
+  slotNumber      Int       @map("slot_number")
+  installationId  String    @map("installation_id") @db.Uuid
+  startDate       DateTime  @map("start_date") @db.Date
+  endDate         DateTime? @map("end_date") @db.Date
+  isActive        Boolean   @default(true) @map("is_active")
+  reason          String?
+  createdBy       String?   @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  guardia      OpsGuardia         @relation("ops_asignacion_guardia", fields: [guardiaId], references: [id], onDelete: Restrict)
+  puesto       OpsPuestoOperativo @relation("ops_asignacion_puesto", fields: [puestoId], references: [id], onDelete: Cascade)
+  installation CrmInstallation    @relation("ops_asignacion_installation", fields: [installationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "idx_ops_asignacion_guardia_tenant")
+  @@index([guardiaId], map: "idx_ops_asignacion_guardia_guardia")
+  @@index([puestoId, slotNumber], map: "idx_ops_asignacion_guardia_puesto_slot")
+  @@index([installationId], map: "idx_ops_asignacion_guardia_installation")
+  @@index([isActive], map: "idx_ops_asignacion_guardia_active")
+  @@map("asignacion_guardias")
+  @@schema("ops")
+}
+
+model OpsSerieAsignacion {
+  id              String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId        String    @map("tenant_id")
+  puestoId        String    @map("puesto_id") @db.Uuid
+  slotNumber      Int       @map("slot_number")
+  guardiaId       String    @map("guardia_id") @db.Uuid
+  patternCode     String    @map("pattern_code")
+  patternWork     Int       @map("pattern_work")
+  patternOff      Int       @map("pattern_off")
+  startDate       DateTime  @map("start_date") @db.Date
+  startPosition   Int       @default(1) @map("start_position")
+  endDate         DateTime? @map("end_date") @db.Date
+  isActive        Boolean   @default(true) @map("is_active")
+  createdBy       String?   @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  puesto  OpsPuestoOperativo @relation(fields: [puestoId], references: [id], onDelete: Cascade)
+  guardia OpsGuardia         @relation("ops_serie_guardia", fields: [guardiaId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId], map: "idx_ops_serie_asig_tenant")
+  @@index([puestoId, slotNumber], map: "idx_ops_serie_asig_puesto_slot")
+  @@index([guardiaId], map: "idx_ops_serie_asig_guardia")
+  @@map("serie_asignaciones")
   @@schema("ops")
 }
 
@@ -1545,6 +1617,7 @@ model OpsAsistenciaDiaria {
   tenantId           String    @map("tenant_id")
   installationId     String    @map("installation_id") @db.Uuid
   puestoId           String    @map("puesto_id") @db.Uuid
+  slotNumber         Int       @default(1) @map("slot_number")
   date               DateTime  @db.Date
   plannedGuardiaId   String?   @map("planned_guardia_id") @db.Uuid
   actualGuardiaId    String?   @map("actual_guardia_id") @db.Uuid
@@ -1554,6 +1627,9 @@ model OpsAsistenciaDiaria {
   checkOutAt         DateTime? @map("check_out_at") @db.Timestamptz(6)
   notes              String?
   teGenerated        Boolean   @default(false) @map("te_generated")
+  lockedAt           DateTime? @map("locked_at") @db.Timestamptz(6)
+  lockedBy           String?   @map("locked_by")
+  correctionReason   String?   @map("correction_reason")
   createdBy          String?   @map("created_by")
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -1565,7 +1641,7 @@ model OpsAsistenciaDiaria {
   replacementGuardia OpsGuardia?      @relation("ops_asistencia_reemplazo_guardia", fields: [replacementGuardiaId], references: [id], onDelete: SetNull)
   turnosExtra       OpsTurnoExtra[]
 
-  @@unique([puestoId, date], map: "uq_ops_asistencia_puesto_fecha")
+  @@unique([puestoId, slotNumber, date], map: "uq_ops_asistencia_puesto_slot_fecha")
   @@index([tenantId], map: "idx_ops_asistencia_tenant")
   @@index([installationId, date], map: "idx_ops_asistencia_installation_date")
   @@index([attendanceStatus], map: "idx_ops_asistencia_status")

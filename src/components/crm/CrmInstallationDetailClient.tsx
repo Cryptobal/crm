@@ -4,7 +4,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, ExternalLink, Trash2, Pencil, Loader2 } from "lucide-react";
+import { MapPin, ExternalLink, Trash2, Pencil, Loader2, LayoutGrid, Plus } from "lucide-react";
+import { PuestoFormModal, type PuestoFormData } from "@/components/shared/PuestoFormModal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,11 +42,18 @@ export type InstallationDetail = {
   puestosActivos?: Array<{
     id: string;
     name: string;
+    puestoTrabajoId?: string | null;
+    cargoId?: string | null;
+    rolId?: string | null;
     shiftStart: string;
     shiftEnd: string;
     weekdays: string[];
     requiredGuards: number;
+    baseSalary?: number | string | null;
     teMontoClp?: number | string | null;
+    puestoTrabajo?: { id: string; name: string } | null;
+    cargo?: { id: string; name: string } | null;
+    rol?: { id: string; name: string } | null;
   }>;
   quotesInstalacion?: Array<{
     id: string;
@@ -55,8 +63,449 @@ export type InstallationDetail = {
     totalGuards: number;
     updatedAt: string;
   }>;
+  asignacionGuardias?: Array<{
+    id: string;
+    guardiaId: string;
+    puestoId: string;
+    slotNumber: number;
+    startDate: string;
+    guardia: {
+      id: string;
+      code?: string | null;
+      lifecycleStatus: string;
+      persona: { firstName: string; lastName: string; rut?: string | null };
+    };
+    puesto: { id: string; name: string; shiftStart: string; shiftEnd: string };
+  }>;
   account?: { id: string; name: string; type?: "prospect" | "client"; status?: string; isActive?: boolean } | null;
 };
+
+/* ── Lifecycle colors (shared) ── */
+
+const LIFECYCLE_COLORS: Record<string, string> = {
+  postulante: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
+  seleccionado: "bg-blue-500/15 text-blue-300 border-blue-500/30",
+  contratado_activo: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  inactivo: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  desvinculado: "bg-red-500/15 text-red-300 border-red-500/30",
+};
+
+const LIFECYCLE_LABELS: Record<string, string> = {
+  postulante: "Postulante",
+  seleccionado: "Seleccionado",
+  contratado_activo: "Contratado",
+  inactivo: "Inactivo",
+  desvinculado: "Desvinculado",
+};
+
+/* ── Dotación Section (guardias asignados, read-only from OPS) ── */
+
+function DotacionSection({ installation }: { installation: InstallationDetail }) {
+  const asignaciones = installation.asignacionGuardias ?? [];
+  const puestos = installation.puestosActivos ?? [];
+
+  if (puestos.length === 0) {
+    return (
+      <EmptyState
+        icon={<LayoutGrid className="h-8 w-8" />}
+        title="Sin dotación"
+        description="No hay puestos operativos activos. Configúralos primero."
+        compact
+      />
+    );
+  }
+
+  // Group assignments by puestoId
+  const assignmentsByPuesto = new Map<string, typeof asignaciones>();
+  for (const a of asignaciones) {
+    const list = assignmentsByPuesto.get(a.puestoId) ?? [];
+    list.push(a);
+    assignmentsByPuesto.set(a.puestoId, list);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <Link
+          href="/ops/puestos"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <LayoutGrid className="h-3.5 w-3.5" />
+          Gestionar en OPS
+        </Link>
+      </div>
+
+      <div className="space-y-2">
+        {puestos.map((puesto) => {
+          const puestoAssignments = assignmentsByPuesto.get(puesto.id) ?? [];
+          const startH = parseInt(puesto.shiftStart.split(":")[0], 10);
+          const isNight = startH >= 18 || startH < 6;
+
+          return (
+            <div key={puesto.id} className="rounded-lg border border-border p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium">{puesto.name}</p>
+                <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold border ${
+                  isNight
+                    ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
+                    : "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                }`}>
+                  {isNight ? "Noche" : "Día"}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  {puesto.shiftStart}-{puesto.shiftEnd} · {puesto.requiredGuards} slot(s)
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                {Array.from({ length: puesto.requiredGuards }, (_, i) => i + 1).map((slotNum) => {
+                  const assignment = puestoAssignments.find((a) => a.slotNumber === slotNum);
+                  return (
+                    <div
+                      key={slotNum}
+                      className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs ${
+                        assignment
+                          ? "border border-border/60 bg-card"
+                          : "border border-dashed border-amber-500/30 bg-amber-500/5"
+                      }`}
+                    >
+                      <span className="text-muted-foreground font-mono text-[10px] w-10">
+                        Slot {slotNum}
+                      </span>
+                      {assignment ? (
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">
+                            {assignment.guardia.persona.firstName} {assignment.guardia.persona.lastName}
+                          </span>
+                          {assignment.guardia.code && (
+                            <span className="text-muted-foreground">({assignment.guardia.code})</span>
+                          )}
+                          <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium border ${
+                            LIFECYCLE_COLORS[assignment.guardia.lifecycleStatus] ?? LIFECYCLE_COLORS.postulante
+                          }`}>
+                            {LIFECYCLE_LABELS[assignment.guardia.lifecycleStatus] ?? assignment.guardia.lifecycleStatus}
+                          </span>
+                          {assignment.guardia.persona.rut && (
+                            <span className="text-[10px] text-muted-foreground">{assignment.guardia.persona.rut}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-amber-400 italic text-[11px]">Vacante</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-[10px] text-muted-foreground/60 border-t border-border pt-3">
+        La asignación de guardias se gestiona desde OPS (Puestos operativos). Esta vista es de solo lectura.
+      </p>
+    </div>
+  );
+}
+
+/* ── Staffing Section (defined before main component) ── */
+
+function StaffingSection({
+  installation,
+  sourceQuoteId,
+  sourceQuoteCode,
+  sourceUpdatedAt,
+}: {
+  installation: InstallationDetail;
+  sourceQuoteId: string | null;
+  sourceQuoteCode: string | null;
+  sourceUpdatedAt: string | null;
+}) {
+  const router = useRouter();
+  const StaffingIcon = CRM_MODULES.installations.icon;
+
+  // Modal states
+  const [formModalOpen, setFormModalOpen] = useState(false);
+  const [formModalTitle, setFormModalTitle] = useState("Nuevo puesto operativo");
+  const [formModalInitial, setFormModalInitial] = useState<Partial<PuestoFormData> | undefined>();
+  const [editingPuestoId, setEditingPuestoId] = useState<string | null>(null);
+
+  // Delete/deactivate states
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
+  const [deactivateConfirm, setDeactivateConfirm] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: "", name: "" });
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const hasPuestos = installation.puestosActivos && installation.puestosActivos.length > 0;
+
+  // Open create modal
+  const openCreate = () => {
+    setEditingPuestoId(null);
+    setFormModalTitle("Nuevo puesto operativo");
+    setFormModalInitial(undefined);
+    setFormModalOpen(true);
+  };
+
+  // Open edit modal
+  const openEdit = (puesto: NonNullable<InstallationDetail["puestosActivos"]>[number]) => {
+    setEditingPuestoId(puesto.id);
+    setFormModalTitle("Editar puesto operativo");
+    setFormModalInitial({
+      puestoTrabajoId: puesto.puestoTrabajoId ?? "",
+      cargoId: puesto.cargoId ?? "",
+      rolId: puesto.rolId ?? "",
+      customName: puesto.name,
+      startTime: puesto.shiftStart,
+      endTime: puesto.shiftEnd,
+      weekdays: puesto.weekdays,
+      numGuards: puesto.requiredGuards,
+      baseSalary: Number(puesto.baseSalary ?? 0),
+    });
+    setFormModalOpen(true);
+  };
+
+  // Save (create or edit)
+  const handleSave = async (data: PuestoFormData) => {
+    const body = {
+      name: data.customName || undefined,
+      puestoTrabajoId: data.puestoTrabajoId || null,
+      cargoId: data.cargoId || null,
+      rolId: data.rolId || null,
+      shiftStart: data.startTime,
+      shiftEnd: data.endTime,
+      weekdays: data.weekdays,
+      requiredGuards: data.numGuards,
+      baseSalary: data.baseSalary || null,
+    };
+
+    if (editingPuestoId) {
+      // PATCH
+      const res = await fetch(`/api/ops/puestos/${editingPuestoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) throw new Error(payload.error || "No se pudo actualizar");
+      toast.success("Puesto actualizado");
+    } else {
+      // POST
+      const res = await fetch("/api/ops/puestos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, installationId: installation.id }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) throw new Error(payload.error || "No se pudo crear");
+      toast.success("Puesto creado");
+    }
+    setFormModalOpen(false);
+    router.refresh();
+  };
+
+  // Delete puesto
+  const handleDelete = async () => {
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/ops/puestos/${deleteConfirm.id}`, { method: "DELETE" });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) throw new Error(payload.error || "No se pudo eliminar");
+      toast.success("Puesto eliminado");
+      setDeleteConfirm({ open: false, id: "", name: "" });
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo eliminar el puesto");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Deactivate puesto
+  const handleDeactivate = async () => {
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/ops/puestos/${deactivateConfirm.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: false }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) throw new Error(payload.error || "No se pudo desactivar");
+      toast.success("Puesto desactivado");
+      setDeactivateConfirm({ open: false, id: "", name: "" });
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo desactivar el puesto");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {sourceQuoteId && sourceQuoteCode ? (
+        <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3 text-xs text-emerald-200">
+          Dotación sincronizada desde cotización{" "}
+          <Link href={`/cpq/${sourceQuoteId}`} className="underline underline-offset-2 hover:text-emerald-100">
+            {sourceQuoteCode}
+          </Link>
+          {sourceUpdatedAt ? (
+            <span className="text-emerald-300/80"> · {new Date(sourceUpdatedAt).toLocaleString("es-CL")}</span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Actions bar */}
+      <div className="flex items-center justify-between">
+        <Button size="sm" variant="secondary" onClick={openCreate} className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" />
+          Agregar puesto
+        </Button>
+        {hasPuestos && (
+          <Link
+            href="/ops/puestos"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Ver en OPS
+          </Link>
+        )}
+      </div>
+
+      {/* Puestos table */}
+      {hasPuestos ? (
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="min-w-full text-xs sm:text-sm">
+            <thead className="bg-muted/30">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">Puesto</th>
+                <th className="px-3 py-2 text-left font-medium">Cargo / Rol</th>
+                <th className="px-3 py-2 text-left font-medium">Horario</th>
+                <th className="px-3 py-2 text-right font-medium">Dotación</th>
+                <th className="px-3 py-2 text-right font-medium">Sueldo base</th>
+                <th className="px-3 py-2 text-right font-medium w-[160px]">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {installation.puestosActivos!.map((item) => {
+                const cargoName = item.cargo?.name ?? "—";
+                const rolName = item.rol?.name ?? "—";
+                const salary = Number(item.baseSalary ?? 0);
+                return (
+                  <tr key={item.id} className="border-t border-border/60">
+                    <td className="px-3 py-2">
+                      <div className="font-medium">{item.name}</div>
+                      {item.puestoTrabajo && (
+                        <div className="text-[10px] text-muted-foreground">{item.puestoTrabajo.name}</div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">{cargoName} / {rolName}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1.5">
+                        <span>{item.shiftStart} - {item.shiftEnd}</span>
+                        {(() => {
+                          const startH = parseInt(item.shiftStart.split(":")[0], 10);
+                          const isNight = startH >= 18 || startH < 6;
+                          return (
+                            <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
+                              isNight
+                                ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/30"
+                                : "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                            }`}>
+                              {isNight ? "Noche" : "Día"}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-right">{item.requiredGuards}</td>
+                    <td className="px-3 py-2 text-right">{salary > 0 ? `$${salary.toLocaleString("es-CL")}` : "—"}</td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(item)} title="Editar">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[10px] px-2"
+                          onClick={() => setDeactivateConfirm({ open: true, id: item.id, name: item.name })}
+                          title="Desactivar"
+                        >
+                          Desactivar
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteConfirm({ open: true, id: item.id, name: item.name })}
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState icon={<StaffingIcon className="h-8 w-8" />} title="Sin dotación activa" description="Aún no hay puestos activos. Usa el botón para agregar uno." compact />
+      )}
+
+      {installation.quotesInstalacion && installation.quotesInstalacion.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Cotizaciones asociadas</p>
+          <div className="space-y-2">
+            {installation.quotesInstalacion.map((quote) => (
+              <CrmRelatedRecordCard key={quote.id} module="quotes" title={quote.code} subtitle={`${quote.totalPositions} puestos · ${quote.totalGuards} guardias`} badge={{ label: quote.status, variant: "secondary" }} meta={new Date(quote.updatedAt).toLocaleDateString("es-CL")} href={`/cpq/${quote.id}`} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Shared puesto form modal */}
+      <PuestoFormModal
+        open={formModalOpen}
+        onOpenChange={setFormModalOpen}
+        title={formModalTitle}
+        initialData={formModalInitial}
+        onSave={handleSave}
+      />
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={deleteConfirm.open}
+        onOpenChange={(open) => setDeleteConfirm((prev) => ({ ...prev, open }))}
+        title="Eliminar puesto"
+        description={`El puesto "${deleteConfirm.name}" será eliminado permanentemente. Si tiene pauta o asistencia asociada, no se podrá eliminar.`}
+        confirmLabel="Eliminar"
+        variant="destructive"
+        loading={actionLoading}
+        loadingLabel="Eliminando..."
+        onConfirm={handleDelete}
+      />
+
+      {/* Deactivate confirmation */}
+      <ConfirmDialog
+        open={deactivateConfirm.open}
+        onOpenChange={(open) => setDeactivateConfirm((prev) => ({ ...prev, open }))}
+        title="Desactivar puesto"
+        description={`El puesto "${deactivateConfirm.name}" se desactivará y no aparecerá en la pauta mensual ni en OPS.`}
+        confirmLabel="Desactivar"
+        variant="default"
+        loading={actionLoading}
+        loadingLabel="Desactivando..."
+        onConfirm={handleDeactivate}
+      />
+    </div>
+  );
+}
+
+/* ── Main Component ── */
 
 export function CrmInstallationDetailClient({
   installation,
@@ -292,110 +741,21 @@ export function CrmInstallationDetailClient({
     },
     {
       key: "staffing",
+      label: "Puestos operativos",
+      children: (
+        <StaffingSection
+          installation={installation}
+          sourceQuoteId={sourceQuoteId}
+          sourceQuoteCode={sourceQuoteCode}
+          sourceUpdatedAt={sourceUpdatedAt}
+        />
+      ),
+    },
+    {
+      key: "dotacion",
       label: "Dotación activa",
       children: (
-        <div className="space-y-3">
-          {sourceQuoteId && sourceQuoteCode ? (
-            <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3 text-xs text-emerald-200">
-              Dotación sincronizada desde cotización{" "}
-              <Link href={`/cpq/${sourceQuoteId}`} className="underline underline-offset-2 hover:text-emerald-100">
-                {sourceQuoteCode}
-              </Link>
-              {sourceUpdatedAt ? (
-                <span className="text-emerald-300/80"> · {new Date(sourceUpdatedAt).toLocaleString("es-CL")}</span>
-              ) : null}
-            </div>
-          ) : null}
-
-          {dotacionItems.length > 0 ? (
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="min-w-full text-xs sm:text-sm">
-                <thead className="bg-muted/30">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium">Puesto</th>
-                    <th className="px-3 py-2 text-left font-medium">Cargo / Rol</th>
-                    <th className="px-3 py-2 text-left font-medium">Horario</th>
-                    <th className="px-3 py-2 text-left font-medium">Días</th>
-                    <th className="px-3 py-2 text-right font-medium">Dotación</th>
-                    <th className="px-3 py-2 text-right font-medium">Sueldo base</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dotacionItems.map((item, idx) => {
-                    const puesto = (typeof item.customName === "string" && item.customName) || (item.puestoTrabajoName as string) || "Puesto";
-                    const cargo = (item.cargoName as string) || "—";
-                    const rol = (item.rolName as string) || "—";
-                    const shiftStart = (item.shiftStart as string) || "--:--";
-                    const shiftEnd = (item.shiftEnd as string) || "--:--";
-                    const weekdays = Array.isArray(item.weekdays) ? item.weekdays.join(", ") : "—";
-                    const requiredGuards = Number(item.requiredGuards ?? 0);
-                    const baseSalary = Number(item.baseSalary ?? 0);
-
-                    return (
-                      <tr key={`${String(item.positionId ?? idx)}-${idx}`} className="border-t border-border/60">
-                        <td className="px-3 py-2">{puesto}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{cargo} / {rol}</td>
-                        <td className="px-3 py-2">{shiftStart} - {shiftEnd}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{weekdays}</td>
-                        <td className="px-3 py-2 text-right">{requiredGuards}</td>
-                        <td className="px-3 py-2 text-right">${baseSalary.toLocaleString("es-CL")}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : installation.puestosActivos && installation.puestosActivos.length > 0 ? (
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="min-w-full text-xs sm:text-sm">
-                <thead className="bg-muted/30">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium">Puesto</th>
-                    <th className="px-3 py-2 text-left font-medium">Horario</th>
-                    <th className="px-3 py-2 text-left font-medium">Días</th>
-                    <th className="px-3 py-2 text-right font-medium">Dotación</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {installation.puestosActivos.map((item) => (
-                    <tr key={item.id} className="border-t border-border/60">
-                      <td className="px-3 py-2">{item.name}</td>
-                      <td className="px-3 py-2">{item.shiftStart} - {item.shiftEnd}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{item.weekdays.join(", ")}</td>
-                      <td className="px-3 py-2 text-right">{item.requiredGuards}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState
-              icon={<StaffingIcon className="h-8 w-8" />}
-              title="Sin dotación activa"
-              description="Aún no hay estructura activa para esta instalación."
-              compact
-            />
-          )}
-
-          {installation.quotesInstalacion && installation.quotesInstalacion.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Cotizaciones asociadas</p>
-              <div className="space-y-2">
-                {installation.quotesInstalacion.map((quote) => (
-                  <CrmRelatedRecordCard
-                    key={quote.id}
-                    module="quotes"
-                    title={quote.code}
-                    subtitle={`${quote.totalPositions} puestos · ${quote.totalGuards} guardias`}
-                    badge={{ label: quote.status, variant: "secondary" }}
-                    meta={new Date(quote.updatedAt).toLocaleDateString("es-CL")}
-                    href={`/cpq/${quote.id}`}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
+        <DotacionSection installation={installation} />
       ),
     },
     /* Notas: se habilitará cuando NotesSection soporte entityType "installation" */

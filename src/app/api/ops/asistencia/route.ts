@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, unauthorized } from "@/lib/api-auth";
-import { createOpsAuditLog, ensureOpsAccess, parseDateOnly, toISODate } from "@/lib/ops";
+import { ensureOpsAccess, parseDateOnly, toISODate } from "@/lib/ops";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,35 +13,25 @@ export async function GET(request: NextRequest) {
     const installationId = request.nextUrl.searchParams.get("installationId") || undefined;
     const dateRaw = request.nextUrl.searchParams.get("date") || toISODate(new Date());
 
-    if (!installationId) {
-      return NextResponse.json(
-        { success: false, error: "installationId es requerido" },
-        { status: 400 }
-      );
-    }
-
-    const installation = await prisma.crmInstallation.findFirst({
-      where: { id: installationId, tenantId: ctx.tenantId },
-      select: { id: true },
-    });
-    if (!installation) {
-      return NextResponse.json(
-        { success: false, error: "Instalación no encontrada" },
-        { status: 404 }
-      );
-    }
-
     const date = parseDateOnly(dateRaw);
 
+    // If installationId = "all", get all installations
+    const installationFilter = installationId && installationId !== "all"
+      ? { installationId }
+      : {};
+
+    // Auto-create asistencia rows from pauta mensual (for the date)
     const pauta = await prisma.opsPautaMensual.findMany({
       where: {
         tenantId: ctx.tenantId,
-        installationId,
+        ...installationFilter,
         date,
       },
       select: {
         puestoId: true,
+        slotNumber: true,
         plannedGuardiaId: true,
+        installationId: true,
       },
     });
 
@@ -49,8 +39,9 @@ export async function GET(request: NextRequest) {
       await prisma.opsAsistenciaDiaria.createMany({
         data: pauta.map((item) => ({
           tenantId: ctx.tenantId,
-          installationId,
+          installationId: item.installationId,
           puestoId: item.puestoId,
+          slotNumber: item.slotNumber,
           date,
           plannedGuardiaId: item.plannedGuardiaId,
           attendanceStatus: "pendiente",
@@ -63,10 +54,13 @@ export async function GET(request: NextRequest) {
     const asistencia = await prisma.opsAsistenciaDiaria.findMany({
       where: {
         tenantId: ctx.tenantId,
-        installationId,
+        ...installationFilter,
         date,
       },
       include: {
+        installation: {
+          select: { id: true, name: true },
+        },
         puesto: {
           select: {
             id: true,
@@ -74,6 +68,7 @@ export async function GET(request: NextRequest) {
             shiftStart: true,
             shiftEnd: true,
             teMontoClp: true,
+            requiredGuards: true,
           },
         },
         plannedGuardia: {
@@ -106,13 +101,16 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: [{ puesto: { name: "asc" } }],
+      orderBy: [
+        { installation: { name: "asc" } },
+        { puesto: { name: "asc" } },
+        { slotNumber: "asc" },
+      ],
     });
 
     return NextResponse.json({
       success: true,
       data: {
-        installationId,
         date: dateRaw,
         items: asistencia,
       },

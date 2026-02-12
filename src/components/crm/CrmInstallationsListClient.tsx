@@ -67,7 +67,7 @@ export function CrmInstallationsListClient({
   const [installations, setInstallations] = useState<InstallationRow[]>(initialInstallations);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("cards");
-  const [accountFilter, setAccountFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Create form state
   const [open, setOpen] = useState(false);
@@ -80,30 +80,15 @@ export function CrmInstallationsListClient({
   const filteredInstallations = useMemo(() => {
     const q = search.trim().toLowerCase();
     return installations.filter((inst) => {
-      if (accountFilter !== "all" && inst.account?.id !== accountFilter) return false;
+      if (statusFilter === "active" && inst.isActive !== true) return false;
+      if (statusFilter === "inactive" && inst.isActive !== false) return false;
       if (q) {
         const searchable = `${inst.name} ${inst.address || ""} ${inst.city || ""} ${inst.commune || ""} ${inst.account?.name || ""}`.toLowerCase();
         if (!searchable.includes(q)) return false;
       }
       return true;
     });
-  }, [installations, search, accountFilter]);
-
-  // Get unique accounts for filter pills
-  const accountsWithInstallations = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; count: number }>();
-    installations.forEach((inst) => {
-      if (inst.account) {
-        const existing = map.get(inst.account.id);
-        if (existing) {
-          existing.count++;
-        } else {
-          map.set(inst.account.id, { id: inst.account.id, name: inst.account.name, count: 1 });
-        }
-      }
-    });
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
-  }, [installations]);
+  }, [installations, search, statusFilter]);
 
   const createInstallation = async () => {
     if (!form.name.trim()) {
@@ -150,30 +135,24 @@ export function CrmInstallationsListClient({
         </div>
         <div className="flex items-center gap-2">
           <ViewToggle view={view} onChange={setView} />
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-            <button
-              type="button"
-              onClick={() => setAccountFilter("all")}
-              className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors shrink-0 ${
-                accountFilter === "all"
-                  ? "bg-primary/15 text-primary border border-primary/30"
-                  : "text-muted-foreground hover:text-foreground border border-transparent"
-              }`}
-            >
-              Todas ({installations.length})
-            </button>
-            {accountsWithInstallations.slice(0, 5).map((acc) => (
+          {/* Status filter */}
+          <div className="flex gap-1 shrink-0">
+            {([
+              { key: "all", label: "Todas" },
+              { key: "active", label: "Activas" },
+              { key: "inactive", label: "Inactivas" },
+            ] as const).map((opt) => (
               <button
-                key={acc.id}
+                key={opt.key}
                 type="button"
-                onClick={() => setAccountFilter(acc.id)}
-                className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors shrink-0 ${
-                  accountFilter === acc.id
+                onClick={() => setStatusFilter(opt.key)}
+                className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors shrink-0 ${
+                  statusFilter === opt.key
                     ? "bg-primary/15 text-primary border border-primary/30"
                     : "text-muted-foreground hover:text-foreground border border-transparent"
                 }`}
               >
-                {acc.name} ({acc.count})
+                {opt.label}
               </button>
             ))}
           </div>
@@ -282,7 +261,7 @@ export function CrmInstallationsListClient({
               icon={<MapPin className="h-8 w-8" />}
               title="Sin instalaciones"
               description={
-                search || accountFilter !== "all"
+                search || statusFilter !== "all"
                   ? "No hay instalaciones para los filtros seleccionados."
                   : "No hay instalaciones registradas. Usa el botón + para crear una."
               }

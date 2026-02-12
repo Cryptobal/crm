@@ -34,6 +34,7 @@ import { EmptyState } from "@/components/opai/EmptyState";
 import { toast } from "sonner";
 import { resolveDocument, tiptapToPlainText } from "@/lib/docs/token-resolver";
 import { NotesSection } from "./NotesSection";
+import { FileAttachments } from "./FileAttachments";
 
 /** Convierte Tiptap JSON a HTML para email */
 function tiptapToEmailHtml(doc: any): string {
@@ -859,6 +860,12 @@ export function CrmDealDetailClient({
     children: <NotesSection entityType="deal" entityId={deal.id} currentUserId={currentUserId} />,
   };
 
+  const filesSection: DetailSection = {
+    key: "files",
+    label: "Archivos",
+    children: <FileAttachments entityType="deal" entityId={deal.id} title="Archivos" />,
+  };
+
   const sections: DetailSection[] = [
     generalSection,
     contactsSection,
@@ -867,6 +874,7 @@ export function CrmDealDetailClient({
     followUpSection,
     communicationSection,
     notesSection,
+    filesSection,
   ];
 
   return (

@@ -771,37 +771,69 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
           <PageHeader
             title={quote.code}
             description={
-              <span className="flex flex-wrap items-center gap-x-1 gap-y-0">
+              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0 text-xs">
+                {/* Cuenta */}
                 {crmContext.accountId ? (
-                  <Link href={`/crm/accounts/${crmContext.accountId}`} className="text-primary hover:underline font-medium">
-                    {quote.clientName || "Sin cliente"}
-                  </Link>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="text-muted-foreground">Cuenta:</span>
+                    <Link href={`/crm/accounts/${crmContext.accountId}`} className="text-primary hover:underline font-medium">
+                      {quote.clientName || "Sin cliente"}
+                    </Link>
+                  </span>
                 ) : (
-                  <span>{quote.clientName || "Sin cliente"}</span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="text-muted-foreground">Cuenta:</span>
+                    <span>{quote.clientName || "Sin cliente"}</span>
+                  </span>
                 )}
+                {/* Contacto */}
                 {crmContext.contactId && (() => {
                   const c = crmContacts.find((x) => x.id === crmContext.contactId);
                   const name = c ? `${c.firstName} ${c.lastName}`.trim() : "";
                   if (!name) return null;
                   return (
                     <>
-                      <span className="text-muted-foreground/60">·</span>
-                      <Link href={`/crm/contacts/${crmContext.contactId}`} className="text-primary hover:underline font-medium">
-                        {name}
-                      </Link>
+                      <span className="text-muted-foreground/40">·</span>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-muted-foreground">Contacto:</span>
+                        <Link href={`/crm/contacts/${crmContext.contactId}`} className="text-primary hover:underline font-medium">
+                          {name}
+                        </Link>
+                      </span>
                     </>
                   );
                 })()}
+                {/* Instalación */}
                 {crmContext.installationId && (() => {
                   const inst = crmInstallations.find((x) => x.id === crmContext.installationId);
                   const name = inst?.name || "";
                   if (!name) return null;
                   return (
                     <>
-                      <span className="text-muted-foreground/60">·</span>
-                      <Link href={`/crm/installations/${crmContext.installationId}`} className="text-primary hover:underline font-medium">
-                        {name}
-                      </Link>
+                      <span className="text-muted-foreground/40">·</span>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-muted-foreground">Instalación:</span>
+                        <Link href={`/crm/installations/${crmContext.installationId}`} className="text-primary hover:underline font-medium">
+                          {name}
+                        </Link>
+                      </span>
+                    </>
+                  );
+                })()}
+                {/* Negocio */}
+                {crmContext.dealId && (() => {
+                  const deal = crmDeals.find((d) => d.id === crmContext.dealId);
+                  const name = deal?.title || "";
+                  if (!name) return null;
+                  return (
+                    <>
+                      <span className="text-muted-foreground/40">·</span>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-muted-foreground">Negocio:</span>
+                        <Link href={`/crm/deals/${crmContext.dealId}`} className="text-primary hover:underline font-medium">
+                          {name}
+                        </Link>
+                      </span>
                     </>
                   );
                 })()}
@@ -1626,6 +1658,7 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                 disabled={!quote || positions.length === 0 || quote.status === "sent"}
                 hasAccount={!!crmContext.accountId}
                 hasContact={!!crmContext.contactId}
+                hasDeal={!!crmContext.dealId}
                 contactName={(() => {
                   const c = crmContext.contactId ? crmContacts.find((x) => x.id === crmContext.contactId) : null;
                   return c ? `${c.firstName} ${c.lastName}`.trim() : undefined;

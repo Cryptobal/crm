@@ -27,7 +27,7 @@ export default async function CrmInstallationDetailPage({
   }
 
   const tenantId = session.user?.tenantId ?? (await getDefaultTenantId());
-  const [installation, puestosActivos, quotesInstalacion] = await Promise.all([
+  const [installation, puestosActivos, quotesInstalacion, asignacionGuardias] = await Promise.all([
     prisma.crmInstallation.findFirst({
       where: { id, tenantId },
       include: { account: { select: { id: true, name: true, type: true, isActive: true } } },
@@ -38,11 +38,18 @@ export default async function CrmInstallationDetailPage({
       select: {
         id: true,
         name: true,
+        puestoTrabajoId: true,
+        cargoId: true,
+        rolId: true,
         shiftStart: true,
         shiftEnd: true,
         weekdays: true,
         requiredGuards: true,
+        baseSalary: true,
         teMontoClp: true,
+        puestoTrabajo: { select: { id: true, name: true } },
+        cargo: { select: { id: true, name: true } },
+        rol: { select: { id: true, name: true } },
       },
     }),
     prisma.cpqQuote.findMany({
@@ -58,6 +65,21 @@ export default async function CrmInstallationDetailPage({
       },
       take: 20,
     }),
+    prisma.opsAsignacionGuardia.findMany({
+      where: { tenantId, installationId: id, isActive: true },
+      include: {
+        guardia: {
+          select: {
+            id: true,
+            code: true,
+            lifecycleStatus: true,
+            persona: { select: { firstName: true, lastName: true, rut: true } },
+          },
+        },
+        puesto: { select: { id: true, name: true, shiftStart: true, shiftEnd: true } },
+      },
+      orderBy: [{ puestoId: "asc" }, { slotNumber: "asc" }],
+    }),
   ]);
 
   if (!installation) {
@@ -69,6 +91,7 @@ export default async function CrmInstallationDetailPage({
       ...installation,
       puestosActivos,
       quotesInstalacion,
+      asignacionGuardias,
     })
   );
 

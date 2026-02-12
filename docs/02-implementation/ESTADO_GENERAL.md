@@ -310,24 +310,107 @@ Se implementó el flujo MVP end-to-end:
 - Lotes de pago TE, marcado pagado y exportación CSV bancaria.
 - Gestión de guardias y lista negra.
 
+### Refactorización OPS v2 (2026-02-12)
+
+Se ejecutó una refactorización profunda del módulo OPS con los siguientes cambios:
+
+**Base de datos:**
+- Nuevo campo `slot_number` en `pauta_mensual` y `asistencia_diaria` (soporte multi-guardia por puesto).
+- Nuevo campo `shift_code` en `pauta_mensual` (T=trabaja, -=descanso, V=vacaciones, L=licencia, P=permiso).
+- Nueva tabla `serie_asignaciones` (definición de rotaciones: 4x4, 5x2, 7x7, etc.).
+- Cambio de constraints: `UNIQUE(puestoId, date)` → `UNIQUE(puestoId, slotNumber, date)` en ambas tablas.
+- Campos de bloqueo en asistencia: `locked_at`, `locked_by`, `correction_reason`.
+
+**Puestos operativos (refactorizado):**
+- Navegación jerárquica: Cliente → Instalación → Puestos.
+- Modal para crear y editar puestos (antes solo formulario inline sin edición).
+- Se filtra solo clientes activos con instalaciones activas.
+
+**Pauta mensual (rediseñada):**
+- Vista de matriz tipo spreadsheet: filas = puesto/slot/guardia, columnas = días del mes.
+- Selector de mes con nombre (Enero, Febrero...) en vez de número.
+- Sistema de pintado de series: click en celda → modal con guardia, patrón, posición de inicio → pintar toda la fila.
+- Colores diferenciados por estado (T, -, V, L, P).
+- Click derecho para ciclar estados especiales.
+- Días bloqueados (procesados en asistencia) no editables.
+
+**Asistencia diaria (rediseñada):**
+- Renombrada de "Pauta diaria" a "Asistencia diaria".
+- Vista multi-instalación con selector Cliente/Instalación y opción "Todas".
+- Agrupación por instalación con tabla completa por cada una.
+- Columnas: Puesto, Planificado, Real/Reemplazo, Horario, Check In/Out, Estado, Acciones.
+- Dashboard de resumen: Total puestos, Cubiertos, PPC, TE, % Cobertura.
+- Soporte para slotNumber (múltiples guardias por puesto).
+
+**Turnos Extra en OPS:**
+- Nueva página `/ops/turnos-extra` integrada en el SubNav de OPS.
+- Muestra TE generados desde asistencia con filtros y acciones de aprobar/rechazar.
+
+**PPC corregido:**
+- Lógica corregida: PPC = solo puestos SIN guardia planificado.
+- "No asistió" ya NO genera PPC (tiene guardia planificado, se resuelve con reemplazo → TE).
+- Incluye PPC por vacaciones, licencia, permiso (guardia ausente con motivo → slot vacío).
+- Vista con filtro día/mes y agrupación por instalación.
+
+**SubNav OPS actualizado:**
+- 6 tabs: Inicio | Puestos | Pauta mensual | Asistencia diaria | Turnos extra | PPC.
+
+### Asignación de guardias a puestos (2026-02-12)
+
+Se implementó el sistema de asignación de guardias a puestos operativos:
+
+**Base de datos:**
+- Nueva tabla `asignacion_guardias` (OpsAsignacionGuardia): vincula guardia → puesto + slot con fechas y historial.
+- Nuevos campos en `puestos_operativos`: `puesto_trabajo_id`, `cargo_id`, `rol_id`, `base_salary` (relaciones a catálogos CPQ).
+
+**OPS Puestos operativos (refactorizado):**
+- Vista de puestos con slots expandidos mostrando guardia asignado o "Vacante (PPC)".
+- Modal de asignación con buscador de guardias disponibles (solo `seleccionado` o `contratado_activo`).
+- Desasignación con confirmación (genera PPC automáticamente).
+- Colores por lifecycle status: Postulante (gris), Seleccionado (azul), Contratado (verde), Inactivo (amarillo), Desvinculado (rojo).
+- Badge Día/Noche con colores diferenciados en cada puesto.
+
+**CRM Instalaciones:**
+- Sección "Dotación activa" renombrada a "Puestos operativos" (gestión de puestos).
+- Nueva sección "Dotación activa" (read-only): muestra guardias asignados por puesto/slot, leída desde OPS.
+- Modal estandarizado compartido con CPQ: tipo puesto, cargo, rol, horario, días, guardias, sueldo base.
+- Filtro por estado (Todas/Activas/Inactivas) en listado de instalaciones.
+- Botón eliminar puesto con confirmación.
+- Badge Día/Noche en horario.
+
+**Ficha del guardia:**
+- Nueva sección "Asignación" (primera en la navegación): muestra asignación actual y historial de movimientos.
+- Asignación actual: puesto, instalación, cliente, fecha de inicio.
+- Historial: todas las asignaciones pasadas con fechas y motivo de cambio.
+
+**Componente compartido:**
+- `PuestoFormModal` (`src/components/shared/PuestoFormModal.tsx`): modal reutilizable para crear/editar puestos con catálogos CPQ.
+
+**Documentación:**
+- Nuevo glosario de términos: `docs/00-product/GLOSARIO.md`
+
 ---
 
 ## Qué sigue (recomendación actualizada)
 
-Con Fase 1 MVP v1 implementada, el siguiente bloque recomendado es:
+Con la asignación de guardias implementada, el siguiente bloque recomendado es:
 
-1. **Hardening Fase 1 (QA + cobertura de tests)**  
-   Tests unitarios/e2e para pauta, asistencia, TE y pagos.
-2. **RBAC operacional fino**  
-   Incorporar roles específicos (`rrhh`, `operaciones`, `reclutamiento`) y permisos granulares.
-3. **Optimización UX móvil de Ops/TE/Personas**  
-   Mejoras de productividad para supervisores en terreno.
-4. **Inicio Fase 2**  
-   Postventa + Tickets sobre la base operativa ya implementada.
+1. **Desvinculación automática**  
+   Cuando un guardia se desvincula (lifecycle → desvinculado), cerrar su asignación automáticamente y generar PPC.
+2. **Pauta mensual: lectura de asignaciones**  
+   Al generar pauta, pre-llenar guardias desde `OpsAsignacionGuardia` (no manual).
+3. **Cruce con eventos RRHH**  
+   Vacaciones/licencia/permiso → marcar en pauta y generar PPC automático.
+4. **Bloqueo automático de días**  
+   Cuando asistencia se confirma, bloquear en pauta mensual.
+5. **API FaceID / Marcación**  
+   Check-in/check-out automático vía API.
+6. **Hardening + QA**  
+   Tests e2e para asignación, pauta, asistencia, series, TE.
 
 Plan de Fase 1 actualizado: `docs/05-etapa-1/ETAPA_1_IMPLEMENTACION.md`  
 Roadmap completo: `docs/00-product/MASTER_SPEC_OPI.md`
 
 ---
 
-*Este documento refleja el estado real del repositorio al 2026-02-11.*
+*Este documento refleja el estado real del repositorio al 2026-02-12. Última actualización: Asignación de guardias a puestos.*

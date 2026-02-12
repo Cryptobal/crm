@@ -22,16 +22,32 @@ export default async function GuardiaDetailPage({
   }
 
   const tenantId = session.user.tenantId ?? (await getDefaultTenantId());
-  const guardia = await prisma.opsGuardia.findFirst({
-    where: { id, tenantId },
-    include: {
-      persona: true,
-      bankAccounts: { orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] },
-      comments: { orderBy: [{ createdAt: "desc" }], take: 100 },
-      documents: { orderBy: [{ createdAt: "desc" }] },
-      historyEvents: { orderBy: [{ createdAt: "desc" }], take: 100 },
-    },
-  });
+  const [guardia, asignaciones] = await Promise.all([
+    prisma.opsGuardia.findFirst({
+      where: { id, tenantId },
+      include: {
+        persona: true,
+        bankAccounts: { orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] },
+        comments: { orderBy: [{ createdAt: "desc" }], take: 100 },
+        documents: { orderBy: [{ createdAt: "desc" }] },
+        historyEvents: { orderBy: [{ createdAt: "desc" }], take: 100 },
+      },
+    }),
+    prisma.opsAsignacionGuardia.findMany({
+      where: { guardiaId: id, tenantId },
+      include: {
+        puesto: { select: { id: true, name: true, shiftStart: true, shiftEnd: true } },
+        installation: {
+          select: {
+            id: true,
+            name: true,
+            account: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: [{ isActive: "desc" }, { startDate: "desc" }],
+    }),
+  ]);
 
   if (!guardia) notFound();
 
@@ -44,6 +60,7 @@ export default async function GuardiaDetailPage({
       <PersonasSubnav />
       <GuardiaDetailClient
         initialGuardia={JSON.parse(JSON.stringify(guardia))}
+        asignaciones={JSON.parse(JSON.stringify(asignaciones))}
         userRole={role}
       />
     </div>

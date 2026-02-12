@@ -6,7 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { getDefaultTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/opai";
 import { Card, CardContent } from "@/components/ui/card";
-import { CalendarDays, ClipboardList, ShieldUser, UserRoundCheck } from "lucide-react";
+import {
+  CalendarDays,
+  ClipboardList,
+  Clock3,
+  ShieldAlert,
+  ShieldUser,
+  UserRoundCheck,
+} from "lucide-react";
 
 export default async function OpsDashboardPage() {
   const session = await auth();
@@ -20,16 +27,17 @@ export default async function OpsDashboardPage() {
 
   const tenantId = session.user.tenantId ?? (await getDefaultTenantId());
 
-  const [puestosCount, guardiasCount, ppcCount] = await Promise.all([
+  const [puestosCount, guardiasCount, teCount, ppcCount] = await Promise.all([
     prisma.opsPuestoOperativo.count({ where: { tenantId, active: true } }),
     prisma.opsGuardia.count({ where: { tenantId } }),
-    prisma.opsAsistenciaDiaria.count({
+    prisma.opsTurnoExtra.count({ where: { tenantId, status: "pending" } }),
+    // PPC correcto: puestos sin guardia planificado o con V/L/P
+    prisma.opsPautaMensual.count({
       where: {
         tenantId,
         OR: [
-          { attendanceStatus: "ppc" },
-          { attendanceStatus: "no_asistio" },
-          { attendanceStatus: "pendiente", actualGuardiaId: null, replacementGuardiaId: null },
+          { plannedGuardiaId: null, shiftCode: { not: "-" } },
+          { shiftCode: { in: ["V", "L", "P"] } },
         ],
       },
     }),
@@ -39,7 +47,7 @@ export default async function OpsDashboardPage() {
     {
       href: "/ops/puestos",
       title: "Puestos operativos",
-      description: "Estructura base por instalación, horario y días.",
+      description: "Visualiza estructura base por instalación, horario y días.",
       icon: ClipboardList,
       count: puestosCount,
       color: "text-blue-400 bg-blue-400/10",
@@ -54,18 +62,26 @@ export default async function OpsDashboardPage() {
     },
     {
       href: "/ops/pauta-diaria",
-      title: "Pauta diaria",
+      title: "Asistencia diaria",
       description: "Marca asistencia, reemplazos y generación TE.",
       icon: UserRoundCheck,
       count: null,
       color: "text-purple-400 bg-purple-400/10",
     },
     {
+      href: "/ops/turnos-extra",
+      title: "Turnos extra",
+      description: "Gestión de turnos extra generados desde asistencia.",
+      icon: Clock3,
+      count: teCount > 0 ? teCount : null,
+      color: "text-rose-400 bg-rose-400/10",
+    },
+    {
       href: "/ops/ppc",
       title: "Puestos por cubrir (PPC)",
-      description: "Visualiza brechas de cobertura del día.",
-      icon: ShieldUser,
-      count: ppcCount,
+      description: "Brechas de cobertura: sin guardia o con vacaciones/licencia.",
+      icon: ShieldAlert,
+      count: ppcCount > 0 ? ppcCount : null,
       color: "text-amber-400 bg-amber-400/10",
     },
     {

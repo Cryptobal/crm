@@ -18,10 +18,23 @@ export default async function OpsPautaMensualPage() {
 
   const tenantId = session.user.tenantId ?? (await getDefaultTenantId());
 
-  const [installations, guardias] = await Promise.all([
-    prisma.crmInstallation.findMany({
-      where: { tenantId },
-      select: { id: true, name: true },
+  const [clients, guardias] = await Promise.all([
+    prisma.crmAccount.findMany({
+      where: {
+        tenantId,
+        type: "client",
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        rut: true,
+        installations: {
+          where: { isActive: true },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        },
+      },
       orderBy: { name: "asc" },
     }),
     prisma.opsGuardia.findMany({
@@ -41,7 +54,7 @@ export default async function OpsPautaMensualPage() {
           },
         },
       },
-      orderBy: [{ createdAt: "desc" }],
+      orderBy: [{ persona: { lastName: "asc" } }],
     }),
   ]);
 
@@ -53,7 +66,7 @@ export default async function OpsPautaMensualPage() {
       />
       <OpsSubnav />
       <OpsPautaMensualClient
-        installations={JSON.parse(JSON.stringify(installations))}
+        initialClients={JSON.parse(JSON.stringify(clients))}
         guardias={JSON.parse(JSON.stringify(guardias))}
       />
     </div>

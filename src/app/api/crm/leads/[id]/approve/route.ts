@@ -384,6 +384,60 @@ export async function POST(
         },
       });
 
+      // ── Transferir archivos del lead al negocio y cuenta (leads por email reenviado) ──
+      if (lead.source === "email_forward") {
+        const leadFileLinks = await tx.crmFileLink.findMany({
+          where: { tenantId: ctx.tenantId, entityType: "lead", entityId: lead.id },
+          select: { fileId: true },
+        });
+        for (const link of leadFileLinks) {
+          await tx.crmFileLink.create({
+            data: {
+              tenantId: ctx.tenantId,
+              fileId: link.fileId,
+              entityType: "deal",
+              entityId: deal.id,
+            },
+          });
+          await tx.crmFileLink.create({
+            data: {
+              tenantId: ctx.tenantId,
+              fileId: link.fileId,
+              entityType: "account",
+              entityId: account.id,
+            },
+          });
+        }
+        // Guardar correo original en historial del negocio (CrmEmailThread + CrmEmailMessage)
+        const meta = lead.metadata as { inboundEmail?: { subject?: string; from?: string; to?: string[]; html?: string; text?: string; receivedAt?: string } } | null;
+        const inboundEmail = meta?.inboundEmail;
+        if (inboundEmail?.subject != null) {
+          const thread = await tx.crmEmailThread.create({
+            data: {
+              tenantId: ctx.tenantId,
+              accountId: account.id,
+              contactId: contact.id,
+              dealId: deal.id,
+              subject: inboundEmail.subject,
+              lastMessageAt: inboundEmail.receivedAt ? new Date(inboundEmail.receivedAt) : new Date(),
+            },
+          });
+          await tx.crmEmailMessage.create({
+            data: {
+              tenantId: ctx.tenantId,
+              threadId: thread.id,
+              direction: "in",
+              fromEmail: inboundEmail.from ?? "",
+              toEmails: Array.isArray(inboundEmail.to) ? inboundEmail.to : [],
+              subject: inboundEmail.subject,
+              htmlBody: inboundEmail.html ?? null,
+              textBody: inboundEmail.text ?? null,
+              receivedAt: inboundEmail.receivedAt ? new Date(inboundEmail.receivedAt) : new Date(),
+            },
+          });
+        }
+      }
+
       // ── Instalaciones + Cotización CPQ ──
       // Obtener defaults y catálogos CPQ activos
       const defaultCargo = await tx.cpqCargo.findFirst({ where: { active: true }, orderBy: { name: "asc" } });

@@ -37,6 +37,7 @@ interface SendCpqQuoteModalProps {
   disabled?: boolean;
   hasAccount?: boolean;
   hasContact?: boolean;
+  hasDeal?: boolean;
   contactName?: string;
   contactEmail?: string;
 }
@@ -59,6 +60,7 @@ export function SendCpqQuoteModal({
   disabled,
   hasAccount,
   hasContact,
+  hasDeal,
   contactName,
   contactEmail,
 }: SendCpqQuoteModalProps) {
@@ -76,7 +78,7 @@ export function SendCpqQuoteModal({
   // Success state
   const [previewUrl, setPreviewUrl] = useState("");
 
-  const canSend = hasAccount && hasContact;
+  const canSend = hasAccount && hasContact && hasDeal;
 
   useEffect(() => {
     if (contactName) setRecipientName(contactName);
@@ -175,14 +177,15 @@ export function SendCpqQuoteModal({
                 detail={clientName}
               />
               <CheckItem ok={!!hasContact} label="Contacto con email asignado" />
+              <CheckItem ok={!!hasDeal} label="Negocio vinculado" />
             </div>
 
             {!canSend && (
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
                 <p className="text-xs text-amber-400 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 shrink-0" />
-                  Asigna una cuenta y un contacto en el paso &quot;Datos&quot;
-                  antes de enviar.
+                  Asigna una cuenta, un contacto y un negocio en el paso
+                  &quot;Datos&quot; antes de enviar.
                 </p>
               </div>
             )}

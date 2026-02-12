@@ -25,6 +25,24 @@ const weekdayEnum = z.enum([
   "friday",
   "saturday",
   "sunday",
+  // Also accept Spanish short names
+  "lunes",
+  "martes",
+  "miercoles",
+  "miércoles",
+  "jueves",
+  "viernes",
+  "sabado",
+  "sábado",
+  "domingo",
+  // Accept short labels from shared modal
+  "Lun",
+  "Mar",
+  "Mié",
+  "Jue",
+  "Vie",
+  "Sáb",
+  "Dom",
 ]);
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -35,20 +53,28 @@ const percentRegex = /^\d+(\.\d{1,2})?$/;
 export const createPuestoSchema = z.object({
   installationId: z.string().uuid("installationId inválido"),
   name: z.string().trim().min(1, "Nombre es requerido").max(200),
+  puestoTrabajoId: z.string().uuid("puestoTrabajoId inválido").optional().nullable(),
+  cargoId: z.string().uuid("cargoId inválido").optional().nullable(),
+  rolId: z.string().uuid("rolId inválido").optional().nullable(),
   shiftStart: z.string().regex(timeRegex, "shiftStart debe tener formato HH:MM"),
   shiftEnd: z.string().regex(timeRegex, "shiftEnd debe tener formato HH:MM"),
   weekdays: z.array(weekdayEnum).min(1, "Debe seleccionar al menos un día"),
   requiredGuards: z.number().int().min(1).max(20).default(1),
+  baseSalary: z.number().min(0).optional().nullable(),
   teMontoClp: z.number().min(0).optional().nullable(),
   active: z.boolean().optional(),
 });
 
 export const updatePuestoSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
+  puestoTrabajoId: z.string().uuid("puestoTrabajoId inválido").optional().nullable(),
+  cargoId: z.string().uuid("cargoId inválido").optional().nullable(),
+  rolId: z.string().uuid("rolId inválido").optional().nullable(),
   shiftStart: z.string().regex(timeRegex, "shiftStart debe tener formato HH:MM").optional(),
   shiftEnd: z.string().regex(timeRegex, "shiftEnd debe tener formato HH:MM").optional(),
   weekdays: z.array(weekdayEnum).min(1).optional(),
   requiredGuards: z.number().int().min(1).max(20).optional(),
+  baseSalary: z.number().min(0).optional().nullable(),
   teMontoClp: z.number().min(0).optional().nullable(),
   active: z.boolean().optional(),
 });
@@ -60,8 +86,10 @@ export const bulkCreatePuestosSchema = z.object({
 
 export const upsertPautaItemSchema = z.object({
   puestoId: z.string().uuid("puestoId inválido"),
+  slotNumber: z.number().int().min(1).max(20).default(1),
   date: z.string().regex(dateRegex, "date debe tener formato YYYY-MM-DD"),
   plannedGuardiaId: z.string().uuid("plannedGuardiaId inválido").optional().nullable(),
+  shiftCode: z.string().trim().max(20).optional().nullable(),
   status: z.string().trim().min(1).max(50).default("planificado"),
   notes: z.string().trim().max(2000).optional().nullable(),
 });
@@ -71,7 +99,19 @@ export const generatePautaSchema = z.object({
   month: z.number().int().min(1).max(12),
   year: z.number().int().min(2020).max(2100),
   overwrite: z.boolean().default(false),
-  defaultGuardiaId: z.string().uuid("defaultGuardiaId inválido").optional().nullable(),
+});
+
+export const pintarSerieSchema = z.object({
+  puestoId: z.string().uuid("puestoId inválido"),
+  slotNumber: z.number().int().min(1).max(20),
+  guardiaId: z.string().uuid("guardiaId inválido"),
+  patternCode: z.string().trim().min(1).max(20),
+  patternWork: z.number().int().min(1).max(30),
+  patternOff: z.number().int().min(0).max(30),
+  startDate: z.string().regex(dateRegex, "startDate debe tener formato YYYY-MM-DD"),
+  startPosition: z.number().int().min(1).max(60),
+  month: z.number().int().min(1).max(12),
+  year: z.number().int().min(2020).max(2100),
 });
 
 export const updateAsistenciaSchema = z.object({

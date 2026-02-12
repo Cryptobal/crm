@@ -50,7 +50,13 @@ export async function POST(
       );
     }
 
-    // 2. Load contact
+    // 2. Validate required CRM context
+    if (!quote.dealId) {
+      return NextResponse.json(
+        { success: false, error: "La cotización debe tener un negocio asignado" },
+        { status: 400 }
+      );
+    }
     if (!quote.contactId) {
       return NextResponse.json(
         { success: false, error: "La cotización debe tener un contacto asignado" },

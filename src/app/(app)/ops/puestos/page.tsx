@@ -18,24 +18,58 @@ export default async function OpsPuestosPage() {
 
   const tenantId = session.user.tenantId ?? (await getDefaultTenantId());
 
-  const [installations, puestos] = await Promise.all([
-    prisma.crmInstallation.findMany({
-      where: {
-        tenantId,
-        account: { type: "client", isActive: true },
-        isActive: true,
+  const [clients, puestos, asignaciones, guardias] = await Promise.all([
+    prisma.crmAccount.findMany({
+      where: { tenantId, type: "client", isActive: true },
+      select: {
+        id: true,
+        name: true,
+        rut: true,
+        installations: {
+          where: { isActive: true },
+          select: { id: true, name: true, teMontoClp: true },
+          orderBy: { name: "asc" },
+        },
       },
-      select: { id: true, name: true, teMontoClp: true },
       orderBy: { name: "asc" },
     }),
     prisma.opsPuestoOperativo.findMany({
       where: { tenantId },
       include: {
-        installation: {
-          select: { id: true, name: true, teMontoClp: true },
+        installation: { select: { id: true, name: true, teMontoClp: true } },
+        cargo: { select: { id: true, name: true } },
+        rol: { select: { id: true, name: true } },
+      },
+      orderBy: [{ active: "desc" }, { createdAt: "desc" }],
+    }),
+    prisma.opsAsignacionGuardia.findMany({
+      where: { tenantId, isActive: true },
+      include: {
+        guardia: {
+          select: {
+            id: true,
+            code: true,
+            lifecycleStatus: true,
+            persona: { select: { firstName: true, lastName: true, rut: true } },
+          },
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { slotNumber: "asc" },
+    }),
+    prisma.opsGuardia.findMany({
+      where: {
+        tenantId,
+        status: "active",
+        isBlacklisted: false,
+        lifecycleStatus: { in: ["seleccionado", "contratado_activo"] },
+      },
+      select: {
+        id: true,
+        code: true,
+        lifecycleStatus: true,
+        persona: { select: { firstName: true, lastName: true, rut: true } },
+      },
+      orderBy: [{ persona: { lastName: "asc" } }],
     }),
   ]);
 
@@ -43,12 +77,14 @@ export default async function OpsPuestosPage() {
     <div className="space-y-6">
       <PageHeader
         title="Puestos operativos"
-        description="Define estructura por instalación, turnos y monto de turno extra."
+        description="Estructura, slots y asignación de guardias por instalación."
       />
       <OpsSubnav />
       <OpsPuestosClient
-        initialInstallations={JSON.parse(JSON.stringify(installations))}
+        initialClients={JSON.parse(JSON.stringify(clients))}
         initialPuestos={JSON.parse(JSON.stringify(puestos))}
+        initialAsignaciones={JSON.parse(JSON.stringify(asignaciones))}
+        guardias={JSON.parse(JSON.stringify(guardias))}
       />
     </div>
   );

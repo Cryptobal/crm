@@ -8,6 +8,7 @@ import {
   getMonthDateRange,
   getWeekdayKey,
   listDatesBetween,
+  weekdayMatches,
 } from "@/lib/ops";
 
 export async function POST(request: NextRequest) {
@@ -32,25 +33,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (body.defaultGuardiaId) {
-      const guardia = await prisma.opsGuardia.findFirst({
-        where: { id: body.defaultGuardiaId, tenantId: ctx.tenantId },
-        select: { id: true, isBlacklisted: true, status: true },
-      });
-      if (!guardia) {
-        return NextResponse.json(
-          { success: false, error: "Guardia por defecto no encontrado" },
-          { status: 404 }
-        );
-      }
-      if (guardia.isBlacklisted || guardia.status !== "active") {
-        return NextResponse.json(
-          { success: false, error: "El guardia por defecto debe estar activo y fuera de lista negra" },
-          { status: 400 }
-        );
-      }
-    }
-
     const puestos = await prisma.opsPuestoOperativo.findMany({
       where: {
         tenantId: ctx.tenantId,
@@ -60,6 +42,7 @@ export async function POST(request: NextRequest) {
       select: {
         id: true,
         weekdays: true,
+        requiredGuards: true,
       },
       orderBy: { createdAt: "asc" },
     });
@@ -74,19 +57,38 @@ export async function POST(request: NextRequest) {
     const { start, end } = getMonthDateRange(body.year, body.month);
     const monthDates = listDatesBetween(start, end);
 
+    // Generate rows: for each puesto × slot × day
     const data = monthDates.flatMap((date) => {
       const weekday = getWeekdayKey(date);
       return puestos
-        .filter((puesto) => puesto.weekdays.includes(weekday))
-        .map((puesto) => ({
-          tenantId: ctx.tenantId,
-          installationId: body.installationId,
-          puestoId: puesto.id,
-          date,
-          plannedGuardiaId: body.defaultGuardiaId ?? null,
-          status: "planificado",
-          createdBy: ctx.userId,
-        }));
+        .filter((puesto) => weekdayMatches(puesto.weekdays, weekday))
+        .flatMap((puesto) => {
+          const slots: {
+            tenantId: string;
+            installationId: string;
+            puestoId: string;
+            slotNumber: number;
+            date: Date;
+            plannedGuardiaId: string | null;
+            shiftCode: string | null;
+            status: string;
+            createdBy: string | null;
+          }[] = [];
+          for (let slot = 1; slot <= puesto.requiredGuards; slot++) {
+            slots.push({
+              tenantId: ctx.tenantId,
+              installationId: body.installationId,
+              puestoId: puesto.id,
+              slotNumber: slot,
+              date,
+              plannedGuardiaId: null,
+              shiftCode: null,
+              status: "planificado",
+              createdBy: ctx.userId,
+            });
+          }
+          return slots;
+        });
     });
 
     if (data.length === 0) {

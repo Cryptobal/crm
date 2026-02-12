@@ -38,6 +38,7 @@ import {
 import { hasOpsCapability } from "@/lib/ops-rbac";
 
 const SECTIONS = [
+  { id: "asignacion", label: "Asignación", icon: MapPin },
   { id: "datos", label: "Datos personales", icon: User },
   { id: "documentos", label: "Ficha de documentos", icon: FilePlus2 },
   { id: "docs-vinculados", label: "Docs vinculados", icon: Link2 },
@@ -109,8 +110,25 @@ type GuardiaDetail = {
   }>;
 };
 
+type AsignacionHistorial = {
+  id: string;
+  puestoId: string;
+  slotNumber: number;
+  startDate: string;
+  endDate?: string | null;
+  isActive: boolean;
+  reason?: string | null;
+  puesto: { id: string; name: string; shiftStart: string; shiftEnd: string };
+  installation: {
+    id: string;
+    name: string;
+    account?: { id: string; name: string } | null;
+  };
+};
+
 interface GuardiaDetailClientProps {
   initialGuardia: GuardiaDetail;
+  asignaciones?: AsignacionHistorial[];
   userRole: string;
 }
 
@@ -129,7 +147,7 @@ const ACCOUNT_TYPE_LABEL: Record<string, string> = {
   cuenta_rut: "Cuenta RUT",
 };
 
-export function GuardiaDetailClient({ initialGuardia, userRole }: GuardiaDetailClientProps) {
+export function GuardiaDetailClient({ initialGuardia, asignaciones = [], userRole }: GuardiaDetailClientProps) {
   const [guardia, setGuardia] = useState(initialGuardia);
   const [uploading, setUploading] = useState(false);
   const [creatingDoc, setCreatingDoc] = useState(false);
@@ -608,6 +626,76 @@ export function GuardiaDetailClient({ initialGuardia, userRole }: GuardiaDetailC
           </Button>
         ))}
       </nav>
+
+      {/* ── Asignación actual + historial ── */}
+      <Card id="asignacion">
+        <CardHeader>
+          <CardTitle>Asignación actual</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(() => {
+            const current = asignaciones.find((a) => a.isActive);
+            const history = asignaciones.filter((a) => !a.isActive);
+            return (
+              <>
+                {current ? (
+                  <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-300">
+                          {current.puesto.name}
+                          <span className="ml-2 text-xs text-emerald-300/60">Slot {current.slotNumber}</span>
+                        </p>
+                        <p className="text-xs text-emerald-200/80 mt-1">
+                          {current.installation.name}
+                          {current.installation.account && ` · ${current.installation.account.name}`}
+                        </p>
+                        <p className="text-xs text-emerald-200/60 mt-0.5">
+                          {current.puesto.shiftStart} - {current.puesto.shiftEnd} · Desde {new Date(current.startDate).toLocaleDateString("es-CL")}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300 border border-emerald-500/30">
+                        Activo
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-amber-500/30 bg-amber-500/5 p-4 text-center">
+                    <p className="text-sm text-amber-400">Sin asignación activa</p>
+                    <p className="text-xs text-muted-foreground mt-1">Este guardia no está asignado a ningún puesto.</p>
+                  </div>
+                )}
+
+                {history.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Historial de asignaciones</p>
+                    <div className="space-y-1.5">
+                      {history.map((h) => (
+                        <div key={h.id} className="rounded-md border border-border/60 px-3 py-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-medium">{h.puesto.name}</span>
+                              <span className="text-muted-foreground"> · {h.installation.name}</span>
+                              {h.installation.account && (
+                                <span className="text-muted-foreground"> · {h.installation.account.name}</span>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-muted-foreground mt-0.5">
+                            {new Date(h.startDate).toLocaleDateString("es-CL")}
+                            {h.endDate && ` → ${new Date(h.endDate).toLocaleDateString("es-CL")}`}
+                            {h.reason && ` · ${h.reason}`}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </CardContent>
+      </Card>
 
       <Card id="datos">
         <CardHeader>

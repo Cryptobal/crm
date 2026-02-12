@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/opai";
 import { OpsPautaDiariaClient, OpsSubnav } from "@/components/ops";
 
-export default async function OpsPautaDiariaPage() {
+export default async function OpsAsistenciaDiariaPage() {
   const session = await auth();
   if (!session?.user) {
     redirect("/opai/login?callbackUrl=/ops/pauta-diaria");
@@ -18,10 +18,22 @@ export default async function OpsPautaDiariaPage() {
 
   const tenantId = session.user.tenantId ?? (await getDefaultTenantId());
 
-  const [installations, guardias] = await Promise.all([
-    prisma.crmInstallation.findMany({
-      where: { tenantId },
-      select: { id: true, name: true },
+  const [clients, guardias] = await Promise.all([
+    prisma.crmAccount.findMany({
+      where: {
+        tenantId,
+        type: "client",
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        installations: {
+          where: { isActive: true },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        },
+      },
       orderBy: { name: "asc" },
     }),
     prisma.opsGuardia.findMany({
@@ -34,25 +46,22 @@ export default async function OpsPautaDiariaPage() {
         id: true,
         code: true,
         persona: {
-          select: {
-            firstName: true,
-            lastName: true,
-          },
+          select: { firstName: true, lastName: true },
         },
       },
-      orderBy: [{ createdAt: "desc" }],
+      orderBy: [{ persona: { lastName: "asc" } }],
     }),
   ]);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Pauta diaria"
+        title="Asistencia diaria"
         description="Control diario de asistencia, reemplazos y generación de turnos extra."
       />
       <OpsSubnav />
       <OpsPautaDiariaClient
-        installations={JSON.parse(JSON.stringify(installations))}
+        initialClients={JSON.parse(JSON.stringify(clients))}
         guardias={JSON.parse(JSON.stringify(guardias))}
       />
     </div>

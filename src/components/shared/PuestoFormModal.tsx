@@ -1,0 +1,468 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
+import { formatNumber, parseLocalizedNumber } from "@/lib/utils";
+
+/* ── Constants ─────────────────────────────────── */
+
+const TIME_OPTIONS = [
+  "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
+  "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
+  "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30",
+  "19:00", "19:30", "20:00",
+];
+
+const WEEKDAY_ORDER = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+/* ── Types ─────────────────────────────────────── */
+
+type CatalogItem = { id: string; name: string; description?: string | null };
+
+export type PuestoFormData = {
+  puestoTrabajoId: string;
+  cargoId: string;
+  rolId: string;
+  customName: string;
+  startTime: string;
+  endTime: string;
+  weekdays: string[];
+  numGuards: number;
+  baseSalary: number;
+};
+
+export interface PuestoFormModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title?: string;
+  /** Pre-filled data for editing */
+  initialData?: Partial<PuestoFormData>;
+  /** Called on successful save */
+  onSave: (data: PuestoFormData) => Promise<void>;
+  saving?: boolean;
+}
+
+const DEFAULT_FORM: PuestoFormData = {
+  puestoTrabajoId: "",
+  cargoId: "",
+  rolId: "",
+  customName: "",
+  startTime: "08:00",
+  endTime: "20:00",
+  weekdays: [],
+  numGuards: 1,
+  baseSalary: 550000,
+};
+
+function getShiftHours(startTime: string, endTime: string): number | null {
+  if (!startTime || !endTime) return null;
+  const [sH, sM] = startTime.split(":").map(Number);
+  const [eH, eM] = endTime.split(":").map(Number);
+  if ([sH, sM, eH, eM].some((v) => Number.isNaN(v))) return null;
+  const startMin = sH * 60 + sM;
+  let endMin = eH * 60 + eM;
+  if (endMin <= startMin) endMin += 24 * 60;
+  return (endMin - startMin) / 60;
+}
+
+/* ── Component ─────────────────────────────────── */
+
+export function PuestoFormModal({
+  open,
+  onOpenChange,
+  title = "Puesto operativo",
+  initialData,
+  onSave,
+  saving: externalSaving,
+}: PuestoFormModalProps) {
+  const [form, setForm] = useState<PuestoFormData>(DEFAULT_FORM);
+  const [saving, setSaving] = useState(false);
+  const isSaving = externalSaving ?? saving;
+
+  // Catalogs
+  const [cargos, setCargos] = useState<CatalogItem[]>([]);
+  const [roles, setRoles] = useState<CatalogItem[]>([]);
+  const [puestos, setPuestos] = useState<CatalogItem[]>([]);
+
+  // Load catalogs when modal opens
+  useEffect(() => {
+    if (open) {
+      Promise.all([
+        fetch("/api/cpq/cargos?active=true").then((r) => r.json()),
+        fetch("/api/cpq/roles?active=true").then((r) => r.json()),
+        fetch("/api/cpq/puestos?active=true").then((r) => r.json()),
+      ])
+        .then(([c, r, p]) => {
+          setCargos(c.data || []);
+          setRoles(r.data || []);
+          setPuestos(p.data || []);
+        })
+        .catch(console.error);
+    }
+  }, [open]);
+
+  // Reset form when modal opens with initial data
+  useEffect(() => {
+    if (open) {
+      setForm({ ...DEFAULT_FORM, ...initialData });
+    }
+  }, [open, initialData]);
+
+  const shiftHours = useMemo(
+    () => getShiftHours(form.startTime, form.endTime),
+    [form.startTime, form.endTime]
+  );
+
+  const toggleWeekday = (day: string) => {
+    setForm((prev) => ({
+      ...prev,
+      weekdays: prev.weekdays.includes(day)
+        ? prev.weekdays.filter((d) => d !== day)
+        : [...prev.weekdays, day],
+    }));
+  };
+
+  const applyWeekdayPreset = (preset: "weekdays" | "weekend" | "all" | "clear") => {
+    const map = {
+      clear: [] as string[],
+      all: [...WEEKDAY_ORDER],
+      weekdays: WEEKDAY_ORDER.slice(0, 5),
+      weekend: WEEKDAY_ORDER.slice(5),
+    };
+    setForm((prev) => ({ ...prev, weekdays: map[preset] }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await onSave(form);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectClass =
+    "flex h-10 w-full rounded-md border border-input bg-card px-3 text-sm";
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* ── Row 1: Tipo de puesto + Cargo ── */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Tipo de Puesto *
+              </Label>
+              <select
+                className={selectClass}
+                value={form.puestoTrabajoId}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, puestoTrabajoId: e.target.value }))
+                }
+              >
+                <option value="">Selecciona un puesto</option>
+                {puestos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Cargo *
+              </Label>
+              <select
+                className={selectClass}
+                value={form.cargoId}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, cargoId: e.target.value }))
+                }
+              >
+                <option value="">Selecciona un cargo</option>
+                {cargos.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* ── Row 2: Nombre personalizado + Rol ── */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Nombre personalizado
+              </Label>
+              <Input
+                value={form.customName}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, customName: e.target.value }))
+                }
+                placeholder="Ej: Control Acceso Nocturno"
+                className="h-10 bg-background text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Rol *
+              </Label>
+              <select
+                className={selectClass}
+                value={form.rolId}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, rolId: e.target.value }))
+                }
+              >
+                <option value="">Selecciona un rol</option>
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                    {r.description ? ` (${r.description})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* ── Row 3: Horario + Guardias + Sueldo ── */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Horario
+                </Label>
+                <div className="flex gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={
+                      form.startTime === "08:00" && form.endTime === "20:00"
+                        ? "default"
+                        : "outline"
+                    }
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() =>
+                      setForm((p) => ({
+                        ...p,
+                        startTime: "08:00",
+                        endTime: "20:00",
+                      }))
+                    }
+                  >
+                    Día
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={
+                      form.startTime === "20:00" && form.endTime === "08:00"
+                        ? "default"
+                        : "outline"
+                    }
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() =>
+                      setForm((p) => ({
+                        ...p,
+                        startTime: "20:00",
+                        endTime: "08:00",
+                      }))
+                    }
+                  >
+                    Noche
+                  </Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[10px]">Inicio</Label>
+                  <select
+                    className={selectClass}
+                    value={form.startTime}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, startTime: e.target.value }))
+                    }
+                  >
+                    {TIME_OPTIONS.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px]">Término</Label>
+                  <select
+                    className={selectClass}
+                    value={form.endTime}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, endTime: e.target.value }))
+                    }
+                  >
+                    {TIME_OPTIONS.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Jornada:{" "}
+                <span className="font-medium text-foreground">
+                  {shiftHours === null
+                    ? "--"
+                    : `${shiftHours % 1 === 0 ? shiftHours.toFixed(0) : shiftHours.toFixed(1)} h`}
+                </span>
+              </p>
+
+              {/* Días */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Días
+                </Label>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() => applyWeekdayPreset("weekdays")}
+                  >
+                    Lun-Vie
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() => applyWeekdayPreset("weekend")}
+                  >
+                    Sáb-Dom
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() => applyWeekdayPreset("all")}
+                  >
+                    Todos
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-[10px] text-muted-foreground"
+                    onClick={() => applyWeekdayPreset("clear")}
+                  >
+                    Limpiar
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {WEEKDAY_ORDER.map((day) => {
+                    const active = form.weekdays.includes(day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleWeekday(day)}
+                        className={`rounded-full border px-2.5 py-0.5 text-[11px] transition-colors ${
+                          active
+                            ? "border-primary/50 bg-primary/15 text-primary"
+                            : "border-border/60 bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Right column: Guardias + Sueldo */}
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Guardias
+                </Label>
+                <select
+                  className="flex h-10 w-20 rounded-md border border-input bg-card px-2 text-sm"
+                  value={form.numGuards}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      numGuards: Number(e.target.value),
+                    }))
+                  }
+                >
+                  {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Sueldo base
+                </Label>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={formatNumber(form.baseSalary, {
+                    minDecimals: 0,
+                    maxDecimals: 0,
+                  })}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      baseSalary: parseLocalizedNumber(e.target.value),
+                    }))
+                  }
+                  className="h-10 bg-background text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSaving}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

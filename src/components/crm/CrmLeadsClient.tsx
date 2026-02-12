@@ -16,7 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { CrmLead } from "@/types";
-import { Plus, Loader2, AlertTriangle, Trash2, ChevronRight, UserPlus, Phone, Mail, MessageSquare, Clock, Users, Calendar, Briefcase, MapPin, X, Copy, ExternalLink } from "lucide-react";
+import { Plus, Loader2, AlertTriangle, Trash2, ChevronRight, UserPlus, Phone, Mail, MessageSquare, Clock, Users, Calendar, Briefcase, MapPin, X, Copy, ExternalLink, Mailbox } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { StatusBadge } from "@/components/opai/StatusBadge";
 import { EmptyState } from "@/components/opai/EmptyState";
@@ -27,6 +27,7 @@ import { AddressAutocomplete, type AddressResult } from "@/components/ui/Address
 import { toast } from "sonner";
 import { formatNumber, parseLocalizedNumber } from "@/lib/utils";
 import { resolveDocument, tiptapToPlainText } from "@/lib/docs/token-resolver";
+import { FileAttachments } from "./FileAttachments";
 
 /* ─── Dotación & Installation draft types ─── */
 
@@ -1362,6 +1363,31 @@ export function CrmLeadsClient({
             </div>
           )}
 
+          {selectedLead?.source === "email_forward" && selectedLead?.metadata && typeof selectedLead.metadata === "object" && !Array.isArray(selectedLead.metadata) && (
+            <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Mailbox className="h-3.5 w-3.5" />
+                Correo original
+              </h4>
+              {(() => {
+                const meta = selectedLead.metadata as { inboundEmail?: { subject?: string; from?: string; text?: string; html?: string; receivedAt?: string } };
+                const email = meta?.inboundEmail;
+                if (!email) return null;
+                return (
+                  <div className="space-y-2 text-sm">
+                    {email.subject && <p><span className="text-muted-foreground">Asunto:</span> {email.subject}</p>}
+                    {email.from && <p><span className="text-muted-foreground">De:</span> {email.from}</p>}
+                    {email.receivedAt && <p className="text-muted-foreground text-xs">{new Date(email.receivedAt).toLocaleString()}</p>}
+                    <div className="rounded border border-border bg-background/80 p-3 max-h-48 overflow-y-auto text-xs whitespace-pre-wrap break-words">
+                      {email.text ? email.text : email.html ? email.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 2000) : "Sin contenido"}
+                    </div>
+                  </div>
+                );
+              })()}
+              <FileAttachments entityType="lead" entityId={selectedLead.id} readOnly title="Archivos adjuntos del correo" />
+            </div>
+          )}
+
           <div className="space-y-5">
             <div className="space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -2123,7 +2149,12 @@ export function CrmLeadsClient({
                       )}
                       {lead.source && (
                         <span className="text-[10px] text-muted-foreground/80">
-                          {lead.source === "web_cotizador" ? "Cotizador Web" : lead.source === "web_cotizador_inteligente" ? "Cotizador IA" : lead.source}
+                          {lead.source === "web_cotizador" ? "Cotizador Web" : lead.source === "web_cotizador_inteligente" ? "Cotizador IA" : lead.source === "email_forward" ? "Correo reenviado" : lead.source}
+                        </span>
+                      )}
+                      {lead.source === "email_forward" && (
+                        <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-400">
+                          Email
                         </span>
                       )}
                       {lead.status === "rejected" && rejectionInfo && (
@@ -2203,6 +2234,11 @@ export function CrmLeadsClient({
                           {lead.source === "web_cotizador_inteligente" && (
                             <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[10px] font-medium text-teal-400">
                               Cotizador Inteligente
+                            </span>
+                          )}
+                          {lead.source === "email_forward" && (
+                            <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-400">
+                              Correo reenviado
                             </span>
                           )}
                           {totalGuards > 0 && (
@@ -2292,7 +2328,7 @@ export function CrmLeadsClient({
                         </div>
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5 items-center">
                           <CrmDates createdAt={lead.createdAt} updatedAt={(lead as { updatedAt?: string }).updatedAt} showTime />
-                          {lead.source && lead.source !== "web_cotizador" && lead.source !== "web_cotizador_inteligente" && (
+                          {lead.source && lead.source !== "web_cotizador" && lead.source !== "web_cotizador_inteligente" && lead.source !== "email_forward" && (
                             <span className="text-[11px] text-muted-foreground/80">
                               Fuente: {lead.source}
                             </span>

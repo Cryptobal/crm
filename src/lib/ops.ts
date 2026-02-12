@@ -78,6 +78,29 @@ export function getWeekdayKey(date: Date): WeekdayKey {
   return WEEKDAY_BY_JS_DAY[date.getUTCDay()];
 }
 
+/* Map of Spanish weekday names to English keys */
+const SPANISH_TO_ENGLISH: Record<string, WeekdayKey> = {
+  lunes: "monday",
+  martes: "tuesday",
+  miercoles: "wednesday",
+  miércoles: "wednesday",
+  jueves: "thursday",
+  viernes: "friday",
+  sabado: "saturday",
+  sábado: "saturday",
+  domingo: "sunday",
+};
+
+/**
+ * Checks if a weekday (English key) exists in an array that may contain
+ * either English keys or Spanish names.
+ */
+export function weekdayMatches(weekdays: string[], weekdayKey: WeekdayKey): boolean {
+  if (weekdays.includes(weekdayKey)) return true;
+  // Also check if the array uses Spanish names
+  return weekdays.some((w) => SPANISH_TO_ENGLISH[w.toLowerCase()] === weekdayKey);
+}
+
 export function getMonthDateRange(year: number, month: number): { start: Date; end: Date } {
   // month = 1-12
   const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));

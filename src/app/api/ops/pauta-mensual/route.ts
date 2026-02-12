@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
             shiftStart: true,
             shiftEnd: true,
             weekdays: true,
+            requiredGuards: true,
           },
         },
         plannedGuardia: {
@@ -63,7 +64,51 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: [{ date: "asc" }, { puestoId: "asc" }],
+      orderBy: [{ puestoId: "asc" }, { slotNumber: "asc" }, { date: "asc" }],
+    });
+
+    // Also get active series for this installation
+    const puestoIds = [...new Set(pauta.map((p) => p.puestoId))];
+    const series = puestoIds.length > 0
+      ? await prisma.opsSerieAsignacion.findMany({
+          where: {
+            tenantId: ctx.tenantId,
+            puestoId: { in: puestoIds },
+            isActive: true,
+          },
+          include: {
+            guardia: {
+              select: {
+                id: true,
+                code: true,
+                persona: {
+                  select: { firstName: true, lastName: true },
+                },
+              },
+            },
+          },
+        })
+      : [];
+
+    // Also get active guard assignments for this installation
+    const asignaciones = await prisma.opsAsignacionGuardia.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        installationId,
+        isActive: true,
+      },
+      select: {
+        puestoId: true,
+        slotNumber: true,
+        guardiaId: true,
+        guardia: {
+          select: {
+            id: true,
+            code: true,
+            persona: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
     });
 
     return NextResponse.json({
@@ -73,6 +118,8 @@ export async function GET(request: NextRequest) {
         year,
         installationId,
         items: pauta,
+        series,
+        asignaciones,
       },
     });
   } catch (error) {
@@ -129,8 +176,9 @@ export async function POST(request: NextRequest) {
 
     const pauta = await prisma.opsPautaMensual.upsert({
       where: {
-        puestoId_date: {
+        puestoId_slotNumber_date: {
           puestoId: body.puestoId,
+          slotNumber: body.slotNumber,
           date,
         },
       },
@@ -138,14 +186,17 @@ export async function POST(request: NextRequest) {
         tenantId: ctx.tenantId,
         installationId: puesto.installationId,
         puestoId: body.puestoId,
+        slotNumber: body.slotNumber,
         date,
         plannedGuardiaId: body.plannedGuardiaId ?? null,
+        shiftCode: body.shiftCode ?? null,
         status: body.status,
         notes: body.notes ?? null,
         createdBy: ctx.userId,
       },
       update: {
         plannedGuardiaId: body.plannedGuardiaId ?? null,
+        shiftCode: body.shiftCode ?? null,
         status: body.status,
         notes: body.notes ?? null,
       },
@@ -165,9 +216,10 @@ export async function POST(request: NextRequest) {
 
     await createOpsAuditLog(ctx, "ops.pauta.upsert", "ops_pauta", pauta.id, {
       puestoId: body.puestoId,
+      slotNumber: body.slotNumber,
       date: body.date,
       plannedGuardiaId: body.plannedGuardiaId ?? null,
-      status: body.status,
+      shiftCode: body.shiftCode ?? null,
     });
 
     return NextResponse.json({ success: true, data: pauta });

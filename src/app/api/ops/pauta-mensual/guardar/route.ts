@@ -45,8 +45,9 @@ export async function POST(request: NextRequest) {
       body.items.map((item) =>
         prisma.opsPautaMensual.upsert({
           where: {
-            puestoId_date: {
+            puestoId_slotNumber_date: {
               puestoId: item.puestoId,
+              slotNumber: item.slotNumber,
               date: parseDateOnly(item.date),
             },
           },
@@ -54,14 +55,17 @@ export async function POST(request: NextRequest) {
             tenantId: ctx.tenantId,
             installationId: puestoById.get(item.puestoId)!.installationId,
             puestoId: item.puestoId,
+            slotNumber: item.slotNumber,
             date: parseDateOnly(item.date),
             plannedGuardiaId: item.plannedGuardiaId ?? null,
+            shiftCode: item.shiftCode ?? null,
             status: item.status,
             notes: item.notes ?? null,
             createdBy: ctx.userId,
           },
           update: {
             plannedGuardiaId: item.plannedGuardiaId ?? null,
+            shiftCode: item.shiftCode ?? null,
             status: item.status,
             notes: item.notes ?? null,
           },

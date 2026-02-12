@@ -42,7 +42,9 @@ export type CrmSectionKey =
   | "followup"
   | "communication"
   | "notes"
-  | "staffing";
+  | "staffing"
+  | "dotacion"
+  | "files";
 
 export interface ModuleConfig {
   key: CrmModuleKey;
@@ -182,7 +184,17 @@ export const CRM_SECTIONS: Record<CrmSectionKey, SectionConfig> = {
   staffing: {
     key: "staffing",
     icon: Shield,
-    label: "Dotación",
+    label: "Puestos operativos",
+  },
+  dotacion: {
+    key: "dotacion",
+    icon: Users,
+    label: "Dotación activa",
+  },
+  files: {
+    key: "files",
+    icon: FileText,
+    label: "Archivos",
   },
 };
 
@@ -223,6 +235,7 @@ export const DETAIL_SECTION_ORDER: CrmSectionKey[] = [
   "deals",
   "quotes",
   "staffing",
+  "dotacion",
   "followup",
   "communication",
   "notes",
@@ -235,5 +248,5 @@ export const MODULE_DETAIL_SECTIONS: Record<string, CrmSectionKey[]> = {
   accounts: ["general", "contacts", "installations", "deals", "quotes", "communication", "notes"],
   contacts: ["general", "account", "deals", "communication", "notes"],
   deals: ["general", "account", "contacts", "installations", "quotes", "followup", "communication", "notes"],
-  installations: ["general", "account", "staffing", "quotes", "communication", "notes"],
+  installations: ["general", "account", "staffing", "dotacion", "quotes", "communication", "notes"],
 };
