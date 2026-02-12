@@ -354,8 +354,8 @@ export function OpsPautaDiariaClient({
         </Card>
       ) : (
         grouped.map(([instId, group]) => (
-          <Card key={instId}>
-            <CardContent className="pt-4 pb-3 space-y-3">
+          <Card key={instId} className="overflow-visible">
+            <CardContent className="pt-4 pb-3 space-y-3 overflow-visible">
               <h3 className="text-sm font-semibold text-primary/80 uppercase tracking-wide">
                 {group.name}
               </h3>
