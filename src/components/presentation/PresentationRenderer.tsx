@@ -232,7 +232,7 @@ export function PresentationRenderer({ payload, showTokens = false, pdfMode = fa
           {/* S09 - Cómo Operamos (incluido en PDF: términos operativos) */}
           <Section09ComoOperamos data={sections.s09_como_operamos} />
           
-          {/* ── Secciones de credenciales y equipo (solo web) ── */}
+          {/* ── Secciones de credenciales y equipo (solo web, excepto S13) ── */}
           {!pdfMode && (
             <>
               {/* S10 - Supervisión */}
@@ -243,10 +243,14 @@ export function PresentationRenderer({ payload, showTokens = false, pdfMode = fa
               
               {/* S12 - Cumplimiento */}
               <Section12Cumplimiento data={sections.s12_cumplimiento} />
-              
-              {/* S13 - Certificaciones */}
-              <Section13Certificaciones data={sections.s13_certificaciones} />
-              
+            </>
+          )}
+
+          {/* S13 - Certificaciones (incluido en PDF: credenciales profesionales) */}
+          <Section13Certificaciones data={sections.s13_certificaciones} />
+
+          {!pdfMode && (
+            <>
               {/* S14 - Tecnología */}
               <Section14Tecnologia data={sections.s14_tecnologia} />
               
@@ -264,10 +268,14 @@ export function PresentationRenderer({ payload, showTokens = false, pdfMode = fa
               
               {/* S19 - Resultados */}
               <Section19Resultados data={sections.s19_resultados} />
-              
-              {/* S20 - Clientes */}
-              <Section20Clientes data={sections.s20_clientes} />
-              
+            </>
+          )}
+
+          {/* S20 - Clientes (incluido en PDF: social proof) */}
+          <Section20Clientes data={sections.s20_clientes} />
+
+          {!pdfMode && (
+            <>
               {/* S21 - Sectores */}
               <Section21Sectores data={sections.s21_sectores} />
             </>
@@ -289,16 +297,11 @@ export function PresentationRenderer({ payload, showTokens = false, pdfMode = fa
           {/* S24 - Términos y Condiciones (incluido en PDF) */}
           <Section24TerminosCondiciones data={sections.s24_terminos_condiciones} />
           
-          {/* ── Secciones de comparación (solo web) ── */}
-          {!pdfMode && (
-            <>
-              {/* S25 - Comparación Competitiva */}
-              <Section25Comparacion data={sections.s25_comparacion} />
-              
-              {/* S26 - Por Qué Nos Eligen */}
-              <Section26PorqueEligen data={sections.s26_porque_eligen} />
-            </>
-          )}
+          {/* S25 - Comparación Competitiva (incluido en PDF: diferenciación) */}
+          <Section25Comparacion data={sections.s25_comparacion} />
+          
+          {/* S26 - Por Qué Nos Eligen (solo web) */}
+          {!pdfMode && <Section26PorqueEligen data={sections.s26_porque_eligen} />}
           
           {/* S27 - Implementación (incluido en PDF) */}
           <Section27Implementacion data={sections.s27_implementacion} />

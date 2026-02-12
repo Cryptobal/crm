@@ -10,7 +10,7 @@ import { SectionWrapper, ContainerWrapper } from '../SectionWrapper';
 import { useThemeClasses } from '../ThemeProvider';
 import { usePdfMode } from '../PdfModeContext';
 import { cn } from '@/lib/utils';
-import { Calendar, MessageCircle, ArrowRight, Sparkles, Zap, CheckCircle2 } from 'lucide-react';
+import { Calendar, MessageCircle, ArrowRight, Sparkles, Zap, CheckCircle2, Phone, Mail, Globe } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface Section28CierreProps {
@@ -71,15 +71,37 @@ export function Section28Cierre({ data, contactEmail = 'comercial@gard.cl', cont
           {/* CTAs - Versión estática para PDF, animada para web */}
           {pdfMode ? (
             <>
-              {/* Versión estática para PDF */}
-              <div className="flex flex-col sm:flex-row gap-5 justify-center mb-12 px-4">
-                <div className="inline-flex items-center justify-center gap-3 px-10 py-5 rounded-2xl text-lg font-bold text-white bg-white/5 border-2 border-teal-400/50">
-                  <Calendar className="w-6 h-6 text-teal-400" />
-                  <span>{data.cta_primary.text}</span>
-                </div>
-                <div className="inline-flex items-center justify-center gap-3 px-10 py-5 rounded-2xl text-lg font-bold text-white bg-white/5 border-2 border-green-500/50">
-                  <MessageCircle className="w-6 h-6 text-green-400" />
-                  <span>Hablar por WhatsApp</span>
+              {/* Información de contacto para PDF */}
+              <div className="glass-card rounded-2xl p-10 border-2 border-teal-400/30 max-w-2xl mx-auto mb-10">
+                <h3 className="text-2xl font-bold text-white mb-8 text-center">Contáctanos</h3>
+                <div className="space-y-5">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-teal-400/15 border border-teal-400/30">
+                      <Phone className="w-6 h-6 text-teal-400" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-white/50 font-medium">Teléfono</div>
+                      <div className="text-lg font-bold text-white">{contactPhone}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-teal-400/15 border border-teal-400/30">
+                      <Mail className="w-6 h-6 text-teal-400" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-white/50 font-medium">Email</div>
+                      <div className="text-lg font-bold text-white">{contactEmail}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-teal-400/15 border border-teal-400/30">
+                      <Globe className="w-6 h-6 text-teal-400" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-white/50 font-medium">Web</div>
+                      <div className="text-lg font-bold text-white">www.gard.cl</div>
+                    </div>
+                  </div>
                 </div>
               </div>
               
