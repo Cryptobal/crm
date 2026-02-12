@@ -7,11 +7,11 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/opai";
+import { PayrollSubnav } from "@/components/payroll/PayrollSubnav";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Calendar, AlertCircle, Info } from "lucide-react";
-import Link from "next/link";
+import { Calendar, AlertCircle, Info } from "lucide-react";
 import { formatCLP, formatNumber } from "@/lib/utils";
 
 export default function PayrollParameters() {
@@ -81,19 +81,13 @@ export default function PayrollParameters() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Link href="/payroll">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <PageHeader title="Parámetros Legales Chile" />
-        </div>
+        <PageHeader title="Parámetros Legales Chile" />
         <Badge variant="default" className="gap-1.5 text-xs">
           <Calendar className="h-3 w-3" />
           {parameters.effective_from}
         </Badge>
       </div>
+      <PayrollSubnav />
 
       {/* Row 1: AFP, SIS/Salud, AFC, Mutual/Topes */}
       <div className="grid gap-3 lg:grid-cols-4">

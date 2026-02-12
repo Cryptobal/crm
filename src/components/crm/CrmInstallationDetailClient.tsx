@@ -4,9 +4,19 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, ExternalLink, Trash2 } from "lucide-react";
+import { MapPin, ExternalLink, Trash2, Pencil, Loader2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { AddressAutocomplete, type AddressResult } from "@/components/ui/AddressAutocomplete";
 import { EmptyState } from "@/components/opai/EmptyState";
 import { CrmDetailLayout, type DetailSection } from "./CrmDetailLayout";
 import { DetailField, DetailFieldGrid } from "./DetailField";
@@ -103,7 +113,10 @@ export function CrmInstallationDetailClient({
   const openToggleInstallationStatus = () => {
     const next = !isActive;
     setStatusNextValue(next);
-    setStatusActivateAccount(next && installation.account?.isActive === false);
+    const accountNeedsActivation =
+      installation.account &&
+      (installation.account.isActive === false || installation.account.type === "prospect");
+    setStatusActivateAccount(next && !!accountNeedsActivation);
     setStatusConfirmOpen(true);
   };
 
@@ -129,6 +142,67 @@ export function CrmInstallationDetailClient({
       toast.error("No se pudo cambiar el estado de la instalación");
     } finally {
       setStatusUpdating(false);
+    }
+  };
+
+  // ── Edit state ──
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: installation.name,
+    address: installation.address || "",
+    city: installation.city || "",
+    commune: installation.commune || "",
+    lat: installation.lat ?? null as number | null,
+    lng: installation.lng ?? null as number | null,
+    notes: installation.notes || "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const openEdit = () => {
+    setEditForm({
+      name: installation.name,
+      address: installation.address || "",
+      city: installation.city || "",
+      commune: installation.commune || "",
+      lat: installation.lat ?? null,
+      lng: installation.lng ?? null,
+      notes: installation.notes || "",
+    });
+    setEditOpen(true);
+  };
+
+  const handleAddressChange = (result: AddressResult) => {
+    setEditForm((prev) => ({
+      ...prev,
+      address: result.address,
+      city: result.city || prev.city,
+      commune: result.commune || prev.commune,
+      lat: result.lat,
+      lng: result.lng,
+    }));
+  };
+
+  const saveEdit = async () => {
+    if (!editForm.name.trim()) {
+      toast.error("El nombre es obligatorio.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/crm/installations/${installation.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) throw new Error(payload?.error || "No se pudo guardar");
+      toast.success("Instalación actualizada");
+      setEditOpen(false);
+      router.refresh();
+    } catch (error: any) {
+      toast.error(error?.message || "No se pudo guardar la instalación.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -336,6 +410,7 @@ export function CrmInstallationDetailClient({
         badge={isActive ? { label: "Activa", variant: "success" } : { label: "Inactiva", variant: "warning" }}
         backHref="/crm/installations"
         actions={[
+          { label: "Editar instalación", icon: Pencil, onClick: openEdit },
           { label: "Eliminar instalación", icon: Trash2, onClick: () => setDeleteConfirm(true), variant: "destructive" },
         ]}
         extra={
@@ -350,6 +425,77 @@ export function CrmInstallationDetailClient({
         }
         sections={sections}
       />
+
+      {/* ── Edit Dialog ── */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar instalación</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nombre *</Label>
+              <Input
+                value={editForm.name}
+                onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+                placeholder="Ej: Planta Norte, Bodega Central..."
+                className="bg-background text-foreground border-input"
+                disabled={saving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Dirección</Label>
+              <AddressAutocomplete
+                value={editForm.address}
+                onChange={handleAddressChange}
+                placeholder="Buscar dirección en Google Maps..."
+                showMap={true}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="text-xs">Ciudad</Label>
+                <Input
+                  value={editForm.city}
+                  onChange={(e) => setEditForm((p) => ({ ...p, city: e.target.value }))}
+                  placeholder="Santiago"
+                  className="bg-background text-foreground border-input text-sm"
+                  disabled={saving}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Comuna</Label>
+                <Input
+                  value={editForm.commune}
+                  onChange={(e) => setEditForm((p) => ({ ...p, commune: e.target.value }))}
+                  placeholder="Providencia"
+                  className="bg-background text-foreground border-input text-sm"
+                  disabled={saving}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Notas</Label>
+              <Input
+                value={editForm.notes}
+                onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))}
+                placeholder="Observaciones..."
+                className="bg-background text-foreground border-input"
+                disabled={saving}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={saveEdit} disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={deleteConfirm}

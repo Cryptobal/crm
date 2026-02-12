@@ -22,13 +22,21 @@ export default async function CrmInstallationsPage() {
   }
 
   const tenantId = session.user?.tenantId ?? (await getDefaultTenantId());
-  const installations = await prisma.crmInstallation.findMany({
-    where: { tenantId },
-    include: { account: { select: { id: true, name: true, type: true, isActive: true } } },
-    orderBy: { createdAt: "desc" },
-  });
+  const [installations, accounts] = await Promise.all([
+    prisma.crmInstallation.findMany({
+      where: { tenantId },
+      include: { account: { select: { id: true, name: true, type: true, isActive: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.crmAccount.findMany({
+      where: { tenantId },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+  ]);
 
   const initialInstallations = JSON.parse(JSON.stringify(installations));
+  const initialAccounts = JSON.parse(JSON.stringify(accounts));
 
   return (
     <>
@@ -37,7 +45,10 @@ export default async function CrmInstallationsPage() {
         description="Sedes y ubicaciones de clientes"
       />
       <CrmSubnav role={role} />
-      <CrmInstallationsListClient initialInstallations={initialInstallations} />
+      <CrmInstallationsListClient
+        initialInstallations={initialInstallations}
+        accounts={initialAccounts}
+      />
     </>
   );
 }

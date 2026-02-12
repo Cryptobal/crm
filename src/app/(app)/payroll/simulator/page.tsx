@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/opai";
+import { PayrollSubnav } from "@/components/payroll/PayrollSubnav";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { formatCLP, formatNumber, parseLocalizedNumber } from "@/lib/utils";
 import {
-  ArrowLeft,
   Calculator,
   ChevronDown,
   ChevronUp,
@@ -161,17 +161,10 @@ export default function PayrollSimulator() {
     <div className="space-y-5">
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Link href="/payroll">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <PageHeader
-            title="Simulador de Liquidación"
-            description="Cálculo completo según ley chilena"
-          />
-        </div>
+        <PageHeader
+          title="Simulador de Liquidación"
+          description="Cálculo completo según ley chilena"
+        />
         <div className="flex items-center gap-2">
           <div className="hidden items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs sm:flex">
             <span className="text-muted-foreground">UF</span>
@@ -188,6 +181,8 @@ export default function PayrollSimulator() {
           </Link>
         </div>
       </div>
+
+      <PayrollSubnav />
 
       <div className="grid gap-5 lg:grid-cols-5">
         {/* ══════════════════════════════════════

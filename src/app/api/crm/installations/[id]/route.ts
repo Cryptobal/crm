@@ -81,11 +81,16 @@ export async function PATCH(
         include: { account: { select: { id: true, name: true, type: true, status: true, isActive: true } } },
       });
 
+      const accountNeedsActivation =
+        updatedInstallation.account &&
+        (updatedInstallation.account.isActive === false ||
+          updatedInstallation.account.type === "prospect");
+
       if (
         payload.isActive === true &&
         payload.activateAccount === true &&
         updatedInstallation.accountId &&
-        updatedInstallation.account?.isActive === false
+        accountNeedsActivation
       ) {
         await tx.crmAccount.update({
           where: { id: updatedInstallation.accountId },
@@ -94,7 +99,7 @@ export async function PATCH(
         return {
           ...updatedInstallation,
           account: updatedInstallation.account
-            ? { ...updatedInstallation.account, isActive: true }
+            ? { ...updatedInstallation.account, isActive: true, type: "client" as const }
             : updatedInstallation.account,
         };
       }
@@ -102,7 +107,7 @@ export async function PATCH(
       if (
         payload.isActive === true &&
         updatedInstallation.accountId &&
-        updatedInstallation.account?.isActive === false &&
+        accountNeedsActivation &&
         payload.activateAccount !== true
       ) {
         throw new Error("ACCOUNT_INACTIVE");

@@ -2,15 +2,17 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/opai/EmptyState";
-import { FileText, ChevronRight, Plus } from "lucide-react";
+import { FileText, ChevronRight, Plus, Loader2 } from "lucide-react";
 import { formatCLP, formatNumber } from "@/lib/utils";
 import { CrmDates } from "@/components/crm/CrmDates";
 import { CrmToolbar } from "./CrmToolbar";
 import type { ViewMode } from "./ViewToggle";
+import { toast } from "sonner";
 
 type QuoteRow = {
   id: string;
@@ -48,11 +50,32 @@ export function CrmCotizacionesClient({
   quotes: QuoteRow[];
   accounts: AccountRow[];
 }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [accountFilter, setAccountFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
   const [sort, setSort] = useState("newest");
+  const [creating, setCreating] = useState(false);
+
+  const createQuote = async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/cpq/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload?.error || "Error al crear cotización");
+      toast.success(`Cotización ${payload.data.code} creada`);
+      router.push(`/crm/cotizaciones/${payload.data.id}`);
+    } catch (error: any) {
+      toast.error(error?.message || "No se pudo crear la cotización.");
+      setCreating(false);
+    }
+  };
 
   const filteredQuotes = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -123,12 +146,16 @@ export function CrmCotizacionesClient({
         activeView={viewMode}
         onViewChange={(v) => setViewMode(v as ViewMode)}
         actionSlot={
-          <Link href="/cpq">
-            <Button size="icon" variant="secondary" className="h-9 w-9 shrink-0">
-              <Plus className="h-4 w-4" />
-              <span className="sr-only">Nueva cotización</span>
-            </Button>
-          </Link>
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-9 w-9 shrink-0"
+            onClick={createQuote}
+            disabled={creating}
+          >
+            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            <span className="sr-only">Nueva cotización</span>
+          </Button>
         }
       />
 
@@ -145,11 +172,10 @@ export function CrmCotizacionesClient({
                   : "Crea tu primera cotización desde el módulo CPQ."
               }
               action={
-                <Link href="/cpq">
-                  <Button size="sm" variant="outline">
-                    Ir a CPQ
-                  </Button>
-                </Link>
+                <Button size="sm" variant="outline" onClick={createQuote} disabled={creating}>
+                  {creating && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                  Nueva cotización
+                </Button>
               }
               compact
             />

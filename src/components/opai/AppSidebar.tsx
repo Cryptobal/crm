@@ -129,10 +129,10 @@ export function AppSidebar({
         </div>
       </nav>
 
-      {/* User footer */}
+      {/* User footer — mt-auto para que quede abajo y no quede espacio vacío */}
       <div
         className={cn(
-          "border-t border-border shrink-0 transition-[padding] duration-200",
+          "border-t border-border shrink-0 transition-[padding] duration-200 mt-auto",
           collapsed ? "p-2" : "p-3"
         )}
       >
@@ -163,8 +163,8 @@ export function AppSidebar({
           </Link>
         )}
 
-        {/* Footer actions + collapse toggle */}
-        <div className={cn("flex gap-1", collapsed ? "flex-col items-center" : "items-center justify-between")}>
+        {/* Footer: contenido a la izquierda, botón cerrar/expandir siempre a la derecha */}
+        <div className={cn("flex gap-1 w-full", collapsed ? "flex-col items-center" : "items-center")}>
           {footer && (
             <div
               className={cn(
@@ -176,14 +176,16 @@ export function AppSidebar({
             </div>
           )}
           {onToggleSidebar && (
-            <button
-              type="button"
-              className="hidden lg:inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              onClick={onToggleSidebar}
-              aria-label={isSidebarOpen ? 'Contraer navegación' : 'Expandir navegación'}
-            >
-              {isSidebarOpen ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
-            </button>
+            <span className={cn(collapsed ? "" : "ml-auto")}>
+              <button
+                type="button"
+                className="hidden lg:inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                onClick={onToggleSidebar}
+                aria-label={isSidebarOpen ? 'Contraer navegación' : 'Expandir navegación'}
+              >
+                {isSidebarOpen ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
+              </button>
+            </span>
           )}
         </div>
       </div>

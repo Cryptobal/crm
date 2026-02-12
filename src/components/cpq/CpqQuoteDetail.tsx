@@ -786,13 +786,9 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                   return (
                     <>
                       <span className="text-muted-foreground/60">·</span>
-                      {crmContext.accountId ? (
-                        <Link href={`/crm/accounts/${crmContext.accountId}`} className="text-primary hover:underline font-medium">
-                          {name}
-                        </Link>
-                      ) : (
-                        <span>{name}</span>
-                      )}
+                      <Link href={`/crm/contacts/${crmContext.contactId}`} className="text-primary hover:underline font-medium">
+                        {name}
+                      </Link>
                     </>
                   );
                 })()}
@@ -803,7 +799,9 @@ export function CpqQuoteDetail({ quoteId }: CpqQuoteDetailProps) {
                   return (
                     <>
                       <span className="text-muted-foreground/60">·</span>
-                      <span>{name}</span>
+                      <Link href={`/crm/installations/${crmContext.installationId}`} className="text-primary hover:underline font-medium">
+                        {name}
+                      </Link>
                     </>
                   );
                 })()}

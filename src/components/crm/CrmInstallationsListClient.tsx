@@ -2,12 +2,25 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { MapPin, Search, ChevronRight } from "lucide-react";
+import { MapPin, Search, ChevronRight, Plus, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/opai/EmptyState";
 import { CrmDates } from "@/components/crm/CrmDates";
 import { ViewToggle, type ViewMode } from "./ViewToggle";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export type InstallationRow = {
   id: string;
@@ -23,15 +36,46 @@ export type InstallationRow = {
   account?: { id: string; name: string; type?: "prospect" | "client"; status?: string; isActive?: boolean } | null;
 };
 
+type AccountOption = { id: string; name: string };
+
+type FormState = {
+  accountId: string;
+  name: string;
+  address: string;
+  city: string;
+  commune: string;
+  notes: string;
+};
+
+const DEFAULT_FORM: FormState = {
+  accountId: "",
+  name: "",
+  address: "",
+  city: "",
+  commune: "",
+  notes: "",
+};
+
 export function CrmInstallationsListClient({
   initialInstallations,
+  accounts = [],
 }: {
   initialInstallations: InstallationRow[];
+  accounts?: AccountOption[];
 }) {
+  const router = useRouter();
   const [installations, setInstallations] = useState<InstallationRow[]>(initialInstallations);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<ViewMode>("cards");
   const [accountFilter, setAccountFilter] = useState<string>("all");
+
+  // Create form state
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+  const [loading, setLoading] = useState(false);
+
+  const inputCn = "bg-background text-foreground placeholder:text-muted-foreground border-input focus-visible:ring-ring";
+  const selectCn = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
   const filteredInstallations = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -61,9 +105,39 @@ export function CrmInstallationsListClient({
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
   }, [installations]);
 
+  const createInstallation = async () => {
+    if (!form.name.trim()) {
+      toast.error("El nombre es obligatorio.");
+      return;
+    }
+    if (!form.accountId) {
+      toast.error("Selecciona una cuenta.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/crm/installations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload?.error || "Error al crear instalación");
+      toast.success("Instalación creada");
+      setOpen(false);
+      setForm(DEFAULT_FORM);
+      // Refresh to get full data with account relation
+      router.refresh();
+    } catch (error: any) {
+      toast.error(error?.message || "No se pudo crear la instalación.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {/* ── Search + Filters ── */}
+      {/* ── Search + Filters + Create ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -71,7 +145,7 @@ export function CrmInstallationsListClient({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nombre, dirección o cuenta..."
-            className="pl-9 h-9 bg-background text-foreground border-input"
+            className={`pl-9 h-9 ${inputCn}`}
           />
         </div>
         <div className="flex items-center gap-2">
@@ -103,6 +177,100 @@ export function CrmInstallationsListClient({
               </button>
             ))}
           </div>
+          {/* ── Botón + crear instalación ── */}
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="icon" variant="secondary" className="h-9 w-9 shrink-0">
+                <Plus className="h-4 w-4" />
+                <span className="sr-only">Nueva instalación</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Nueva instalación</DialogTitle>
+                <DialogDescription>
+                  Crea una nueva sede o ubicación asociada a una cuenta.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Cuenta *</Label>
+                  <select
+                    className={selectCn}
+                    value={form.accountId}
+                    onChange={(e) => setForm((p) => ({ ...p, accountId: e.target.value }))}
+                    disabled={loading}
+                  >
+                    <option value="">Selecciona cuenta</option>
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>{acc.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Nombre *</Label>
+                  <Input
+                    value={form.name}
+                    onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                    placeholder="Ej: Planta Norte, Bodega Central..."
+                    className={inputCn}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Dirección</Label>
+                  <Input
+                    value={form.address}
+                    onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
+                    placeholder="Dirección completa"
+                    className={inputCn}
+                    disabled={loading}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Ciudad</Label>
+                    <Input
+                      value={form.city}
+                      onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))}
+                      placeholder="Santiago"
+                      className={`${inputCn} text-sm`}
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Comuna</Label>
+                    <Input
+                      value={form.commune}
+                      onChange={(e) => setForm((p) => ({ ...p, commune: e.target.value }))}
+                      placeholder="Providencia"
+                      className={`${inputCn} text-sm`}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Notas</Label>
+                  <Input
+                    value={form.notes}
+                    onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+                    placeholder="Observaciones..."
+                    className={inputCn}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+                  Cancelar
+                </Button>
+                <Button onClick={createInstallation} disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Crear
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -116,7 +284,7 @@ export function CrmInstallationsListClient({
               description={
                 search || accountFilter !== "all"
                   ? "No hay instalaciones para los filtros seleccionados."
-                  : "No hay instalaciones registradas. Crea instalaciones desde el detalle de una cuenta."
+                  : "No hay instalaciones registradas. Usa el botón + para crear una."
               }
               compact
             />

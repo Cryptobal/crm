@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2, ExternalLink, Trash2, FileText, Mail, ChevronRight, Send, MessageSquare, Plus, Star, X, Clock3 } from "lucide-react";
+import { Loader2, ExternalLink, Trash2, FileText, Mail, ChevronRight, Send, MessageSquare, Plus, Star, X, Clock3, MapPin } from "lucide-react";
 import { EmailHistoryList, type EmailMessage } from "@/components/crm/EmailHistoryList";
 import { ContractEditor } from "@/components/docs/ContractEditor";
 import { CrmDetailLayout, type DetailSection } from "./CrmDetailLayout";
@@ -113,15 +113,17 @@ export type DealDetail = {
   proposalSentAt?: string | null;
 };
 
+type InstallationRow = { id: string; name: string; address?: string | null; city?: string | null; commune?: string | null; isActive?: boolean };
 type DocTemplateMail = { id: string; name: string; content: any };
 type DocTemplateWhatsApp = { id: string; name: string; content: any };
 
 export function CrmDealDetailClient({
-  deal, quotes, pipelineStages, dealContacts: initialDealContacts, accountContacts, gmailConnected, docTemplatesMail = [], docTemplatesWhatsApp = [], followUpConfig = null, followUpLogs = [], canConfigureCrm = false, currentUserId = "",
+  deal, quotes, pipelineStages, dealContacts: initialDealContacts, accountContacts, accountInstallations = [], gmailConnected, docTemplatesMail = [], docTemplatesWhatsApp = [], followUpConfig = null, followUpLogs = [], canConfigureCrm = false, currentUserId = "",
 }: {
   deal: DealDetail; quotes: QuoteOption[];
   pipelineStages: PipelineStageOption[];
   dealContacts: DealContactRow[]; accountContacts: ContactRow[];
+  accountInstallations?: InstallationRow[];
   gmailConnected: boolean; docTemplatesMail?: DocTemplateMail[]; docTemplatesWhatsApp?: DocTemplateWhatsApp[];
   followUpConfig?: FollowUpConfigState | null;
   followUpLogs?: FollowUpLog[];
@@ -409,6 +411,7 @@ export function CrmDealDetailClient({
 
   // ── Helpers ──
   const ContactsIcon = CRM_MODULES.contacts.icon;
+  const InstallationsIcon = CRM_MODULES.installations.icon;
   const QuotesIcon = CRM_MODULES.quotes.icon;
   const FollowUpIcon = Clock3;
 
@@ -715,6 +718,40 @@ export function CrmDealDetailClient({
     ),
   };
 
+  const installationsSection: DetailSection = {
+    key: "installations",
+    label: "Instalaciones de la cuenta",
+    count: accountInstallations.length,
+    defaultCollapsed: accountInstallations.length === 0,
+    children: accountInstallations.length === 0 ? (
+      <EmptyState
+        icon={<MapPin className="h-8 w-8" />}
+        title="Sin instalaciones"
+        description="La cuenta no tiene instalaciones registradas."
+        compact
+      />
+    ) : (
+      <div className="space-y-2">
+        {accountInstallations.map((inst) => (
+          <CrmRelatedRecordCard
+            key={inst.id}
+            module="installations"
+            title={inst.name}
+            subtitle={
+              [inst.address, inst.commune, inst.city].filter(Boolean).join(", ") || "Sin dirección"
+            }
+            badge={
+              inst.isActive
+                ? { label: "Activa", variant: "success" as const }
+                : { label: "Inactiva", variant: "secondary" as const }
+            }
+            href={`/crm/installations/${inst.id}`}
+          />
+        ))}
+      </div>
+    ),
+  };
+
   const contactsSection: DetailSection = {
     key: "contacts",
     label: "Contactos del negocio",
@@ -825,6 +862,7 @@ export function CrmDealDetailClient({
   const sections: DetailSection[] = [
     generalSection,
     contactsSection,
+    installationsSection,
     quotesSection,
     followUpSection,
     communicationSection,

@@ -57,6 +57,7 @@ export default async function CrmDealDetailPage({
     docTemplatesWhatsApp,
     dealContacts,
     accountContacts,
+    accountInstallations,
     followUpConfig,
     followUpLogsRaw,
   ] = await Promise.all([
@@ -103,6 +104,20 @@ export default async function CrmDealDetailPage({
       where: { tenantId, accountId: deal.accountId },
       orderBy: { createdAt: "desc" },
     }),
+    deal.accountId
+      ? prisma.crmInstallation.findMany({
+          where: { tenantId, accountId: deal.accountId },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            commune: true,
+            isActive: true,
+          },
+        })
+      : Promise.resolve([]),
     prisma.crmFollowUpConfig.findUnique({
       where: { tenantId },
       select: {
@@ -203,6 +218,7 @@ export default async function CrmDealDetailPage({
   const initialPipelineStages = JSON.parse(JSON.stringify(pipelineStages));
   const initialDealContacts = JSON.parse(JSON.stringify(dealContacts));
   const initialAccountContacts = JSON.parse(JSON.stringify(accountContacts));
+  const initialAccountInstallations = JSON.parse(JSON.stringify(accountInstallations));
   const initialDocTemplatesMail = JSON.parse(JSON.stringify(docTemplatesMail));
   const initialDocTemplatesWhatsApp = JSON.parse(JSON.stringify(docTemplatesWhatsApp));
   const initialFollowUpConfig = followUpConfig ? JSON.parse(JSON.stringify(followUpConfig)) : null;
@@ -218,6 +234,7 @@ export default async function CrmDealDetailPage({
           pipelineStages={initialPipelineStages}
           dealContacts={initialDealContacts}
           accountContacts={initialAccountContacts}
+          accountInstallations={initialAccountInstallations}
           gmailConnected={Boolean(gmailAccount)}
           docTemplatesMail={initialDocTemplatesMail}
           docTemplatesWhatsApp={initialDocTemplatesWhatsApp}

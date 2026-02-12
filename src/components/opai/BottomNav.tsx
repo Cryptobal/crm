@@ -3,84 +3,71 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import {
-  Grid3x3,
-  FileText,
-  Building2,
-  Calculator,
-  Settings,
-  Users,
-  Contact,
-  TrendingUp,
-  DollarSign,
-  MapPin,
-  ClipboardList,
-} from 'lucide-react';
-import { hasAppAccess } from '@/lib/app-access';
-import { hasAnyConfigSubmoduleAccess, hasCrmSubmoduleAccess } from '@/lib/module-access';
-
-const MAIN_NAV_ITEMS = [
-  { href: '/hub', label: 'Inicio', icon: Grid3x3, app: 'hub' as const },
-  { href: '/opai/inicio', label: 'Docs', icon: FileText, app: 'docs' as const },
-  { href: '/crm', label: 'CRM', icon: Building2, app: 'crm' as const },
-  { href: '/payroll', label: 'Payroll', icon: Calculator, app: 'payroll' as const },
-  { href: '/ops', label: 'Ops', icon: ClipboardList, app: 'ops' as const },
-  { href: '/opai/configuracion', label: 'Config', icon: Settings, app: 'admin' as const },
-];
-
-const CRM_NAV_ITEMS = [
-  { href: '/crm/leads', label: 'Leads', icon: Users, key: 'leads' as const },
-  { href: '/crm/accounts', label: 'Cuentas', icon: Building2, key: 'accounts' as const },
-  { href: '/crm/installations', label: 'Instalaciones', icon: MapPin, key: 'installations' as const },
-  { href: '/crm/deals', label: 'Negocios', icon: TrendingUp, key: 'deals' as const },
-  { href: '/crm/contacts', label: 'Contactos', icon: Contact, key: 'contacts' as const },
-  { href: '/crm/cotizaciones', label: 'CPQ', icon: DollarSign, key: 'quotes' as const },
-];
+import { getBottomNavItems } from '@/lib/module-nav';
 
 interface BottomNavProps {
   userRole?: string;
 }
 
+/**
+ * BottomNav — Barra de navegación inferior contextual (mobile-first).
+ *
+ * Patrón Salesforce/HubSpot Mobile:
+ * - En rutas generales: muestra módulos principales (Inicio, Docs, CRM, Payroll, Ops, Config)
+ * - Dentro de un módulo: muestra subcategorías del módulo con iconos
+ *   (ej. en CRM: Leads, Cuentas, Instalaciones, Negocios, Contactos, CPQ)
+ *
+ * Se oculta en desktop (lg+) donde la sidebar maneja la navegación.
+ */
 export function BottomNav({ userRole }: BottomNavProps) {
   const pathname = usePathname();
-  const isCrm = pathname?.startsWith('/crm/');
-  const visibleMainItems = MAIN_NAV_ITEMS.filter((item) => {
-    if (!userRole) return false;
-    if (item.app === 'admin') {
-      return hasAnyConfigSubmoduleAccess(userRole);
-    }
-    return hasAppAccess(userRole, item.app);
-  });
-  const visibleCrmItems = CRM_NAV_ITEMS.filter((item) => {
-    if (!userRole) return false;
-    return hasCrmSubmoduleAccess(userRole, item.key);
-  });
-  const items = isCrm ? visibleCrmItems : visibleMainItems;
 
-  if (items.length === 0) {
-    return null;
-  }
+  if (!userRole || !pathname) return null;
+
+  const items = getBottomNavItems(pathname, userRole);
+
+  if (items.length === 0) return null;
+
+  // Si hay muchos items (> 5), hacemos labels más compactos
+  const compact = items.length > 5;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 lg:hidden">
-      <div className="flex h-14 items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
+      <div
+        className={cn(
+          "flex items-center justify-around px-1 pb-[env(safe-area-inset-bottom)]",
+          compact ? "h-14" : "h-14"
+        )}
+      >
         {items.map((item) => {
           const isActive =
             pathname === item.href || pathname?.startsWith(item.href + '/');
           const Icon = item.icon;
           return (
             <Link
-              key={item.href}
+              key={item.key}
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center gap-0.5 rounded-lg px-3 py-1 transition-colors",
+                "relative flex flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1 transition-colors min-w-0",
+                compact ? "px-1.5" : "px-3",
                 isActive
                   ? "text-primary"
-                  : "text-muted-foreground"
+                  : "text-muted-foreground active:text-foreground"
               )}
             >
-              <Icon className="h-5 w-5" />
-              <span className="text-[10px] font-medium">{item.label}</span>
+              {/* Active dot indicator */}
+              {isActive && (
+                <span className="absolute -top-1 left-1/2 -translate-x-1/2 h-0.5 w-4 rounded-full bg-primary" />
+              )}
+              <Icon className={cn("shrink-0", compact ? "h-4.5 w-4.5" : "h-5 w-5")} />
+              <span
+                className={cn(
+                  "font-medium truncate max-w-full",
+                  compact ? "text-[9px]" : "text-[10px]"
+                )}
+              >
+                {item.label}
+              </span>
             </Link>
           );
         })}
