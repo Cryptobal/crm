@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  Eye,
   FileText,
   Loader2,
   Paperclip,
@@ -263,21 +264,37 @@ export function FileAttachments({
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       {file.publicUrl && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          asChild
-                        >
-                          <a
-                            href={file.publicUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Descargar / abrir"
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            asChild
                           >
-                            <Download className="h-4 w-4" />
-                          </a>
-                        </Button>
+                            <a
+                              href={file.publicUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Ver archivo"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </a>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            asChild
+                          >
+                            <a
+                              href={`${file.publicUrl}?download=true`}
+                              download={file.fileName}
+                              title="Descargar"
+                            >
+                              <Download className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        </>
                       )}
                       {!readOnly && (
                         <>
