@@ -1531,7 +1531,7 @@ export function CrmLeadDetailClient({ lead: initialLead }: { lead: CrmLead }) {
 
       {/* ── Sticky action bar for editable leads ── */}
       {isEditable && (
-        <div className="sticky bottom-0 -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-10 2xl:-mx-12 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 py-3 z-10">
+        <div className="sticky bottom-14 lg:bottom-0 -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-10 2xl:-mx-12 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 py-3 z-10">
           <div className="flex flex-col sm:flex-row items-center justify-end gap-2">
             <Button variant="outline" onClick={saveLeadDraft} disabled={approving || savingLead}>
               {savingLead && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

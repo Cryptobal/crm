@@ -41,6 +41,10 @@ import {
   Plug,
   Bell,
 } from "lucide-react";
+import {
+  CRM_SECTIONS,
+  MODULE_DETAIL_SECTIONS,
+} from "@/components/crm/CrmModuleIcons";
 import { hasAppAccess } from "./app-access";
 import {
   hasCrmSubmoduleAccess,
@@ -57,6 +61,8 @@ export interface BottomNavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Si true, el item es un ancla de sección (scroll) en vez de un link de navegación */
+  isSection?: boolean;
 }
 
 /* ── Main nav items ── */
@@ -175,9 +181,66 @@ const MODULE_DETECTIONS: ModuleDetection[] = [
   },
 ];
 
+/* ── CRM detail page → section items ── */
+
+const CRM_MODULE_MAP: Record<string, string> = {
+  leads: "leads",
+  accounts: "accounts",
+  contacts: "contacts",
+  deals: "deals",
+  installations: "installations",
+  cotizaciones: "quotes",
+};
+
+/** Abreviaciones para el bottom nav (espacio limitado) */
+const SECTION_SHORT_LABELS: Record<string, string> = {
+  general: "Info",
+  account: "Cuenta",
+  contacts: "Contacto",
+  deals: "Negocio",
+  installations: "Instal.",
+  quotes: "CPQ",
+  followup: "Seguim.",
+  communication: "Correos",
+  notes: "Notas",
+  staffing: "Puestos",
+  dotacion: "Dotación",
+  files: "Archivos",
+};
+
+/**
+ * Detecta si el pathname es una página de detalle CRM (ej: /crm/leads/cm7xxx)
+ * y devuelve los items de sección para la bottom nav.
+ */
+function getCrmDetailSectionItems(pathname: string): BottomNavItem[] | null {
+  // Patrón: /crm/{module}/{id} donde id es un cuid (cm...) u otro identificador
+  const match = pathname.match(
+    /^\/crm\/(leads|accounts|contacts|deals|installations|cotizaciones)\/([^/]+)$/
+  );
+  if (!match) return null;
+
+  const moduleKey = CRM_MODULE_MAP[match[1]];
+  if (!moduleKey) return null;
+
+  const sectionKeys = MODULE_DETAIL_SECTIONS[moduleKey];
+  if (!sectionKeys || sectionKeys.length === 0) return null;
+
+  return sectionKeys.map((key) => {
+    const section = CRM_SECTIONS[key];
+    return {
+      key: `section-${key}`,
+      href: `#section-${key}`,
+      label: SECTION_SHORT_LABELS[key] || section.label,
+      icon: section.icon,
+      isSection: true,
+    };
+  });
+}
+
 /**
  * Devuelve los items del bottom nav según la ruta actual y el rol del usuario.
  *
+ * - En detalle CRM: muestra secciones del registro (scroll a anclas)
  * - Dentro de un módulo: muestra subcategorías del módulo
  * - En ruta general: muestra navegación principal
  */
@@ -185,6 +248,11 @@ export function getBottomNavItems(
   pathname: string,
   role: string
 ): BottomNavItem[] {
+  // Prioridad 1: páginas de detalle CRM → secciones del registro
+  const sectionItems = getCrmDetailSectionItems(pathname);
+  if (sectionItems) return sectionItems;
+
+  // Prioridad 2: módulos → subcategorías
   for (const detection of MODULE_DETECTIONS) {
     if (detection.test(pathname)) {
       const items = detection.getItems(role);

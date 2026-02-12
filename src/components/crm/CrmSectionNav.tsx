@@ -106,19 +106,24 @@ export function CrmSectionNav({ sections, className }: CrmSectionNavProps) {
     []
   );
 
-  // Scroll el tab activo al centro del nav (para móvil)
+  // Scroll horizontal del tab activo al centro del nav (sin afectar scroll vertical de la página)
   useEffect(() => {
-    if (!navRef.current) return;
-    const activeEl = navRef.current.querySelector(
+    const container = navRef.current;
+    if (!container) return;
+    const activeEl = container.querySelector(
       `[data-section="${activeSection}"]`
-    );
-    if (activeEl) {
-      activeEl.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-        inline: "center",
-      });
-    }
+    ) as HTMLElement | null;
+    if (!activeEl) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const elRect = activeEl.getBoundingClientRect();
+    const scrollLeft =
+      container.scrollLeft +
+      (elRect.left - containerRect.left) -
+      containerRect.width / 2 +
+      elRect.width / 2;
+
+    container.scrollTo({ left: scrollLeft, behavior: "smooth" });
   }, [activeSection]);
 
   if (sections.length <= 1) return null;
@@ -126,7 +131,8 @@ export function CrmSectionNav({ sections, className }: CrmSectionNavProps) {
   return (
     <div
       className={cn(
-        "sticky top-[73px] lg:top-[113px] z-[9] -mx-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80",
+        "hidden lg:block",
+        "sticky top-[113px] z-[9] -mx-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80",
         "sm:-mx-6 lg:-mx-8 xl:-mx-10 2xl:-mx-12",
         className
       )}
