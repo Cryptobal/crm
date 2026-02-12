@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { CalendarDays, FileDown, RefreshCw, Trash2 } from "lucide-react";
+import { CalendarDays, FileDown, Loader2, Trash2 } from "lucide-react";
 
 /* ── constants ─────────────────────────────────── */
 
@@ -578,31 +578,29 @@ export function OpsPautaMensualClient({
           </div>
 
           <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={overwrite}
-                onChange={(e) => setOverwrite(e.target.checked)}
-              />
-              Sobrescribir planificación existente
-            </label>
+            <div className="flex items-center gap-3">
+              {loading && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Cargando pauta…
+                </div>
+              )}
+            </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={handleExportPdf} disabled={loading} size="sm">
+              <Button variant="outline" onClick={handleExportPdf} disabled={loading || items.length === 0} size="sm">
                 <FileDown className="mr-2 h-4 w-4" />
                 Exportar PDF
               </Button>
-              <Button variant="outline" onClick={handleExportExcel} disabled={loading} size="sm">
+              <Button variant="outline" onClick={handleExportExcel} disabled={loading || items.length === 0} size="sm">
                 <FileDown className="mr-2 h-4 w-4" />
                 Exportar Excel
               </Button>
-              <Button variant="outline" onClick={() => void fetchPauta()} disabled={loading} size="sm">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Recargar
-              </Button>
-              <Button onClick={handleGenerate} disabled={loading} size="sm">
-                <CalendarDays className="mr-2 h-4 w-4" />
-                {loading ? "Generando..." : "Generar pauta"}
-              </Button>
+              {items.length === 0 && !loading && (
+                <Button onClick={handleGenerate} disabled={loading} size="sm">
+                  <CalendarDays className="mr-2 h-4 w-4" />
+                  Generar pauta
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
