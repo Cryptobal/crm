@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { CalendarDays, FileDown, RefreshCw } from "lucide-react";
+import { CalendarDays, FileDown, RefreshCw, Trash2 } from "lucide-react";
 
 /* ── constants ─────────────────────────────────── */
 
@@ -191,6 +191,27 @@ export function OpsPautaMensualClient({
     startPosition: 1,
   });
   const [serieSaving, setSerieSaving] = useState(false);
+
+  // Eliminar serie/día modal (clic derecho en celda pintada)
+  const [eliminarSerieModalOpen, setEliminarSerieModalOpen] = useState(false);
+  const [eliminarSerieContext, setEliminarSerieContext] = useState<{
+    puestoId: string;
+    slotNumber: number;
+    dateKey: string;
+    puestoName: string;
+  } | null>(null);
+  const [eliminarSerieSaving, setEliminarSerieSaving] = useState(false);
+
+  // Pintar opciones modal (clic izquierdo: pintar serie o solo el día)
+  const [pintarOpcionesModalOpen, setPintarOpcionesModalOpen] = useState(false);
+  const [pintarOpcionesContext, setPintarOpcionesContext] = useState<{
+    puestoId: string;
+    slotNumber: number;
+    dateKey: string;
+    puestoName: string;
+    guardiaId?: string;
+  } | null>(null);
+  const [pintarSoloDiaSaving, setPintarSoloDiaSaving] = useState(false);
 
   // Client → installations
   const currentClient = useMemo(
@@ -419,6 +440,79 @@ export function OpsPautaMensualClient({
       await fetchPauta();
     } catch {
       toast.error("No se pudo actualizar la celda");
+    }
+  };
+
+  const openPintarOpcionesModal = (ctx: {
+    puestoId: string;
+    slotNumber: number;
+    dateKey: string;
+    puestoName: string;
+    guardiaId?: string;
+  }) => {
+    setPintarOpcionesContext(ctx);
+    setPintarOpcionesModalOpen(true);
+  };
+
+  const handlePintarSoloDia = async (shiftCode: "T" | "-") => {
+    if (!pintarOpcionesContext) return;
+    setPintarSoloDiaSaving(true);
+    try {
+      await fetch("/api/ops/pauta-mensual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          puestoId: pintarOpcionesContext.puestoId,
+          slotNumber: pintarOpcionesContext.slotNumber,
+          date: pintarOpcionesContext.dateKey,
+          shiftCode,
+          plannedGuardiaId: shiftCode === "T" ? pintarOpcionesContext.guardiaId ?? null : null,
+          status: "planificado",
+        }),
+      });
+      toast.success(shiftCode === "T" ? "Día marcado como trabajo" : "Día marcado como libre");
+      setPintarOpcionesModalOpen(false);
+      setPintarOpcionesContext(null);
+      await fetchPauta();
+    } catch {
+      toast.error("No se pudo actualizar el día");
+    } finally {
+      setPintarSoloDiaSaving(false);
+    }
+  };
+
+  const openEliminarSerieModal = (ctx: { puestoId: string; slotNumber: number; dateKey: string; puestoName: string }) => {
+    setEliminarSerieContext(ctx);
+    setEliminarSerieModalOpen(true);
+  };
+
+  const handleEliminarSerie = async (mode: "from_forward" | "single_day") => {
+    if (!eliminarSerieContext) return;
+    setEliminarSerieSaving(true);
+    try {
+      const res = await fetch("/api/ops/pauta-mensual/eliminar-serie", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          puestoId: eliminarSerieContext.puestoId,
+          slotNumber: eliminarSerieContext.slotNumber,
+          date: eliminarSerieContext.dateKey,
+          mode,
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        toast.error(payload.error || "No se pudo eliminar");
+        return;
+      }
+      toast.success(payload.message ?? "Listo");
+      setEliminarSerieModalOpen(false);
+      setEliminarSerieContext(null);
+      await fetchPauta();
+    } catch {
+      toast.error("No se pudo eliminar la serie");
+    } finally {
+      setEliminarSerieSaving(false);
     }
   };
 
@@ -652,18 +746,23 @@ export function OpsPautaMensualClient({
                                       : "Sin asignar"
                                   }
                                   onClick={() => {
-                                    if (isEmpty) {
-                                      openSerieModal(row.puestoId, row.slotNumber, dateKey);
-                                    }
+                                    openPintarOpcionesModal({
+                                      puestoId: row.puestoId,
+                                      slotNumber: row.slotNumber,
+                                      dateKey,
+                                      puestoName: row.puestoName,
+                                      guardiaId: row.guardiaId,
+                                    });
                                   }}
                                   onContextMenu={(e) => {
                                     e.preventDefault();
                                     if (!cell) return;
-                                    // Right-click: cycle through special codes
-                                    const codes = ["T", "-", "V", "L", "P"];
-                                    const currentIdx = codes.indexOf(code);
-                                    const nextCode = codes[(currentIdx + 1) % codes.length];
-                                    void handleCellStatusChange(cell, nextCode);
+                                    openEliminarSerieModal({
+                                      puestoId: row.puestoId,
+                                      slotNumber: row.slotNumber,
+                                      dateKey,
+                                      puestoName: row.puestoName,
+                                    });
                                   }}
                                 >
                                   {code || "·"}
@@ -685,7 +784,15 @@ export function OpsPautaMensualClient({
                               ) : (
                                 <div
                                   className="inline-flex items-center justify-center w-7 h-6 rounded text-[10px] border border-dashed border-border/20 text-muted-foreground/20 cursor-pointer hover:border-primary/40"
-                                  onClick={() => openSerieModal(row.puestoId, row.slotNumber, dateKey)}
+                                  onClick={() =>
+                                    openPintarOpcionesModal({
+                                      puestoId: row.puestoId,
+                                      slotNumber: row.slotNumber,
+                                      dateKey,
+                                      puestoName: row.puestoName,
+                                      guardiaId: row.guardiaId,
+                                    })
+                                  }
                                 >
                                   ·
                                 </div>
@@ -722,7 +829,7 @@ export function OpsPautaMensualClient({
                   P = Permiso
                 </span>
                 <span className="text-muted-foreground/50">
-                  Click en celda vacía = pintar serie · Click derecho = cambiar estado
+                  Click izquierdo = pintar serie o solo el día (T/-) · Click derecho = eliminar serie o día
                 </span>
               </div>
               <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-muted-foreground border-t border-border pt-3">
@@ -844,6 +951,118 @@ export function OpsPautaMensualClient({
             </Button>
             <Button onClick={handlePaintSerie} disabled={serieSaving}>
               {serieSaving ? "Pintando..." : "Pintar serie"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pintar opciones (clic izquierdo en celda) */}
+      <Dialog open={pintarOpcionesModalOpen} onOpenChange={setPintarOpcionesModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4" />
+              Pintar en pauta
+            </DialogTitle>
+            <DialogDescription>
+              {pintarOpcionesContext && (
+                <>
+                  Puesto <span className="font-medium text-foreground">{pintarOpcionesContext.puestoName}</span>, slot {pintarOpcionesContext.slotNumber}, día {pintarOpcionesContext.dateKey}.
+                  <br />
+                  Elige una opción:
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 py-2">
+            <Button
+              variant="outline"
+              className="justify-start"
+              disabled={pintarSoloDiaSaving}
+              onClick={() => {
+                if (!pintarOpcionesContext) return;
+                setPintarOpcionesModalOpen(false);
+                setPintarOpcionesContext(null);
+                openSerieModal(
+                  pintarOpcionesContext.puestoId,
+                  pintarOpcionesContext.slotNumber,
+                  pintarOpcionesContext.dateKey
+                );
+              }}
+            >
+              Pintar la serie (desde este día en adelante)
+            </Button>
+            <div className="rounded-md border border-border bg-muted/20 p-2 space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">Pintar solo este día</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-[10px]"
+                  disabled={pintarSoloDiaSaving}
+                  onClick={() => void handlePintarSoloDia("T")}
+                >
+                  Día de trabajo (T)
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-[10px]"
+                  disabled={pintarSoloDiaSaving}
+                  onClick={() => void handlePintarSoloDia("-")}
+                >
+                  Día libre (-)
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPintarOpcionesModalOpen(false)}>
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Eliminar serie / día (clic derecho en celda) */}
+      <Dialog open={eliminarSerieModalOpen} onOpenChange={setEliminarSerieModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-4 w-4" />
+              Eliminar serie
+            </DialogTitle>
+            <DialogDescription>
+              {eliminarSerieContext && (
+                <>
+                  Puesto <span className="font-medium text-foreground">{eliminarSerieContext.puestoName}</span>, slot {eliminarSerieContext.slotNumber}, día {eliminarSerieContext.dateKey}.
+                  <br />
+                  Elige qué desea eliminar:
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 py-2">
+            <Button
+              variant="outline"
+              className="justify-start"
+              disabled={eliminarSerieSaving}
+              onClick={() => void handleEliminarSerie("from_forward")}
+            >
+              Eliminar la serie de acá en adelante
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start"
+              disabled={eliminarSerieSaving}
+              onClick={() => void handleEliminarSerie("single_day")}
+            >
+              Eliminar solamente este día de la serie
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEliminarSerieModalOpen(false)}>
+              Cancelar
             </Button>
           </DialogFooter>
         </DialogContent>

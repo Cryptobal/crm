@@ -164,12 +164,16 @@ export async function PATCH(
       }
     }
 
+    const nextPlannedGuardiaId =
+      body.plannedGuardiaId !== undefined ? body.plannedGuardiaId : asistencia.plannedGuardiaId;
+
     const updatedAsistencia = await prisma.opsAsistenciaDiaria.update({
       where: { id: asistencia.id },
       data: {
         attendanceStatus: nextStatus,
         actualGuardiaId: nextActualGuardiaId,
         replacementGuardiaId: nextReplacementGuardiaId,
+        plannedGuardiaId: nextPlannedGuardiaId,
         notes: body.notes !== undefined ? body.notes : asistencia.notes,
         checkInAt: body.checkInAt !== undefined ? checkInAt : asistencia.checkInAt,
         checkOutAt: body.checkOutAt !== undefined ? checkOutAt : asistencia.checkOutAt,

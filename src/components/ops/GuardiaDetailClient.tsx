@@ -65,6 +65,7 @@ const SECTIONS = [
   { id: "cuentas", label: "Cuentas bancarias", icon: Landmark },
   { id: "comunicaciones", label: "Comunicaciones", icon: Mail },
   { id: "comentarios", label: "Comentarios", icon: MessageSquare },
+  { id: "dias-trabajados", label: "Días trabajados", icon: CalendarDays },
   { id: "turnos-extra", label: "Turnos extra", icon: CalendarPlus },
   { id: "historial", label: "Historial", icon: History },
 ] as const;
@@ -285,6 +286,21 @@ export function GuardiaDetailClient({ initialGuardia, asignaciones = [], userRol
   const [turnosExtra, setTurnosExtra] = useState<TeRow[]>([]);
   const [turnosExtraLoading, setTurnosExtraLoading] = useState(false);
 
+  type DiaTrabajadoRow = {
+    id: string;
+    date: string;
+    puestoId: string;
+    slotNumber: number;
+    attendanceStatus: string;
+    installationName: string;
+    puestoName: string;
+    shiftStart: string;
+    shiftEnd: string;
+  };
+  const [diasTrabajados, setDiasTrabajados] = useState<DiaTrabajadoRow[]>([]);
+  const [diasTrabajadosSummary, setDiasTrabajadosSummary] = useState<Record<string, number>>({});
+  const [diasTrabajadosLoading, setDiasTrabajadosLoading] = useState(false);
+
   const docsByType = useMemo(() => {
     const map = new Map<string, GuardiaDetail["documents"][number]>();
     for (const doc of guardia.documents) {
@@ -441,6 +457,35 @@ export function GuardiaDetailClient({ initialGuardia, asignaciones = [], userRol
       })
       .finally(() => {
         if (!cancelled) setTurnosExtraLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [guardia.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDiasTrabajadosLoading(true);
+    const to = new Date();
+    const from = new Date(to);
+    from.setFullYear(from.getFullYear() - 1);
+    const fromStr = from.toISOString().slice(0, 10);
+    const toStr = to.toISOString().slice(0, 10);
+    fetch(`/api/personas/guardias/${guardia.id}/dias-trabajados?from=${fromStr}&to=${toStr}`)
+      .then((res) => res.json())
+      .then((payload: { success?: boolean; data?: { items: DiaTrabajadoRow[]; summaryByMonth: Record<string, number> } }) => {
+        if (cancelled || !payload.success || !payload.data) return;
+        setDiasTrabajados(payload.data.items ?? []);
+        setDiasTrabajadosSummary(payload.data.summaryByMonth ?? {});
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDiasTrabajados([]);
+          setDiasTrabajadosSummary({});
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDiasTrabajadosLoading(false);
       });
     return () => {
       cancelled = true;
@@ -1451,6 +1496,84 @@ export function GuardiaDetailClient({ initialGuardia, asignaciones = [], userRol
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">Sin comentarios.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card id="dias-trabajados">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" />
+            Días trabajados
+          </CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Días en que este guardia asistió o cubrió como reemplazo (últimos 12 meses). Base para liquidación y portal del guardia.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {diasTrabajadosLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Cargando días trabajados…
+            </div>
+          ) : (
+            <>
+              {Object.keys(diasTrabajadosSummary).length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Resumen por mes</p>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(diasTrabajadosSummary)
+                      .sort(([a], [b]) => b.localeCompare(a))
+                      .slice(0, 12)
+                      .map(([monthKey, count]) => {
+                        const [y, m] = monthKey.split("-");
+                        const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+                        const label = `${monthNames[parseInt(m, 10) - 1]} ${y}`;
+                        return (
+                          <div
+                            key={monthKey}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-sm"
+                          >
+                            <span className="text-muted-foreground">{label}</span>
+                            <span className="font-semibold text-foreground">{count}</span>
+                            <span className="text-muted-foreground text-xs">días</span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+              {diasTrabajados.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin días trabajados registrados en el período.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border border-border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/50">
+                        <th className="text-left p-2 font-medium">Fecha</th>
+                        <th className="text-left p-2 font-medium">Instalación</th>
+                        <th className="text-left p-2 font-medium">Puesto</th>
+                        <th className="text-center p-2 font-medium">Slot</th>
+                        <th className="text-left p-2 font-medium">Tipo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {diasTrabajados.map((d) => (
+                        <tr key={d.id} className="border-b border-border/60 last:border-0">
+                          <td className="p-2">{formatDateUTC(d.date)}</td>
+                          <td className="p-2">{d.installationName || "—"}</td>
+                          <td className="p-2">{d.puestoName || "—"}</td>
+                          <td className="p-2 text-center">S{d.slotNumber}</td>
+                          <td className="p-2">
+                            {d.attendanceStatus === "asistio" ? "Asistió" : d.attendanceStatus === "reemplazo" ? "Reemplazo" : d.attendanceStatus}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

@@ -120,6 +120,7 @@ export const updateAsistenciaSchema = z.object({
   attendanceStatus: z.enum(["pendiente", "asistio", "no_asistio", "reemplazo", "ppc"]).optional(),
   actualGuardiaId: z.string().uuid("actualGuardiaId inválido").optional().nullable(),
   replacementGuardiaId: z.string().uuid("replacementGuardiaId inválido").optional().nullable(),
+  plannedGuardiaId: z.string().uuid("plannedGuardiaId inválido").optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
   checkInAt: z.string().datetime().optional().nullable(),
   checkOutAt: z.string().datetime().optional().nullable(),

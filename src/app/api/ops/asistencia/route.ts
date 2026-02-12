@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
       : {};
 
     // Auto-create asistencia rows from pauta mensual
-    // ONLY for days with shiftCode = "T" (work days from painted series)
+    // Solo días con serie pintada y shiftCode="T" (día de trabajo).
+    // Días libres ("-") y sin serie no generan filas en asistencia.
     const pauta = await prisma.opsPautaMensual.findMany({
       where: {
         tenantId: ctx.tenantId,
@@ -51,12 +52,40 @@ export async function GET(request: NextRequest) {
     });
     if (orphanedRows.length > 0) {
       const orphanIds = orphanedRows.map((r) => r.id);
-      // Delete pending TEs linked to orphaned asistencia
       await prisma.opsTurnoExtra.deleteMany({
         where: { asistenciaId: { in: orphanIds }, status: "pending" },
       });
       await prisma.opsAsistenciaDiaria.deleteMany({
         where: { id: { in: orphanIds } },
+      });
+    }
+
+    // Limpiar filas de asistencia para días sin serie pintada (shiftCode != "T")
+    // Esto elimina "fantasmas" de filas creadas antes del filtro por shiftCode.
+    // Solo limpia filas no bloqueadas, sin reemplazo y sin TE aprobado/pagado.
+    const pautaKeys = new Set(
+      pauta.map((p) => `${p.puestoId}|${p.slotNumber}`)
+    );
+    const allAsistenciaForDate = await prisma.opsAsistenciaDiaria.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        ...installationFilter,
+        date,
+        lockedAt: null,
+        replacementGuardiaId: null,
+        attendanceStatus: { in: ["pendiente", "ppc"] },
+      },
+      select: { id: true, puestoId: true, slotNumber: true },
+    });
+    const ghostIds = allAsistenciaForDate
+      .filter((row) => !pautaKeys.has(`${row.puestoId}|${row.slotNumber}`))
+      .map((row) => row.id);
+    if (ghostIds.length > 0) {
+      await prisma.opsTurnoExtra.deleteMany({
+        where: { asistenciaId: { in: ghostIds }, status: "pending" },
+      });
+      await prisma.opsAsistenciaDiaria.deleteMany({
+        where: { id: { in: ghostIds } },
       });
     }
 

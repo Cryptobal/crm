@@ -370,6 +370,15 @@ export function OpsPautaDiariaClient({
                       const hasChanges =
                         item.attendanceStatus !== initialStatus || item.replacementGuardiaId != null;
                       const isReplacementOpen = replacementOpenId === item.id;
+                      // Asistencia previa: hay actualGuardiaId (asistio/reemplazo) pero el planificado es distinto o vacío
+                      const showAsistenciaPreviaWarning =
+                        item.actualGuardiaId != null &&
+                        (item.attendanceStatus === "asistio" || item.attendanceStatus === "reemplazo") &&
+                        (item.plannedGuardiaId !== item.actualGuardiaId || item.plannedGuardiaId == null);
+                      const asistenciaPreviaGuardiaName =
+                        item.actualGuardia
+                          ? `${item.actualGuardia.persona.firstName} ${item.actualGuardia.persona.lastName}`
+                          : "Guardia";
                       return (
                         <tr
                           key={item.id}
@@ -489,7 +498,76 @@ export function OpsPautaDiariaClient({
                             </span>
                           </td>
                           <td className="px-2 py-2">
-                            <div className="flex flex-wrap gap-1 items-center">
+                            <div className="flex flex-col gap-1.5">
+                              {showAsistenciaPreviaWarning && (
+                                <div className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-200">
+                                  <p className="font-medium">Este día tenía asistencia registrada ({asistenciaPreviaGuardiaName}).</p>
+                                  <div className="flex gap-1 mt-1">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-5 text-[10px] px-2 border-amber-500/50 text-amber-200 hover:bg-amber-500/20"
+                                      disabled={savingId === item.id || isLocked || !canExecuteOps}
+                                      onClick={() =>
+                                        void patchAsistencia(
+                                          item.id,
+                                          { plannedGuardiaId: item.actualGuardiaId ?? undefined },
+                                          "Asistencia validada (planificado alineado)"
+                                        )
+                                      }
+                                    >
+                                      Validar
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-5 text-[10px] px-2 border-amber-500/50 text-amber-200 hover:bg-amber-500/20"
+                                      disabled={savingId === item.id || isLocked || !canExecuteOps}
+                                      onClick={() => {
+                                        const te = item.turnosExtra?.[0];
+                                        if (te?.status === "paid" && !canManagePaidTeReset) {
+                                          toast.error("No puedes resetear: este TE ya está pagado. Solicita override a un admin.");
+                                          return;
+                                        }
+                                        if (te?.status === "paid" && canManagePaidTeReset) {
+                                          const reason = (window.prompt("Motivo obligatorio para eliminar TE pagado:") || "").trim();
+                                          if (!reason) {
+                                            toast.error("Debes indicar un motivo para forzar la eliminación.");
+                                            return;
+                                          }
+                                          void patchAsistencia(
+                                            item.id,
+                                            {
+                                              attendanceStatus: initialStatus,
+                                              actualGuardiaId: null,
+                                              replacementGuardiaId: null,
+                                              forceDeletePaidTe: true,
+                                              forceDeleteReason: reason,
+                                            },
+                                            "Estado reseteado (override admin)"
+                                          );
+                                          return;
+                                        }
+                                        if (te && (te.status === "pending" || te.status === "approved")) {
+                                          if (!window.confirm("Este reset eliminará el turno extra asociado (si aún no está pagado). ¿Continuar?")) return;
+                                        }
+                                        void patchAsistencia(
+                                          item.id,
+                                          {
+                                            attendanceStatus: initialStatus,
+                                            actualGuardiaId: null,
+                                            replacementGuardiaId: null,
+                                          },
+                                          "Estado reseteado"
+                                        );
+                                      }}
+                                    >
+                                      Corregir
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="flex flex-wrap gap-1 items-center">
                               {showAsistioNoAsistio && (
                                 <>
                                   <Button
@@ -623,6 +701,7 @@ export function OpsPautaDiariaClient({
                                   <RotateCcw className="h-3 w-3" />
                                 </Button>
                               )}
+                              </div>
                             </div>
                           </td>
                         </tr>
