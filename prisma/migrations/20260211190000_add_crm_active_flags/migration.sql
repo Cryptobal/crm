@@ -8,7 +8,7 @@ ADD COLUMN "is_active" BOOLEAN NOT NULL DEFAULT false;
 -- Backfill account active flag from current status.
 UPDATE "crm"."accounts"
 SET "is_active" = CASE
-  WHEN LOWER(COALESCE("status", "active")) = 'inactive' THEN false
+  WHEN LOWER(COALESCE("status", 'active')) = 'inactive' THEN false
   ELSE true
 END;
 
