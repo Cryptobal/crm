@@ -8,6 +8,7 @@
 import { Section28_Cierre } from '@/types/presentation';
 import { SectionWrapper, ContainerWrapper } from '../SectionWrapper';
 import { useThemeClasses } from '../ThemeProvider';
+import { usePdfMode } from '../PdfModeContext';
 import { cn } from '@/lib/utils';
 import { Calendar, MessageCircle, ArrowRight, Sparkles, Zap, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -24,6 +25,7 @@ interface Section28CierrePropsExtended {
 
 export function Section28Cierre({ data, contactEmail = 'comercial@gard.cl', contactPhone = '+56982307771' }: Section28CierrePropsExtended) {
   const theme = useThemeClasses();
+  const pdfMode = usePdfMode();
   
   // WhatsApp link para hablar con quien envió la propuesta
   const whatsappLink = `https://wa.me/56982307771?text=${encodeURIComponent('Hola, vi la propuesta y me gustaría conversar')}`;
@@ -66,86 +68,108 @@ export function Section28Cierre({ data, contactEmail = 'comercial@gard.cl', cont
             {data.microcopy}
           </motion.p>
           
-          {/* CTAs - MINIMALISTAS con animaciones ESPECTACULARES */}
-          <div className="flex flex-col sm:flex-row gap-5 justify-center mb-12 px-4">
-            {/* CTA 1: Agendar */}
-            <motion.a
-              href={data.cta_primary.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              initial={{ opacity: 0, x: -100, scale: 0.8 }}
-              whileInView={{ opacity: 1, x: 0, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ 
-                delay: 0.3, 
-                duration: 0.8,
-                type: 'spring',
-                stiffness: 100
-              }}
-              whileHover={{ scale: 1.05, y: -5 }}
-              className="group relative overflow-hidden inline-flex items-center justify-center gap-3 px-10 py-5 rounded-2xl text-lg font-bold text-white bg-white/5 backdrop-blur-xl border-2 border-teal-400/50 hover:border-teal-400 transition-all shadow-xl hover:shadow-2xl hover:shadow-teal-500/50"
-            >
-              {/* Glow background on hover */}
-              <div className="absolute inset-0 bg-gradient-to-r from-teal-500/0 via-teal-500/20 to-teal-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+          {/* CTAs - Versión estática para PDF, animada para web */}
+          {pdfMode ? (
+            <>
+              {/* Versión estática para PDF */}
+              <div className="flex flex-col sm:flex-row gap-5 justify-center mb-12 px-4">
+                <div className="inline-flex items-center justify-center gap-3 px-10 py-5 rounded-2xl text-lg font-bold text-white bg-white/5 border-2 border-teal-400/50">
+                  <Calendar className="w-6 h-6 text-teal-400" />
+                  <span>{data.cta_primary.text}</span>
+                </div>
+                <div className="inline-flex items-center justify-center gap-3 px-10 py-5 rounded-2xl text-lg font-bold text-white bg-white/5 border-2 border-green-500/50">
+                  <MessageCircle className="w-6 h-6 text-green-400" />
+                  <span>Hablar por WhatsApp</span>
+                </div>
+              </div>
               
-              {/* Content */}
-              <Calendar className="w-6 h-6 text-teal-400 group-hover:scale-110 transition-transform relative z-10" />
-              <span className="relative z-10">{data.cta_primary.text}</span>
-              <ArrowRight className="w-5 h-5 text-teal-400 group-hover:translate-x-2 transition-transform relative z-10" />
-            </motion.a>
-            
-            {/* CTA 2: WhatsApp */}
-            <motion.a
-              href={whatsappLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              initial={{ opacity: 0, x: 100, scale: 0.8 }}
-              whileInView={{ opacity: 1, x: 0, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ 
-                delay: 0.5, 
-                duration: 0.8,
-                type: 'spring',
-                stiffness: 100
-              }}
-              whileHover={{ scale: 1.05, y: -5 }}
-              className="group relative overflow-hidden inline-flex items-center justify-center gap-3 px-10 py-5 rounded-2xl text-lg font-bold text-white bg-white/5 backdrop-blur-xl border-2 border-green-500/50 hover:border-green-500 transition-all shadow-xl hover:shadow-2xl hover:shadow-green-500/50"
-            >
-              {/* Glow background on hover */}
-              <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/20 to-green-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+              {/* Trust indicators estáticos */}
+              <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 sm:gap-4 text-sm sm:text-base px-4">
+                {['Respuesta en 24h', 'Visita sin costo', 'Sin compromiso'].map((text, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 glass-card px-4 py-2 sm:px-5 sm:py-3 rounded-full border border-white/10"
+                  >
+                    <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-teal-400 flex-shrink-0" />
+                    <span className="font-semibold text-white whitespace-nowrap">{text}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Versión animada para web */}
+              <div className="flex flex-col sm:flex-row gap-5 justify-center mb-12 px-4">
+                {/* CTA 1: Agendar */}
+                <motion.a
+                  href={data.cta_primary.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  initial={{ opacity: 0, x: -100, scale: 0.8 }}
+                  whileInView={{ opacity: 1, x: 0, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ 
+                    delay: 0.3, 
+                    duration: 0.8,
+                    type: 'spring',
+                    stiffness: 100
+                  }}
+                  whileHover={{ scale: 1.05, y: -5 }}
+                  className="group relative overflow-hidden inline-flex items-center justify-center gap-3 px-10 py-5 rounded-2xl text-lg font-bold text-white bg-white/5 backdrop-blur-xl border-2 border-teal-400/50 hover:border-teal-400 transition-all shadow-xl hover:shadow-2xl hover:shadow-teal-500/50"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-teal-500/0 via-teal-500/20 to-teal-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <Calendar className="w-6 h-6 text-teal-400 group-hover:scale-110 transition-transform relative z-10" />
+                  <span className="relative z-10">{data.cta_primary.text}</span>
+                  <ArrowRight className="w-5 h-5 text-teal-400 group-hover:translate-x-2 transition-transform relative z-10" />
+                </motion.a>
+                
+                {/* CTA 2: WhatsApp */}
+                <motion.a
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  initial={{ opacity: 0, x: 100, scale: 0.8 }}
+                  whileInView={{ opacity: 1, x: 0, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ 
+                    delay: 0.5, 
+                    duration: 0.8,
+                    type: 'spring',
+                    stiffness: 100
+                  }}
+                  whileHover={{ scale: 1.05, y: -5 }}
+                  className="group relative overflow-hidden inline-flex items-center justify-center gap-3 px-10 py-5 rounded-2xl text-lg font-bold text-white bg-white/5 backdrop-blur-xl border-2 border-green-500/50 hover:border-green-500 transition-all shadow-xl hover:shadow-2xl hover:shadow-green-500/50"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/0 via-green-500/20 to-green-500/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <MessageCircle className="w-6 h-6 text-green-400 group-hover:scale-110 transition-transform relative z-10" />
+                  <span className="relative z-10">Hablar por WhatsApp</span>
+                </motion.a>
+              </div>
               
-              {/* Content */}
-              <MessageCircle className="w-6 h-6 text-green-400 group-hover:scale-110 transition-transform relative z-10" />
-              <span className="relative z-10">Hablar por WhatsApp</span>
-            </motion.a>
-          </div>
-          
-          {/* Trust indicators - RESPONSIVE */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.6 }}
-            className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 sm:gap-4 text-sm sm:text-base px-4"
-          >
-            {[
-              'Respuesta en 24h',
-              'Visita sin costo',
-              'Sin compromiso'
-            ].map((text, index) => (
+              {/* Trust indicators - RESPONSIVE */}
               <motion.div
-                key={index}
-                initial={{ scale: 0 }}
-                whileInView={{ scale: 1 }}
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
                 viewport={{ once: true }}
-                transition={{ delay: 0.8 + index * 0.1, type: 'spring' }}
-                className="flex items-center gap-2 glass-card px-4 py-2 sm:px-5 sm:py-3 rounded-full border border-white/10"
+                transition={{ delay: 0.6 }}
+                className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 sm:gap-4 text-sm sm:text-base px-4"
               >
-                <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-teal-400 flex-shrink-0" />
-                <span className="font-semibold text-white whitespace-nowrap">{text}</span>
+                {['Respuesta en 24h', 'Visita sin costo', 'Sin compromiso'].map((text, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ scale: 0 }}
+                    whileInView={{ scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.8 + index * 0.1, type: 'spring' }}
+                    className="flex items-center gap-2 glass-card px-4 py-2 sm:px-5 sm:py-3 rounded-full border border-white/10"
+                  >
+                    <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-teal-400 flex-shrink-0" />
+                    <span className="font-semibold text-white whitespace-nowrap">{text}</span>
+                  </motion.div>
+                ))}
               </motion.div>
-            ))}
-          </motion.div>
+            </>
+          )}
         </div>
       </ContainerWrapper>
     </SectionWrapper>

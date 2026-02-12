@@ -7,6 +7,7 @@
 import { Section23_PropuestaEconomica } from '@/types/presentation';
 import { SectionWrapper, ContainerWrapper } from '../SectionWrapper';
 import { useThemeClasses } from '../ThemeProvider';
+import { usePdfMode } from '../PdfModeContext';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/utils';
 import { FileText, Calendar, TrendingUp, Sparkles, CheckCircle2 } from 'lucide-react';
@@ -34,6 +35,7 @@ export function Section23PropuestaEconomica({
   contactPhone = '+56 98 230 7771'
 }: Section23PropuestaEconomicaProps) {
   const theme = useThemeClasses();
+  const pdfMode = usePdfMode();
   const { pricing, serviceDetail } = data;
   
   const formatPrice = (value: number) => {
@@ -373,33 +375,35 @@ export function Section23PropuestaEconomica({
           </motion.div>
         )}
 
-        {/* CTAs */}
-        <div className="text-center space-y-4">
-          <p className="text-white/60">¿Preguntas sobre la propuesta?</p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            {/* Descarga PDF - Ahora usa Playwright para PDF idéntico */}
-            <DownloadPricingButtonV3
-              clientName={clientName}
-              quoteNumber={quoteNumber}
-              pricing={pricing}
-              quoteDate={quoteDate}
-              contactEmail={contactEmail}
-              contactPhone={contactPhone}
-            />
+        {/* CTAs - ocultos en modo PDF (no tienen sentido en un documento estático) */}
+        {!pdfMode && (
+          <div className="text-center space-y-4 pdf-hide">
+            <p className="text-white/60">¿Preguntas sobre la propuesta?</p>
             
-            {/* Reunión comercial */}
-            <a
-              href="https://calendar.app.google/MfyKXvYxURJSnUBe9"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-base font-bold text-white glass-card border-2 border-white/30 hover:bg-white/10 hover:border-white/50 shadow-xl transition-all duration-300 hover:scale-105"
-            >
-              <FileText className="w-5 h-5" />
-              Solicitar reunión
-            </a>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {/* Descarga PDF - Ahora usa Playwright para PDF idéntico */}
+              <DownloadPricingButtonV3
+                clientName={clientName}
+                quoteNumber={quoteNumber}
+                pricing={pricing}
+                quoteDate={quoteDate}
+                contactEmail={contactEmail}
+                contactPhone={contactPhone}
+              />
+              
+              {/* Reunión comercial */}
+              <a
+                href="https://calendar.app.google/MfyKXvYxURJSnUBe9"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-base font-bold text-white glass-card border-2 border-white/30 hover:bg-white/10 hover:border-white/50 shadow-xl transition-all duration-300 hover:scale-105"
+              >
+                <FileText className="w-5 h-5" />
+                Solicitar reunión
+              </a>
+            </div>
           </div>
-        </div>
+        )}
       </ContainerWrapper>
     </SectionWrapper>
   );

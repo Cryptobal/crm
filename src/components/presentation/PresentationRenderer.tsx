@@ -48,7 +48,12 @@ import { Section27Implementacion } from './sections/Section27Implementacion';
 import { Section28Cierre } from './sections/Section28Cierre';
 import { PlaceholderSection } from './sections/PlaceholderSection';
 
-// CSS para modo PDF: cada sección ocupa una página landscape completa
+// CSS para modo PDF: cada sección ocupa mínimo una página landscape completa
+// Cambios clave vs. versión anterior:
+// 1. min-height en vez de height/max-height: secciones largas (pricing) pueden fluir a página siguiente
+// 2. Sin overflow:hidden: no se recorta contenido
+// 3. [style] override: fuerza visibilidad de elementos que Framer Motion deja en opacity:0
+// 4. Deshabilita animaciones CSS para estado estático limpio
 const PDF_MODE_STYLES = `
   @page {
     size: A4 landscape;
@@ -61,23 +66,46 @@ const PDF_MODE_STYLES = `
   .pdf-mode {
     background: #0f172a;
   }
+  
+  /* ── Cada sección = mínimo una página ── */
   .pdf-mode .pdf-slide {
     width: 100%;
-    height: 100vh;
-    max-height: 100vh;
-    overflow: hidden;
+    min-height: 100vh;
     page-break-after: always;
-    page-break-inside: avoid;
     break-after: page;
-    break-inside: avoid;
     position: relative;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    box-sizing: border-box;
   }
   .pdf-mode .pdf-slide:last-of-type {
     page-break-after: auto;
     break-after: auto;
+  }
+  
+  /* ── Forzar visibilidad de elementos Framer Motion ──
+   * FM aplica inline style="opacity:0; transform:translateY(80px)"
+   * a elementos que no han entrado en viewport.
+   * Este override los hace visibles en su posición final.
+   * Es seguro porque:
+   * - Solo FM usa inline opacity/transform en este proyecto
+   * - Tailwind usa CSS classes (no inline styles) para transforms
+   * - Next/Image inline styles no usan opacity ni transform
+   */
+  .pdf-mode [style] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  
+  /* ── Deshabilitar todas las animaciones CSS ── */
+  .pdf-mode * {
+    animation: none !important;
+    animation-delay: 0s !important;
+    transition: none !important;
+    transition-delay: 0s !important;
+  }
+  
+  /* ── Ocultar elementos interactivos que no tienen sentido en PDF ── */
+  .pdf-mode .pdf-hide {
+    display: none !important;
   }
 `;
 

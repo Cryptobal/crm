@@ -5,10 +5,13 @@
  * 1. Recibe uniqueId de la presentación
  * 2. Valida que la presentación existe y está activa
  * 3. Abre Playwright en viewport 1440x1018 (ratio A4 landscape)
- * 4. Navega a /p/{uniqueId}?mode=pdf (renderiza sin animaciones, layout slide)
+ * 4. Navega a /p/{uniqueId}?mode=pdf CON bypass de Vercel Deployment Protection
  * 5. Fuerza visibilidad de todos los elementos (override framer-motion)
  * 6. Genera PDF landscape A4 con page-breaks entre secciones
  * 7. Retorna PDF como descarga
+ * 
+ * IMPORTANTE: Requiere VERCEL_AUTOMATION_BYPASS_SECRET en env vars de Vercel
+ * (Project Settings → Deployment Protection → Protection Bypass for Automation)
  * 
  * PRODUCCIÓN: Usa @sparticuz/chromium optimizado para Vercel
  */
@@ -58,20 +61,31 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Construir URL de la presentación en modo PDF
+    // ── Construir URL ──
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL 
       || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-    const pdfUrl = `${baseUrl}/p/${uniqueId}?mode=pdf`;
     
-    console.log(`[PDF] Generando presentación completa: ${pdfUrl}`);
+    // Secret para bypass de Vercel Deployment Protection
+    // Se configura en: Vercel → Project Settings → Deployment Protection → Protection Bypass for Automation
+    const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
     
-    // Configuración de Chromium para Vercel
+    // Construir URL con bypass como query param (método más confiable)
+    const urlParams = new URLSearchParams({ mode: 'pdf' });
+    if (bypassSecret) {
+      urlParams.set('x-vercel-protection-bypass', bypassSecret);
+    }
+    const pdfUrl = `${baseUrl}/p/${uniqueId}?${urlParams.toString()}`;
+    
+    console.log(`[PDF] Generando presentación completa: ${baseUrl}/p/${uniqueId}?mode=pdf`);
+    console.log(`[PDF] Bypass secret configurado: ${bypassSecret ? 'SÍ' : 'NO'}`);
+    console.log(`[PDF] Base URL: ${baseUrl}`);
+    
+    // ── Configuración de Chromium para Vercel ──
     const isDev = process.env.NODE_ENV === 'development';
     const executablePath = isDev 
-      ? undefined // En desarrollo usa el chromium local de playwright
+      ? undefined
       : await chromiumPkg.executablePath();
     
-    // Lanzar Playwright
     browser = await chromium.launch({
       executablePath,
       headless: true,
@@ -82,46 +96,99 @@ export async function POST(request: NextRequest) {
     });
     
     // Viewport: 1440x1018 = ratio exacto A4 landscape (297:210)
-    // Esto asegura que 100vh = exactamente una página landscape
     const context = await browser.newContext({
       viewport: { width: 1440, height: 1018 },
       deviceScaleFactor: 1,
+      // Headers en TODAS las requests del browser:
+      // - x-vercel-protection-bypass: pasa la protección de deployment
+      // - x-vercel-set-bypass-cookie: hace que Vercel setee cookie para sub-recursos (JS, CSS, imgs)
+      extraHTTPHeaders: {
+        ...(bypassSecret ? {
+          'x-vercel-protection-bypass': bypassSecret,
+          'x-vercel-set-bypass-cookie': 'samesitenone',
+        } : {}),
+      },
     });
+    
+    // También setear la cookie de bypass directamente (triple seguridad)
+    if (bypassSecret) {
+      const domain = new URL(baseUrl).hostname;
+      await context.addCookies([{
+        name: 'x-vercel-protection-bypass',
+        value: bypassSecret,
+        domain,
+        path: '/',
+      }]);
+    }
+    
     const page = await context.newPage();
     
-    // Navegar a la presentación en modo PDF
+    // ── Navegar a la presentación en modo PDF ──
     await page.goto(pdfUrl, { 
       waitUntil: 'networkidle',
-      timeout: 45000, // 45s para cargar (incluye imágenes)
+      timeout: 45000,
     });
     
-    // Esperar a que React se hidrate completamente
+    // Verificar que NO estamos en la página de login de Vercel
+    const pageTitle = await page.title();
+    const pageUrl = page.url();
+    if (pageTitle.includes('Vercel') || pageUrl.includes('vercel.com/login')) {
+      console.error('[PDF] BLOQUEADO por Vercel Deployment Protection. Configura VERCEL_AUTOMATION_BYPASS_SECRET.');
+      throw new Error(
+        'Bloqueado por Vercel Deployment Protection. ' +
+        'Configura VERCEL_AUTOMATION_BYPASS_SECRET en las env vars del proyecto.'
+      );
+    }
+    
+    // Esperar a que React se hidrate y Framer Motion inicialice
     await page.waitForTimeout(3000);
     
-    // Forzar visibilidad de todos los elementos que framer-motion dejó ocultos
-    // Framer-motion aplica inline styles (opacity: 0, transform: translateY(...))
-    // a elementos que no han entrado en viewport. Los removemos.
+    // ── PASO 1: Inyectar CSS de respaldo ──
+    await page.addStyleTag({
+      content: `
+        [style] {
+          opacity: 1 !important;
+          transform: none !important;
+        }
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      `,
+    });
+    
+    // ── PASO 2: Forzar visibilidad via JavaScript ──
     await page.evaluate(() => {
       document.querySelectorAll('*').forEach(el => {
         if (!(el instanceof HTMLElement)) return;
         
-        // Remover inline opacity:0 (framer-motion initial state)
-        if (el.style.opacity === '0') {
+        // Remover inline opacity (FM initial state)
+        if (el.style.opacity !== '' && parseFloat(el.style.opacity) < 0.1) {
           el.style.removeProperty('opacity');
         }
         
-        // Remover inline transforms de animación (framer-motion initial state)
-        // Preservar transforms de layout (como -translate-y-1/2 de Tailwind que van en CSS classes)
-        if (el.style.transform) {
+        // Remover inline transform (FM animation offsets)
+        if (el.style.transform && el.style.transform !== 'none') {
           el.style.removeProperty('transform');
         }
       });
     });
     
-    // Pequeña pausa después de los cambios de estilo
-    await page.waitForTimeout(500);
+    // ── PASO 3: Scroll para triggear lazy loading de imágenes ──
+    await page.evaluate(async () => {
+      const totalHeight = document.body.scrollHeight;
+      const step = window.innerHeight;
+      for (let y = 0; y < totalHeight; y += step) {
+        window.scrollTo(0, y);
+        await new Promise(r => setTimeout(r, 200));
+      }
+      window.scrollTo(0, 0);
+    });
     
-    // Generar PDF - Landscape A4, sin márgenes, con backgrounds
+    // Pausa final para estabilizar estilos e imágenes
+    await page.waitForTimeout(1500);
+    
+    // ── Generar PDF ──
     const pdfBuffer = await page.pdf({
       format: 'A4',
       landscape: true,
@@ -138,7 +205,7 @@ export async function POST(request: NextRequest) {
     await browser.close();
     browser = null;
     
-    // Extraer nombre del cliente para el archivo
+    // Nombre del archivo
     const clientData = presentation.clientData as any;
     const companyName = clientData?.client?.company_name 
       || clientData?.account?.Account_Name 
@@ -152,7 +219,6 @@ export async function POST(request: NextRequest) {
     
     console.log(`[PDF] Presentación generada: ${fileName} (${pdfBuffer.length} bytes)`);
     
-    // Retornar PDF
     const uint8Array = new Uint8Array(pdfBuffer);
     
     return new NextResponse(uint8Array, {
