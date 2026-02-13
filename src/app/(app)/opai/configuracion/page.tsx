@@ -17,6 +17,7 @@ import {
   ClipboardList,
   ShieldCheck,
   Bot,
+  ClipboardCheck,
 } from "lucide-react";
 
 type ConfigItem = {
@@ -73,6 +74,14 @@ const CONFIG_SECTIONS: ConfigSection[] = [
         title: "Asistente IA",
         description: "Control de roles, acceso y alcance del chat",
         icon: Bot,
+        adminOnly: true,
+      },
+      {
+        submodule: "usuarios",
+        href: "/opai/configuracion/auditoria",
+        title: "Auditoría",
+        description: "Registro de acciones y cambios por usuario",
+        icon: ClipboardCheck,
         adminOnly: true,
       },
     ],

@@ -41,6 +41,7 @@ const TYPE_ICONS: Record<string, string> = {
   followup_sent: '📨',
   followup_scheduled: '⏰',
   followup_failed: '❌',
+  mention: '💬',
 };
 
 function timeAgo(dateStr: string): string {

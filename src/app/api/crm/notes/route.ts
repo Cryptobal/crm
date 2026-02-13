@@ -8,6 +8,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, unauthorized } from "@/lib/api-auth";
 
+const ENTITY_LINKS: Record<string, string> = {
+  account: "/crm/accounts",
+  contact: "/crm/contacts",
+  deal: "/crm/deals",
+  quote: "/crm/cotizaciones",
+};
+
 export async function GET(request: NextRequest) {
   const ctx = await requireAuth();
   if (!ctx) return unauthorized();
@@ -69,70 +76,110 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { entityType, entityId, content, mentions } = body;
 
-  if (!entityType || !entityId || !content?.trim()) {
-    return NextResponse.json(
-      { success: false, error: "entityType, entityId y content son requeridos" },
-      { status: 400 }
-    );
-  }
+    if (!entityType || !entityId || !content?.trim()) {
+      return NextResponse.json(
+        { success: false, error: "entityType, entityId y content son requeridos" },
+        { status: 400 }
+      );
+    }
 
-  const validTypes = ["account", "contact", "deal", "quote"];
-  if (!validTypes.includes(entityType)) {
-    return NextResponse.json(
-      { success: false, error: "entityType inválido" },
-      { status: 400 }
-    );
-  }
+    const validTypes = ["account", "contact", "deal", "quote"];
+    if (!validTypes.includes(entityType)) {
+      return NextResponse.json(
+        { success: false, error: "entityType inválido" },
+        { status: 400 }
+      );
+    }
 
-  if (!prisma.crmNote) {
-    console.error("Prisma client missing crmNote. Run: npx prisma generate && restart dev server.");
-    return NextResponse.json(
-      {
-        success: false,
-        error:
-          "Cliente de BD sin modelo de notas. Ejecuta 'npx prisma generate' y reinicia el servidor (npm run dev).",
-      },
-      { status: 503 }
-    );
-  }
+    if (!prisma.crmNote) {
+      console.error("Prisma client missing crmNote. Run: npx prisma generate && restart dev server.");
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Cliente de BD sin modelo de notas. Ejecuta 'npx prisma generate' y reinicia el servidor (npm run dev).",
+        },
+        { status: 503 }
+      );
+    }
 
-  try {
-    const note = await prisma.crmNote.create({
-      data: {
-        tenantId: ctx.tenantId,
-        entityType,
-        entityId: String(entityId),
-        content: content.trim(),
-        mentions: Array.isArray(mentions) ? mentions : [],
-        createdBy: ctx.userId,
-      },
-    });
+    try {
+      const mentionIds = Array.isArray(mentions)
+        ? [...new Set(mentions.map((id: unknown) => String(id)).filter(Boolean))]
+        : [];
 
-    // Fetch author info
-    const author = await prisma.admin.findUnique({
-      where: { id: ctx.userId },
-      select: { id: true, name: true, email: true },
-    });
+      const note = await prisma.crmNote.create({
+        data: {
+          tenantId: ctx.tenantId,
+          entityType,
+          entityId: String(entityId),
+          content: content.trim(),
+          mentions: mentionIds,
+          createdBy: ctx.userId,
+        },
+      });
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        ...note,
-        author: author || { id: ctx.userId, name: "Usuario", email: "" },
-        mentionNames: [],
-      },
-    });
-  } catch (error) {
-    console.error("Error creating note:", error);
-    const err = error as Error & { code?: string; meta?: unknown };
-    const message =
-      err?.message ||
-      (err?.code ? `Error de base de datos: ${err.code}` : "Error al crear la nota");
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
-    );
-  }
+      // Fetch author info
+      const author = await prisma.admin.findUnique({
+        where: { id: ctx.userId },
+        select: { id: true, name: true, email: true },
+      });
+
+      // Notificaciones de menciones por usuario (siempre dentro del mismo tenant)
+      const targetMentionIds = mentionIds.filter((id) => id !== ctx.userId);
+      if (targetMentionIds.length > 0) {
+        const mentionedUsers = await prisma.admin.findMany({
+          where: {
+            tenantId: ctx.tenantId,
+            status: "active",
+            id: { in: targetMentionIds },
+          },
+          select: { id: true },
+        });
+
+        if (mentionedUsers.length > 0) {
+          const authorName = author?.name || ctx.userEmail || "Alguien";
+          const entityLinkBase = ENTITY_LINKS[entityType];
+          const entityLink = entityLinkBase ? `${entityLinkBase}/${String(entityId)}` : null;
+
+          await prisma.notification.createMany({
+            data: mentionedUsers.map((user) => ({
+              tenantId: ctx.tenantId,
+              type: "mention",
+              title: `${authorName} te mencionó en una nota`,
+              message: content.trim().slice(0, 180),
+              link: entityLink,
+              data: {
+                mentionUserId: user.id,
+                entityType,
+                entityId: String(entityId),
+                noteId: note.id,
+                authorId: ctx.userId,
+              },
+            })),
+          });
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          ...note,
+          author: author || { id: ctx.userId, name: "Usuario", email: "" },
+          mentionNames: [],
+        },
+      });
+    } catch (error) {
+      console.error("Error creating note:", error);
+      const err = error as Error & { code?: string; meta?: unknown };
+      const message =
+        err?.message ||
+        (err?.code ? `Error de base de datos: ${err.code}` : "Error al crear la nota");
+      return NextResponse.json(
+        { success: false, error: message },
+        { status: 500 }
+      );
+    }
   } catch (outerError) {
     console.error("Error in notes POST:", outerError);
     const msg = outerError instanceof Error ? outerError.message : "Error al crear la nota";

@@ -13,6 +13,7 @@ import { getNotificationPrefs } from "@/lib/notification-prefs";
 import { hasModuleAccess } from "@/lib/permissions";
 import type { AuthContext } from "@/lib/api-auth";
 import type { ModuleKey } from "@/lib/permissions";
+import type { Prisma } from "@prisma/client";
 
 const GUARDIA_DOC_ALERT_DAYS = 30;
 const NOTIFICATION_TYPE_APP_ACCESS: Record<string, ModuleKey> = {
@@ -34,6 +35,7 @@ const NOTIFICATION_TYPE_APP_ACCESS: Record<string, ModuleKey> = {
   followup_sent: "crm",
   followup_scheduled: "crm",
   followup_failed: "crm",
+  mention: "crm",
 };
 
 async function getRoleExcludedNotificationTypes(ctx: AuthContext): Promise<string[]> {
@@ -41,6 +43,38 @@ async function getRoleExcludedNotificationTypes(ctx: AuthContext): Promise<strin
   return Object.entries(NOTIFICATION_TYPE_APP_ACCESS)
     .filter(([, module]) => !hasModuleAccess(perms, module))
     .map(([type]) => type);
+}
+
+function visibleNotificationsWhere(
+  ctx: AuthContext,
+  roleExcludedTypes: string[],
+  options?: { unreadOnly?: boolean; ids?: string[] }
+): Prisma.NotificationWhereInput {
+  const { unreadOnly = false, ids } = options || {};
+  const baseExclusions = roleExcludedTypes.filter((type) => type !== "mention");
+  const orConditions: Prisma.NotificationWhereInput[] = [
+    {
+      // Eventos generales del tenant, respetando exclusiones por módulo/rol.
+      type: {
+        notIn: baseExclusions.length > 0 ? [...baseExclusions, "mention"] : ["mention"],
+      },
+    },
+  ];
+
+  if (!roleExcludedTypes.includes("mention")) {
+    orConditions.push({
+      // Menciones: solo visibles para el usuario mencionado del tenant.
+      type: "mention",
+      data: { path: ["mentionUserId"], equals: ctx.userId },
+    });
+  }
+
+  return {
+    tenantId: ctx.tenantId,
+    ...(ids?.length ? { id: { in: ids } } : {}),
+    ...(unreadOnly ? { read: false } : {}),
+    OR: orConditions,
+  };
 }
 
 async function ensureGuardiaDocExpiryNotifications(tenantId: string, enabled: boolean) {
@@ -135,11 +169,9 @@ export async function GET(request: NextRequest) {
       excludedTypes.add("new_postulacion");
     }
     const excludedTypesList = Array.from(excludedTypes);
-    const notificationsWhere = {
-      tenantId: ctx.tenantId,
-      ...(unreadOnly ? { read: false } : {}),
-      ...(excludedTypesList.length > 0 ? { type: { notIn: excludedTypesList } } : {}),
-    };
+    const notificationsWhere = visibleNotificationsWhere(ctx, excludedTypesList, {
+      unreadOnly,
+    });
 
     const notifications = await prisma.notification.findMany({
       where: notificationsWhere,
@@ -148,11 +180,7 @@ export async function GET(request: NextRequest) {
     });
 
     const unreadCount = await prisma.notification.count({
-      where: {
-        tenantId: ctx.tenantId,
-        read: false,
-        ...(excludedTypesList.length > 0 ? { type: { notIn: excludedTypesList } } : {}),
-      },
+      where: visibleNotificationsWhere(ctx, excludedTypesList, { unreadOnly: true }),
     });
 
     return NextResponse.json({
@@ -180,21 +208,13 @@ export async function PATCH(request: NextRequest) {
     if (body.markAllRead) {
       // Mark all notifications as read
       await prisma.notification.updateMany({
-        where: {
-          tenantId: ctx.tenantId,
-          read: false,
-          ...(roleExcludedTypes.length > 0 ? { type: { notIn: roleExcludedTypes } } : {}),
-        },
+        where: visibleNotificationsWhere(ctx, roleExcludedTypes, { unreadOnly: true }),
         data: { read: true },
       });
     } else if (body.ids && Array.isArray(body.ids)) {
       // Mark specific notifications as read
       await prisma.notification.updateMany({
-        where: {
-          id: { in: body.ids },
-          tenantId: ctx.tenantId,
-          ...(roleExcludedTypes.length > 0 ? { type: { notIn: roleExcludedTypes } } : {}),
-        },
+        where: visibleNotificationsWhere(ctx, roleExcludedTypes, { ids: body.ids }),
         data: { read: true },
       });
     } else {
@@ -224,18 +244,11 @@ export async function DELETE(request: NextRequest) {
 
     if (body.deleteAll) {
       await prisma.notification.deleteMany({
-        where: {
-          tenantId: ctx.tenantId,
-          ...(roleExcludedTypes.length > 0 ? { type: { notIn: roleExcludedTypes } } : {}),
-        },
+        where: visibleNotificationsWhere(ctx, roleExcludedTypes),
       });
     } else if (body.ids && Array.isArray(body.ids)) {
       await prisma.notification.deleteMany({
-        where: {
-          id: { in: body.ids },
-          tenantId: ctx.tenantId,
-          ...(roleExcludedTypes.length > 0 ? { type: { notIn: roleExcludedTypes } } : {}),
-        },
+        where: visibleNotificationsWhere(ctx, roleExcludedTypes, { ids: body.ids }),
       });
     } else {
       return NextResponse.json(
