@@ -106,6 +106,17 @@ export interface RolePermissions {
   capabilities: Partial<Record<CapabilityKey, boolean>>;
 }
 
+export function mergeRolePermissions(
+  base: RolePermissions,
+  override: RolePermissions,
+): RolePermissions {
+  return {
+    modules: { ...base.modules, ...override.modules },
+    submodules: { ...base.submodules, ...override.submodules },
+    capabilities: { ...base.capabilities, ...override.capabilities },
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  METADATA (for UI — labels, hrefs)
 // ═══════════════════════════════════════════════════════════════
@@ -194,6 +205,27 @@ export const EMPTY_PERMISSIONS: RolePermissions = {
   submodules: {},
   capabilities: {},
 };
+
+const ROLE_ALIASES: Record<string, string> = {
+  propietario: "owner",
+  dueno: "owner",
+  "dueño": "owner",
+  administrador: "admin",
+  operations: "operaciones",
+  operaciones: "operaciones",
+  recruit: "reclutamiento",
+  recruiting: "reclutamiento",
+  "solo operaciones": "solo_ops",
+  "solo crm": "solo_crm",
+  "solo documentos": "solo_documentos",
+  "solo payroll": "solo_payroll",
+  lectura: "viewer",
+};
+
+export function normalizeRole(role: string): string {
+  const key = role.trim().toLowerCase();
+  return ROLE_ALIASES[key] ?? key;
+}
 
 function fullPermissions(): RolePermissions {
   const modules: Partial<Record<ModuleKey, PermissionLevel>> = {};
@@ -423,7 +455,7 @@ export function getVisibleSubmodules(
 
 /** Resolver permisos desde un rol legacy (sin DB) */
 export function getDefaultPermissions(role: string): RolePermissions {
-  return DEFAULT_ROLE_PERMISSIONS[role] ?? EMPTY_PERMISSIONS;
+  return DEFAULT_ROLE_PERMISSIONS[normalizeRole(role)] ?? EMPTY_PERMISSIONS;
 }
 
 // ═══════════════════════════════════════════════════════════════

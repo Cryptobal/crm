@@ -4,7 +4,7 @@ import { resolvePagePerms, canView } from "@/lib/permissions-server";
 import { prisma } from "@/lib/prisma";
 import { getDefaultTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/opai";
-import { ListaNegraClient, PersonasSubnav } from "@/components/ops";
+import { ListaNegraClient, OpsSubnav } from "@/components/ops";
 
 export default async function ListaNegraPage() {
   const session = await auth();
@@ -42,7 +42,7 @@ export default async function ListaNegraPage() {
         title="Personas · Lista negra"
         description="Bloqueo operativo de guardias para pauta y turnos extra."
       />
-      <PersonasSubnav />
+      <OpsSubnav />
       <ListaNegraClient initialItems={JSON.parse(JSON.stringify(items))} />
     </div>
   );

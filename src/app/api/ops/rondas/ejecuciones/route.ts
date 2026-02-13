@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { parseBody, requireAuth, unauthorized, resolveApiPerms } from "@/lib/api-auth";
 import { canEdit, canView, hasCapability } from "@/lib/permissions";
 import { buildScheduleSlots } from "@/lib/rondas/schedule-engine";
+import { resolveOnDutyGuardiaForInstallation } from "@/lib/rondas/guardia-assignment";
 import { z } from "zod";
 
 const generateSchema = z.object({
@@ -71,20 +72,40 @@ export async function POST(request: NextRequest) {
       frecuenciaMinutos: programacion.frecuenciaMinutos,
     });
 
-    const created = await prisma.opsRondaEjecucion.createMany({
-      data: slots.map((slot) => ({
-        tenantId: ctx.tenantId,
-        rondaTemplateId: programacion.rondaTemplateId,
-        programacionId: programacion.id,
-        status: "pendiente",
-        scheduledAt: slot,
-        checkpointsTotal: programacion.rondaTemplate.checkpoints.length,
-        checkpointsCompletados: 0,
-        porcentajeCompletado: 0,
-        trustScore: 0,
-      })),
-      skipDuplicates: true,
-    });
+    const rows = await Promise.all(
+      slots.map(async (slot) => {
+        const assignment = await resolveOnDutyGuardiaForInstallation({
+          tenantId: ctx.tenantId,
+          installationId: programacion.rondaTemplate.installationId,
+          scheduledAt: slot,
+        });
+        return {
+          tenantId: ctx.tenantId,
+          rondaTemplateId: programacion.rondaTemplateId,
+          programacionId: programacion.id,
+          guardiaId: assignment.guardiaId,
+          status: "pendiente",
+          scheduledAt: slot,
+          checkpointsTotal: programacion.rondaTemplate.checkpoints.length,
+          checkpointsCompletados: 0,
+          porcentajeCompletado: 0,
+          trustScore: 0,
+          ...(assignment.guardiaId
+            ? {
+                alertas: {
+                  assignment: {
+                    assignedGuardiaId: assignment.guardiaId,
+                    source: assignment.source,
+                    assignedAt: new Date().toISOString(),
+                  },
+                } as never,
+              }
+            : {}),
+        };
+      }),
+    );
+
+    const created = await prisma.opsRondaEjecucion.createMany({ data: rows, skipDuplicates: true });
 
     return NextResponse.json({ success: true, data: { created: created.count } });
   } catch (error) {

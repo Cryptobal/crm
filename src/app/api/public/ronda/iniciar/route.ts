@@ -39,22 +39,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Credenciales inválidas" }, { status: 401 });
     }
 
-    const result = await prisma.opsRondaEjecucion.updateMany({
+    const execution = await prisma.opsRondaEjecucion.findFirst({
       where: {
         id: ejecucionId,
         tenantId: installation.tenantId,
-        guardiaId: persona.guardia.id,
+        rondaTemplate: { installationId: installation.id },
         status: { in: ["pendiente", "incompleta"] },
       },
+      select: {
+        id: true,
+        guardiaId: true,
+        alertas: true,
+      },
+    });
+    if (!execution) {
+      return NextResponse.json({ success: false, error: "Ejecución no disponible" }, { status: 404 });
+    }
+
+    const previousAlertData = (execution.alertas as Record<string, unknown> | null) ?? {};
+    const assignedGuardiaId = execution.guardiaId;
+    const isReplacement = Boolean(assignedGuardiaId && assignedGuardiaId !== persona.guardia.id);
+
+    await prisma.opsRondaEjecucion.update({
+      where: { id: execution.id },
       data: {
         status: "en_curso",
         startedAt: new Date(),
+        guardiaId: persona.guardia.id,
         deviceInfo: (deviceInfo ?? null) as never,
+        alertas: {
+          ...previousAlertData,
+          assignment: {
+            assignedGuardiaId: assignedGuardiaId ?? null,
+            effectiveGuardiaId: persona.guardia.id,
+            replacement: isReplacement,
+            startedAt: new Date().toISOString(),
+          },
+        } as never,
       },
     });
-    if (result.count === 0) {
-      return NextResponse.json({ success: false, error: "Ejecución no disponible" }, { status: 404 });
-    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

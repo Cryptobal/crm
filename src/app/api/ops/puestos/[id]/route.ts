@@ -125,10 +125,25 @@ export async function PATCH(
       return NextResponse.json({ success: true, data: updated });
     }
 
-    // Normal update (no status change)
+    // Normal update (no status change). Build data with only defined fields; convert date strings to Date for Prisma.
+    const data: Record<string, unknown> = {};
+    if (body.name !== undefined) data.name = body.name;
+    if (body.puestoTrabajoId !== undefined) data.puestoTrabajoId = body.puestoTrabajoId;
+    if (body.cargoId !== undefined) data.cargoId = body.cargoId;
+    if (body.rolId !== undefined) data.rolId = body.rolId;
+    if (body.shiftStart !== undefined) data.shiftStart = body.shiftStart;
+    if (body.shiftEnd !== undefined) data.shiftEnd = body.shiftEnd;
+    if (body.weekdays !== undefined) data.weekdays = body.weekdays;
+    if (body.requiredGuards !== undefined) data.requiredGuards = body.requiredGuards;
+    if (body.baseSalary !== undefined) data.baseSalary = body.baseSalary;
+    if (body.teMontoClp !== undefined) data.teMontoClp = body.teMontoClp;
+    if (typeof body.activeFrom === "string" && body.activeFrom) data.activeFrom = parseDateOnly(body.activeFrom);
+    else if (body.activeFrom === null) data.activeFrom = null;
+    if (typeof body.activeUntil === "string" && body.activeUntil) data.activeUntil = parseDateOnly(body.activeUntil);
+    else if (body.activeUntil === null) data.activeUntil = null;
     const updated = await prisma.opsPuestoOperativo.update({
       where: { id },
-      data: body,
+      data: data as Parameters<typeof prisma.opsPuestoOperativo.update>[0]["data"],
     });
 
     await createOpsAuditLog(ctx, "ops.puesto.updated", "ops_puesto", id, body);

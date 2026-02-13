@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { buildScheduleSlots } from "@/lib/rondas/schedule-engine";
+import { resolveOnDutyGuardiaForInstallation } from "@/lib/rondas/guardia-assignment";
 
 /**
  * Genera ejecuciones de rondas para las próximas 24h.
@@ -43,14 +44,32 @@ export async function GET() {
         });
         if (exists) continue;
 
+        const assignment = await resolveOnDutyGuardiaForInstallation({
+          tenantId: p.tenantId,
+          installationId: p.rondaTemplate.installationId,
+          scheduledAt,
+        });
+
         await prisma.opsRondaEjecucion.create({
           data: {
             tenantId: p.tenantId,
             rondaTemplateId: p.rondaTemplateId,
             programacionId: p.id,
+            guardiaId: assignment.guardiaId,
             status: "pendiente",
             scheduledAt,
             checkpointsTotal: p.rondaTemplate.checkpoints.length,
+            ...(assignment.guardiaId
+              ? {
+                  alertas: {
+                    assignment: {
+                      assignedGuardiaId: assignment.guardiaId,
+                      source: assignment.source,
+                      assignedAt: new Date().toISOString(),
+                    },
+                  } as never,
+                }
+              : {}),
           },
         });
         generated += 1;

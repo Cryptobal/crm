@@ -255,8 +255,12 @@ export function RondaClient({ code }: { code: string }) {
             <div key={r.id} className="rounded-xl border border-border bg-card p-3 space-y-2">
               <p className="text-sm font-medium">{r.rondaTemplate.name}</p>
               <p className="text-xs text-muted-foreground">{new Date(r.scheduledAt).toLocaleString("es-CL")}</p>
+              <p className="text-xs text-muted-foreground">
+                Asignado: {r.assignedGuardiaNombre ?? "Sin asignar"}
+                {r.canStartAsReplacement ? " (puedes iniciar como reemplazo)" : ""}
+              </p>
               <Button className="h-12 w-full" onClick={() => startExecution(r.id)}>
-                Iniciar ronda
+                {r.canStartAsReplacement ? "Iniciar como reemplazo" : "Iniciar ronda"}
               </Button>
             </div>
           ))}

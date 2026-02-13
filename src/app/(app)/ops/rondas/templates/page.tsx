@@ -15,11 +15,13 @@ export default async function RondasTemplatesPage() {
   if (!canView(perms, "ops", "rondas")) redirect("/hub");
 
   const tenantId = session.user.tenantId ?? (await getDefaultTenantId());
-  const installation = await prisma.crmInstallation.findFirst({
+  const installations = await prisma.crmInstallation.findMany({
     where: { tenantId, isActive: true },
     select: { id: true, name: true },
+    orderBy: { name: "asc" },
   });
-  if (!installation) {
+
+  if (!installations.length) {
     return (
       <div className="space-y-6">
         <PageHeader title="Plantillas de ronda" description="No hay instalaciones activas para crear plantillas." />
@@ -29,6 +31,7 @@ export default async function RondasTemplatesPage() {
     );
   }
 
+  const installation = installations[0];
   const checkpoints = await prisma.opsCheckpoint.findMany({
     where: { tenantId, installationId: installation.id, isActive: true },
     select: { id: true, name: true },
@@ -47,12 +50,13 @@ export default async function RondasTemplatesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Plantillas de ronda" description={`Instalación: ${installation.name}`} />
+      <PageHeader title="Plantillas de ronda" description="Configura plantillas por instalación." />
       <OpsSubnav />
       <RondasSubnav />
       <RondasTemplatesClient
-        installationId={installation.id}
-        checkpoints={JSON.parse(JSON.stringify(checkpoints))}
+        installations={JSON.parse(JSON.stringify(installations))}
+        initialInstallationId={installation.id}
+        initialCheckpoints={JSON.parse(JSON.stringify(checkpoints))}
         initialTemplates={JSON.parse(JSON.stringify(templates))}
       />
     </div>

@@ -9,6 +9,8 @@ import {
   type RolePermissions,
   getDefaultPermissions,
   EMPTY_PERMISSIONS,
+  normalizeRole,
+  mergeRolePermissions,
 } from "@/lib/permissions";
 
 // ── In-memory cache (TTL 5 min) ──
@@ -57,10 +59,18 @@ export async function resolvePermissions(user: {
   role: string;
   roleTemplateId?: string | null;
 }): Promise<RolePermissions> {
+  const normalizedRole = normalizeRole(user.role);
+  const defaultPerms = getDefaultPermissions(normalizedRole);
+
+  // Regla de negocio: propietario siempre mantiene acceso total.
+  if (normalizedRole === "owner") {
+    return defaultPerms;
+  }
+
   // Si tiene template asignado, resolver desde BD
   if (user.roleTemplateId) {
     const cached = getCached(user.roleTemplateId);
-    if (cached) return cached;
+    if (cached) return mergeRolePermissions(defaultPerms, cached);
 
     const template = await prisma.roleTemplate.findUnique({
       where: { id: user.roleTemplateId },
@@ -70,12 +80,12 @@ export async function resolvePermissions(user: {
     if (template && template.permissions) {
       const perms = template.permissions as unknown as RolePermissions;
       setCache(user.roleTemplateId, perms);
-      return perms;
+      return mergeRolePermissions(defaultPerms, perms);
     }
   }
 
   // Fallback a defaults por rol legacy
-  return getDefaultPermissions(user.role);
+  return defaultPerms;
 }
 
 /**

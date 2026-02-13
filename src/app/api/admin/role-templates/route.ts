@@ -7,7 +7,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, unauthorized } from "@/lib/api-auth";
-import { validatePermissions } from "@/lib/permissions";
+import {
+  type RolePermissions,
+  validatePermissions,
+  getDefaultPermissions,
+  mergeRolePermissions,
+} from "@/lib/permissions";
 
 export async function GET() {
   const ctx = await requireAuth();
@@ -37,7 +42,17 @@ export async function GET() {
       slug: t.slug,
       description: t.description,
       isSystem: t.isSystem,
-      permissions: t.permissions,
+      permissions:
+        t.isSystem && (t.slug === "owner" || t.slug === "admin")
+          ? mergeRolePermissions(
+              getDefaultPermissions(t.slug),
+              ((t.permissions as unknown as RolePermissions) ?? {
+                modules: {},
+                submodules: {},
+                capabilities: {},
+              }) as RolePermissions,
+            )
+          : t.permissions,
       usersCount: t._count.admins,
       createdAt: t.createdAt,
       updatedAt: t.updatedAt,

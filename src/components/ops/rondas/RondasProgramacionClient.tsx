@@ -69,23 +69,45 @@ export function RondasProgramacionClient({
                   <td className="px-3 py-2">{r.frecuenciaMinutos} min</td>
                   <td className="px-3 py-2">{r.isActive ? "Activa" : "Inactiva"}</td>
                   <td className="px-3 py-2 text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-xs"
-                      onClick={async () => {
-                        const res = await fetch(`/api/ops/rondas/programacion/${r.id}`, { method: "DELETE" });
-                        const json = await res.json();
-                        if (!res.ok || !json.success) {
-                          toast.error(json.error ?? "No se pudo eliminar");
-                          return;
-                        }
-                        setRows((prev) => prev.filter((it) => it.id !== r.id));
-                        toast.success("Programación eliminada");
-                      }}
-                    >
-                      Eliminar
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        onClick={async () => {
+                          const res = await fetch("/api/ops/rondas/ejecuciones", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ programacionId: r.id }),
+                          });
+                          const json = await res.json();
+                          if (!res.ok || !json.success) {
+                            toast.error(json.error ?? "No se pudieron generar ejecuciones");
+                            return;
+                          }
+                          toast.success(`Generadas: ${json.data.created}`);
+                        }}
+                      >
+                        Generar 24h
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        onClick={async () => {
+                          const res = await fetch(`/api/ops/rondas/programacion/${r.id}`, { method: "DELETE" });
+                          const json = await res.json();
+                          if (!res.ok || !json.success) {
+                            toast.error(json.error ?? "No se pudo eliminar");
+                            return;
+                          }
+                          setRows((prev) => prev.filter((it) => it.id !== r.id));
+                          toast.success("Programación eliminada");
+                        }}
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -18,6 +18,7 @@ import {
   Filter,
   Copy,
   Link2,
+  QrCode,
   Download,
 } from "lucide-react";
 import QRCode from "qrcode";
@@ -317,6 +318,15 @@ export function OpsMarcacionesClient({ initialClients }: OpsMarcacionesClientPro
                       onClick={() => copyMarcacionUrl(i.marcacionCode!)}
                     >
                       <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 shrink-0"
+                      title="Descargar QR para imprimir"
+                      onClick={() => void downloadQr(i.marcacionCode!, i.name)}
+                    >
+                      <QrCode className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 ))}

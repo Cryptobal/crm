@@ -4,7 +4,7 @@ import { resolvePagePerms, canView } from "@/lib/permissions-server";
 import { prisma } from "@/lib/prisma";
 import { getDefaultTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/opai";
-import { GuardiasClient, PersonasSubnav } from "@/components/ops";
+import { GuardiasClient, OpsSubnav } from "@/components/ops";
 
 export default async function GuardiasPage() {
   const session = await auth();
@@ -55,7 +55,7 @@ export default async function GuardiasPage() {
         title="Personas · Guardias"
         description="Alta de guardias y control de elegibilidad operativa."
       />
-      <PersonasSubnav />
+      <OpsSubnav />
       <GuardiasClient
         initialGuardias={JSON.parse(JSON.stringify(guardias))}
         userRole={session.user.role}

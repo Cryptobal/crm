@@ -5,6 +5,11 @@ import { toast } from "sonner";
 import { RondaTemplateForm } from "@/components/ops/rondas/ronda-template-form";
 import { Button } from "@/components/ui/button";
 
+interface InstallationOption {
+  id: string;
+  name: string;
+}
+
 interface CheckpointOption {
   id: string;
   name: string;
@@ -19,19 +24,53 @@ interface TemplateItem {
 }
 
 export function RondasTemplatesClient({
-  installationId,
-  checkpoints,
+  installations,
+  initialInstallationId,
+  initialCheckpoints,
   initialTemplates,
 }: {
-  installationId: string;
-  checkpoints: CheckpointOption[];
+  installations: InstallationOption[];
+  initialInstallationId: string;
+  initialCheckpoints: CheckpointOption[];
   initialTemplates: TemplateItem[];
 }) {
+  const [installationId, setInstallationId] = useState(initialInstallationId);
+  const [checkpoints, setCheckpoints] = useState(initialCheckpoints);
   const [rows, setRows] = useState(initialTemplates);
   const checkpointMap = useMemo(() => new Map(checkpoints.map((c) => [c.id, c.name])), [checkpoints]);
 
+  const loadInstallationData = async (nextInstallationId: string) => {
+    setInstallationId(nextInstallationId);
+    const [cpRes, tplRes] = await Promise.all([
+      fetch(`/api/ops/rondas/checkpoints?installationId=${encodeURIComponent(nextInstallationId)}`),
+      fetch(`/api/ops/rondas/templates?installationId=${encodeURIComponent(nextInstallationId)}`),
+    ]);
+    const cpJson = await cpRes.json();
+    const tplJson = await tplRes.json();
+    if (!cpRes.ok || !cpJson.success || !tplRes.ok || !tplJson.success) {
+      toast.error("No se pudieron cargar datos de la instalación");
+      return;
+    }
+    setCheckpoints(cpJson.data.map((cp: any) => ({ id: cp.id, name: cp.name })));
+    setRows(tplJson.data);
+  };
+
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <select
+          className="h-10 rounded border border-border bg-background px-2 text-sm"
+          value={installationId}
+          onChange={(e) => void loadInstallationData(e.target.value)}
+        >
+          {installations.map((installation) => (
+            <option key={installation.id} value={installation.id}>
+              {installation.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <RondaTemplateForm
         installationId={installationId}
         checkpoints={checkpoints}

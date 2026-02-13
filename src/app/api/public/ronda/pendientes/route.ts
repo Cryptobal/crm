@@ -42,17 +42,18 @@ export async function GET(request: NextRequest) {
     if (persona.guardia.isBlacklisted) {
       return NextResponse.json({ success: false, error: "Guardia no habilitado" }, { status: 403 });
     }
+    const currentGuardiaId = persona.guardia.id;
 
     const now = new Date();
     const rows = await prisma.opsRondaEjecucion.findMany({
       where: {
         tenantId: installation.tenantId,
-        guardiaId: persona.guardia.id,
         rondaTemplate: { installationId: installation.id },
         status: { in: ["pendiente", "en_curso", "incompleta"] },
         scheduledAt: { lte: new Date(now.getTime() + 12 * 60 * 60 * 1000) },
       },
       include: {
+        guardia: { select: { id: true, persona: { select: { firstName: true, lastName: true } } } },
         rondaTemplate: {
           include: {
             checkpoints: {
@@ -70,8 +71,16 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         guardiaNombre: `${persona.firstName} ${persona.lastName}`,
-        guardiaId: persona.guardia.id,
-        rondas: rows,
+        guardiaId: currentGuardiaId,
+        rondas: rows.map((row) => ({
+          ...row,
+          assignedGuardiaId: row.guardiaId ?? null,
+          assignedGuardiaNombre: row.guardia
+            ? `${row.guardia.persona.firstName} ${row.guardia.persona.lastName}`
+            : null,
+          canStartAsReplacement: Boolean(row.guardiaId && row.guardiaId !== currentGuardiaId),
+          isAssignedToCurrentGuard: row.guardiaId === currentGuardiaId || row.guardiaId === null,
+        })),
       },
     });
   } catch (error) {
