@@ -106,8 +106,20 @@ export function RendicionForm({
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Find combustible item for auto-selection on mileage
+  const combustibleItem = items.find(
+    (i) => i.code === "CMB" || i.name.toLowerCase() === "combustible"
+  );
+
   // Form state
-  const [type, setType] = useState(initialData?.type ?? "PURCHASE");
+  const [type, setTypeRaw] = useState(initialData?.type ?? "PURCHASE");
+  const setType = (newType: string) => {
+    setTypeRaw(newType);
+    // Auto-seleccionar ítem Combustible al cambiar a Kilometraje
+    if (newType === "MILEAGE" && combustibleItem) {
+      setItemId(combustibleItem.id);
+    }
+  };
   const [amount, setAmount] = useState(
     initialData?.amount ? String(initialData.amount) : ""
   );
@@ -251,6 +263,11 @@ export function RendicionForm({
       if (!amount || parseInt(amount) <= 0)
         errs.amount = "Monto debe ser mayor a 0";
       if (!documentType) errs.documentType = "Tipo de documento requerido";
+
+      // "Sin respaldo" requiere descripción obligatoria, no requiere imagen
+      if (documentType === "SIN_RESPALDO" && !description.trim()) {
+        errs.description = "Al seleccionar 'Sin respaldo' debes indicar el motivo en las observaciones";
+      }
     }
 
     if (type === "MILEAGE") {
@@ -258,12 +275,13 @@ export function RendicionForm({
       if (!endLocation) errs.endLocation = "Captura la ubicación de fin";
     }
 
-    // Si no adjunta imagen, la observación es obligatoria (explicar por qué no hay comprobante)
-    if (attachments.length === 0 && !description.trim()) {
+    // Si no adjunta imagen y no es "sin respaldo", la observación es obligatoria
+    if (documentType !== "SIN_RESPALDO" && attachments.length === 0 && !description.trim()) {
       errs.description = "Si no adjuntas imagen, debes indicar el motivo en las observaciones";
     }
 
-    if (config?.requireImage && attachments.length === 0) {
+    // Solo exigir imagen si la config lo requiere Y no es "sin respaldo"
+    if (config?.requireImage && documentType !== "SIN_RESPALDO" && attachments.length === 0) {
       errs.attachments = "Debes adjuntar al menos una imagen";
     }
 
@@ -545,6 +563,7 @@ export function RendicionForm({
                   <SelectContent>
                     <SelectItem value="BOLETA">Boleta</SelectItem>
                     <SelectItem value="FACTURA">Factura</SelectItem>
+                    <SelectItem value="SIN_RESPALDO">Sin respaldo</SelectItem>
                   </SelectContent>
                 </Select>
                 {errors.documentType && (
@@ -682,27 +701,49 @@ export function RendicionForm({
             </div>
           )}
 
-          {/* Item selector */}
-          <div>
-            <Label htmlFor="item">Ítem</Label>
-            <Select value={itemId} onValueChange={setItemId}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Seleccionar ítem (opcional)" />
-              </SelectTrigger>
-              <SelectContent>
-                {items.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                    {item.code && (
-                      <span className="text-muted-foreground ml-1">
-                        ({item.code})
-                      </span>
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Item selector - oculto en kilometraje (auto Combustible) */}
+          {type === "MILEAGE" ? (
+            <div>
+              <Label>Ítem</Label>
+              <p className="text-sm text-muted-foreground mt-1 px-3 py-2 rounded-md border border-border bg-muted/30">
+                Combustible (asignado automáticamente)
+              </p>
+            </div>
+          ) : (
+            <div>
+              <Label htmlFor="item">Ítem</Label>
+              <Select value={itemId || "__none__"} onValueChange={(v) => setItemId(v === "__none__" ? "" : v)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Seleccionar ítem (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin asignar</SelectItem>
+                  {(() => {
+                    // Agrupar por categoría
+                    const grouped: Record<string, typeof items> = {};
+                    items.forEach((item) => {
+                      const cat = item.category || "Otros";
+                      if (!grouped[cat]) grouped[cat] = [];
+                      grouped[cat].push(item);
+                    });
+                    return Object.entries(grouped)
+                      .sort(([a], [b]) => a.localeCompare(b, "es"))
+                      .map(([category, categoryItems]) => (
+                        <div key={category}>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{category}</div>
+                          {categoryItems.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.name}
+                              {item.code && <span className="text-muted-foreground ml-1">({item.code})</span>}
+                            </SelectItem>
+                          ))}
+                        </div>
+                      ));
+                  })()}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Instalación / Centro de costo */}
           {installations.length > 0 && (
@@ -745,10 +786,13 @@ export function RendicionForm({
           <div>
             <Label htmlFor="description">
               Descripción / Observaciones
-              {config?.requireObservations && (
+              {(config?.requireObservations || documentType === "SIN_RESPALDO") && (
                 <span className="text-red-400 ml-1">*</span>
               )}
             </Label>
+            {documentType === "SIN_RESPALDO" && (
+              <p className="text-xs text-amber-400 mt-0.5">Obligatorio indicar motivo al no tener respaldo documental.</p>
+            )}
             <textarea
               id="description"
               value={description}

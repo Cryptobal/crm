@@ -31,12 +31,17 @@ export default async function NuevaRendicionPage() {
       select: { id: true, name: true, code: true, category: true },
       orderBy: { name: "asc" },
     }),
-    // Cargar instalaciones activas con su cliente activo
+    // Cargar instalaciones activas con su cliente (activo por isActive o status)
     prisma.crmInstallation.findMany({
       where: {
         tenantId,
         isActive: true,
-        account: { isActive: true },
+        account: {
+          OR: [
+            { isActive: true },
+            { status: "client_active" },
+          ],
+        },
       },
       select: {
         id: true,
