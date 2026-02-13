@@ -1,7 +1,6 @@
 'use client';
 
 import { ReactNode } from 'react';
-import Link from 'next/link';
 import {
   FileText,
   Building2,
@@ -11,14 +10,14 @@ import {
   Settings,
 } from 'lucide-react';
 import { AppShell, AppSidebar, type NavItem } from '@/components/opai';
-import { hasAppAccess } from '@/lib/app-access';
-import { hasAnyConfigSubmoduleAccess } from '@/lib/module-access';
+import { type RolePermissions, hasModuleAccess } from '@/lib/permissions';
 
 interface AppLayoutClientProps {
   children: ReactNode;
   userName?: string;
   userEmail?: string;
   userRole: string;
+  permissions: RolePermissions;
 }
 
 export function AppLayoutClient({
@@ -26,43 +25,44 @@ export function AppLayoutClient({
   userName,
   userEmail,
   userRole,
+  permissions,
 }: AppLayoutClientProps) {
   const navItems: NavItem[] = [
     {
       href: '/hub',
       label: 'Inicio',
       icon: Grid3x3,
-      show: hasAppAccess(userRole, 'hub'),
+      show: hasModuleAccess(permissions, 'hub'),
     },
     {
       href: '/opai/inicio',
       label: 'Documentos',
       icon: FileText,
-      show: hasAppAccess(userRole, 'docs'),
+      show: hasModuleAccess(permissions, 'docs'),
     },
     {
       href: '/crm',
       label: 'CRM',
       icon: Building2,
-      show: hasAppAccess(userRole, 'crm'),
+      show: hasModuleAccess(permissions, 'crm'),
     },
     {
       href: '/payroll',
       label: 'Payroll',
       icon: Calculator,
-      show: hasAppAccess(userRole, 'payroll'),
+      show: hasModuleAccess(permissions, 'payroll'),
     },
     {
       href: '/ops',
       label: 'Ops',
       icon: ClipboardList,
-      show: hasAppAccess(userRole, 'ops'),
+      show: hasModuleAccess(permissions, 'ops'),
     },
     {
       href: '/opai/configuracion',
       label: 'Configuración',
       icon: Settings,
-      show: hasAnyConfigSubmoduleAccess(userRole),
+      show: hasModuleAccess(permissions, 'config'),
     },
   ];
 

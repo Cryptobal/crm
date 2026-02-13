@@ -22,6 +22,7 @@ model Tenant {
   settings        Setting[]
   templates       Template[]
   webhookSessions WebhookSession[]
+  roleTemplates   RoleTemplate[]
 
   @@index([slug])
   @@index([active])
@@ -141,25 +142,48 @@ model PresentationView {
 }
 
 model Admin {
-  id          String    @id @default(cuid())
-  email       String    @unique
-  password    String
-  name        String
-  role        String    @default("admin")
-  lastLoginAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  tenantId    String
-  status      String    @default("active")
-  invitedBy   String?
-  invitedAt   DateTime?
-  activatedAt DateTime?
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  id              String        @id @default(cuid())
+  email           String        @unique
+  password        String
+  name            String
+  role            String        @default("admin")
+  roleTemplateId  String?       @map("role_template_id")
+  lastLoginAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  tenantId        String
+  status          String        @default("active")
+  invitedBy       String?
+  invitedAt       DateTime?
+  activatedAt     DateTime?
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  roleTemplate    RoleTemplate? @relation(fields: [roleTemplateId], references: [id], onDelete: SetNull)
 
   @@index([email])
   @@index([status])
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([roleTemplateId])
+  @@schema("public")
+}
+
+model RoleTemplate {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  slug        String
+  description String?
+  isSystem    Boolean  @default(false) @map("is_system")
+  permissions Json     @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  admins Admin[]
+
+  @@unique([tenantId, slug], map: "uq_role_template_tenant_slug")
+  @@index([tenantId], map: "idx_role_templates_tenant")
+  @@map("role_templates")
   @@schema("public")
 }
 

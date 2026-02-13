@@ -13,6 +13,7 @@ export type AuthContext = {
   tenantId: string;
   userEmail: string;
   userRole: string;
+  roleTemplateId?: string | null;
 };
 
 /**
@@ -41,6 +42,7 @@ export async function requireAuth(): Promise<AuthContext | null> {
     tenantId,
     userEmail: session.user.email ?? "",
     userRole: session.user.role ?? "",
+    roleTemplateId: session.user.roleTemplateId ?? null,
   };
 }
 

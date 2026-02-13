@@ -1,0 +1,113 @@
+/**
+ * Permissions Server — Resolución de permisos desde la BD
+ *
+ * Server-only: usa prisma para queries. No importar en client components.
+ */
+
+import { prisma } from "@/lib/prisma";
+import {
+  type RolePermissions,
+  getDefaultPermissions,
+  EMPTY_PERMISSIONS,
+} from "@/lib/permissions";
+
+// ── In-memory cache (TTL 5 min) ──
+
+interface CacheEntry {
+  permissions: RolePermissions;
+  expiresAt: number;
+}
+
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
+const cache = new Map<string, CacheEntry>();
+
+function getCached(id: string): RolePermissions | null {
+  const entry = cache.get(id);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    cache.delete(id);
+    return null;
+  }
+  return entry.permissions;
+}
+
+function setCache(id: string, perms: RolePermissions): void {
+  cache.set(id, { permissions: perms, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
+/** Invalidar cache de un template (cuando se edita) */
+export function invalidateTemplateCache(templateId: string): void {
+  cache.delete(templateId);
+}
+
+/** Invalidar todo el cache (cuando se hace cambio masivo) */
+export function invalidateAllCache(): void {
+  cache.clear();
+}
+
+// ── Main resolution ──
+
+/**
+ * Resuelve los permisos de un usuario.
+ *
+ * 1. Si tiene roleTemplateId → busca en BD (cached)
+ * 2. Si no → usa DEFAULT_ROLE_PERMISSIONS según su role legacy
+ */
+export async function resolvePermissions(user: {
+  role: string;
+  roleTemplateId?: string | null;
+}): Promise<RolePermissions> {
+  // Si tiene template asignado, resolver desde BD
+  if (user.roleTemplateId) {
+    const cached = getCached(user.roleTemplateId);
+    if (cached) return cached;
+
+    const template = await prisma.roleTemplate.findUnique({
+      where: { id: user.roleTemplateId },
+      select: { permissions: true },
+    });
+
+    if (template && template.permissions) {
+      const perms = template.permissions as unknown as RolePermissions;
+      setCache(user.roleTemplateId, perms);
+      return perms;
+    }
+  }
+
+  // Fallback a defaults por rol legacy
+  return getDefaultPermissions(user.role);
+}
+
+/**
+ * Resuelve permisos dado solo el ID del admin.
+ * Útil para API routes.
+ */
+export async function resolvePermissionsById(
+  adminId: string,
+): Promise<RolePermissions> {
+  const admin = await prisma.admin.findUnique({
+    where: { id: adminId },
+    select: { role: true, roleTemplateId: true },
+  });
+
+  if (!admin) return EMPTY_PERMISSIONS;
+
+  return resolvePermissions({
+    role: admin.role,
+    roleTemplateId: admin.roleTemplateId,
+  });
+}
+
+/**
+ * Helper para usar en API routes: obtener permisos desde el auth context.
+ */
+export async function getPermissionsFromAuth(auth: {
+  userId: string;
+  userRole: string;
+  roleTemplateId?: string | null;
+}): Promise<RolePermissions> {
+  return resolvePermissions({
+    role: auth.userRole,
+    roleTemplateId: auth.roleTemplateId,
+  });
+}

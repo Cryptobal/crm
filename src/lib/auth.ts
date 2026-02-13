@@ -14,6 +14,7 @@ declare module 'next-auth' {
     email: string;
     name: string;
     role: string;
+    roleTemplateId?: string | null;
     tenantId: string;
   }
   interface Session {
@@ -22,6 +23,7 @@ declare module 'next-auth' {
       email: string;
       name: string;
       role: string;
+      roleTemplateId?: string | null;
       tenantId: string;
     };
   }
@@ -31,6 +33,7 @@ declare module '@auth/core/jwt' {
   interface JWT {
     id: string;
     role: string;
+    roleTemplateId?: string | null;
     tenantId: string;
   }
 }
@@ -70,6 +73,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: admin.email,
           name: admin.name,
           role: admin.role,
+          roleTemplateId: admin.roleTemplateId,
           tenantId: admin.tenantId,
         };
       },
@@ -80,6 +84,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.roleTemplateId = user.roleTemplateId ?? null;
         token.tenantId = user.tenantId;
       }
       return token;
@@ -88,6 +93,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.id;
         session.user.role = token.role;
+        session.user.roleTemplateId = token.roleTemplateId ?? null;
         session.user.tenantId = token.tenantId;
       }
       return session;

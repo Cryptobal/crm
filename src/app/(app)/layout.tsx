@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { AppLayoutClient } from '@/components/opai/AppLayoutClient';
+import { resolvePermissions } from '@/lib/permissions-server';
+import { PermissionsProvider } from '@/lib/permissions-context';
 
 /** Evita pre-render en build; todas las rutas requieren auth/DB */
 export const dynamic = 'force-dynamic';
@@ -14,7 +16,8 @@ export const metadata: Metadata = {
 /**
  * Layout para rutas privadas de la aplicación (App UI)
  * 
- * Server Component que valida autenticación y delega UI a Client Component
+ * Server Component que valida autenticación, resuelve permisos
+ * y provee el contexto de permisos a toda la app.
  * 
  * Aplica a:
  * - /opai/* (dashboard, usuarios, etc)
@@ -32,16 +35,23 @@ export default async function AppLayout({
     redirect('/opai/login');
   }
 
-  const userRole = session.user.role;
+  // Resolver permisos desde role template (BD) o role legacy (defaults)
+  const permissions = await resolvePermissions({
+    role: session.user.role,
+    roleTemplateId: session.user.roleTemplateId,
+  });
 
-  // Delegar UI al Client Component (con rol para App Access)
+  // Delegar UI al Client Component con permisos resueltos
   return (
-    <AppLayoutClient
-      userName={session.user?.name}
-      userEmail={session.user?.email}
-      userRole={userRole}
-    >
-      {children}
-    </AppLayoutClient>
+    <PermissionsProvider permissions={permissions}>
+      <AppLayoutClient
+        userName={session.user?.name}
+        userEmail={session.user?.email}
+        userRole={session.user.role}
+        permissions={permissions}
+      >
+        {children}
+      </AppLayoutClient>
+    </PermissionsProvider>
   );
 }

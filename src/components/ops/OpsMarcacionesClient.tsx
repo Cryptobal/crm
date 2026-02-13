@@ -17,7 +17,10 @@ import {
   Filter,
   Copy,
   Link2,
+  QrCode,
+  Download,
 } from "lucide-react";
+import QRCode from "qrcode";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -210,6 +213,67 @@ export function OpsMarcacionesClient({ initialClients }: OpsMarcacionesClientPro
     );
   };
 
+  const downloadQr = async (code: string, installationName: string) => {
+    const url = getMarcacionUrl(code);
+    try {
+      // Generar QR como canvas con alto detalle
+      const canvas = document.createElement("canvas");
+      await QRCode.toCanvas(canvas, url, {
+        width: 800,
+        margin: 2,
+        color: { dark: "#000000", light: "#ffffff" },
+        errorCorrectionLevel: "H",
+      });
+
+      // Crear imagen con marco para impresión
+      const printCanvas = document.createElement("canvas");
+      const ctx = printCanvas.getContext("2d")!;
+      const padding = 60;
+      const textAreaHeight = 120;
+      printCanvas.width = canvas.width + padding * 2;
+      printCanvas.height = canvas.height + padding * 2 + textAreaHeight;
+
+      // Fondo blanco
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, printCanvas.width, printCanvas.height);
+
+      // QR centrado
+      ctx.drawImage(canvas, padding, padding);
+
+      // Texto debajo del QR
+      const textY = canvas.height + padding + 30;
+      ctx.fillStyle = "#1e293b";
+      ctx.textAlign = "center";
+      const centerX = printCanvas.width / 2;
+
+      ctx.font = "bold 28px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+      ctx.fillText("Marcación de Asistencia", centerX, textY);
+
+      ctx.font = "24px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+      ctx.fillText(installationName, centerX, textY + 36);
+
+      ctx.fillStyle = "#64748b";
+      ctx.font = "16px monospace";
+      ctx.fillText(`Código: ${code}`, centerX, textY + 68);
+
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "12px -apple-system, sans-serif";
+      ctx.fillText("Gard Security — Res. Exenta N°38 DT Chile", centerX, textY + 92);
+
+      // Descargar como PNG
+      const dataUrl = printCanvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `QR-Marcacion-${installationName.replace(/\s+/g, "-")}-${code}.png`;
+      a.click();
+
+      toast.success("QR descargado");
+    } catch (err) {
+      console.error("Error generando QR:", err);
+      toast.error("No se pudo generar el QR");
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* ── Links de marcación por instalación ── */}
@@ -226,7 +290,7 @@ export function OpsMarcacionesClient({ initialClients }: OpsMarcacionesClientPro
                   <th className="text-left py-2 font-medium">Instalación</th>
                   <th className="text-left py-2 font-medium">Código</th>
                   <th className="text-left py-2 font-medium">URL</th>
-                  <th className="text-right py-2 font-medium">Copiar</th>
+                  <th className="text-right py-2 font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -240,16 +304,28 @@ export function OpsMarcacionesClient({ initialClients }: OpsMarcacionesClientPro
                         <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>
                       </td>
                       <td className="py-2.5 text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 px-2"
-                          onClick={() => {
-                            copyMarcacionUrl(i.marcacionCode!);
-                          }}
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2"
+                            title="Copiar URL"
+                            onClick={() => {
+                              copyMarcacionUrl(i.marcacionCode!);
+                            }}
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2"
+                            title="Descargar QR para imprimir"
+                            onClick={() => void downloadQr(i.marcacionCode!, i.name)}
+                          >
+                            <QrCode className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
