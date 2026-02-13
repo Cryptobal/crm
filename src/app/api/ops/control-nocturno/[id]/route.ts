@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, unauthorized, resolveApiPerms } from "@/lib/api-auth";
 import { ensureOpsAccess, createOpsAuditLog } from "@/lib/ops";
 import { hasCapability } from "@/lib/permissions";
+import { sendControlNocturnoEmail } from "@/lib/control-nocturno-email";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -240,6 +241,52 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     });
 
     await createOpsAuditLog(ctx, action || "update", "control_nocturno", id, { action });
+
+    // Send email on submit or approve (fire-and-forget)
+    if (updated && (action === "submit" || action === "approve")) {
+      const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "https://opai.gard.cl";
+
+      const emailData = {
+        reporteId: id,
+        date: updated.date.toISOString().slice(0, 10),
+        centralOperatorName: updated.centralOperatorName,
+        centralLabel: updated.centralLabel,
+        status: action as "enviado" | "aprobado",
+        totalInstalaciones: updated.instalaciones.length,
+        novedades: updated.instalaciones.filter(
+          (i) => i.statusInstalacion === "novedad",
+        ).length,
+        criticos: updated.instalaciones.filter(
+          (i) => i.statusInstalacion === "critico",
+        ).length,
+        generalNotes: updated.generalNotes,
+        baseUrl,
+      };
+
+      // Generate PDF inline for attachment
+      let pdfBuffer: Uint8Array | undefined;
+      try {
+        const pdfUrl = new URL(
+          `/api/ops/control-nocturno/${id}/export-pdf`,
+          baseUrl,
+        );
+        const pdfRes = await fetch(pdfUrl.toString(), {
+          headers: { cookie: request.headers.get("cookie") || "" },
+        });
+        if (pdfRes.ok) {
+          pdfBuffer = new Uint8Array(await pdfRes.arrayBuffer());
+        }
+      } catch (pdfErr) {
+        console.warn("[OPS] Could not generate PDF for email attachment:", pdfErr);
+      }
+
+      // Send email (don't block response)
+      sendControlNocturnoEmail(emailData, pdfBuffer).catch((err) =>
+        console.error("[OPS] Email send error:", err),
+      );
+    }
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
