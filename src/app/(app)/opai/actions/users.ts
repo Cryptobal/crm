@@ -2,27 +2,17 @@
 
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { hasPermission, PERMISSIONS, isValidRole, type Role } from '@/lib/rbac';
+import { hasPermission, PERMISSIONS, type Role } from '@/lib/rbac';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const ROLE_LABELS: Record<string, string> = {
-  owner: 'Propietario',
-  admin: 'Administrador',
-  editor: 'Editor',
-  solo_documentos: 'Solo Documentos',
-  solo_crm: 'Solo CRM',
-  solo_ops: 'Solo Ops',
-  solo_payroll: 'Solo Payroll',
-  viewer: 'Visualizador',
-};
 
 /**
- * Invitar un nuevo usuario al tenant
+ * Invitar un nuevo usuario al tenant (usa RoleTemplate por slug)
  */
-export async function inviteUser(email: string, role: Role) {
+export async function inviteUser(email: string, roleTemplateSlug: string) {
   const session = await auth();
   if (!session?.user) {
     return { success: false, error: 'No autenticado' };
@@ -32,8 +22,12 @@ export async function inviteUser(email: string, role: Role) {
     return { success: false, error: 'Sin permisos para invitar usuarios' };
   }
 
-  if (!isValidRole(role)) {
-    return { success: false, error: 'Rol inválido' };
+  const template = await prisma.roleTemplate.findFirst({
+    where: { slug: roleTemplateSlug, tenantId: session.user.tenantId },
+  });
+
+  if (!template) {
+    return { success: false, error: 'Rol no encontrado. Configúralo en Roles y Permisos.' };
   }
 
   const emailLower = email.trim().toLowerCase();
@@ -66,7 +60,7 @@ export async function inviteUser(email: string, role: Role) {
   const invitation = await prisma.userInvitation.create({
     data: {
       email: emailLower,
-      role,
+      role: template.slug,
       tenantId: session.user.tenantId,
       token: tokenHash,
       expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
@@ -84,7 +78,7 @@ export async function inviteUser(email: string, role: Role) {
       html: `
         <h2>Has sido invitado a Gard Docs</h2>
         <p><strong>${session.user.name}</strong> te ha invitado a unirte al equipo.</p>
-        <p>Rol asignado: <strong>${ROLE_LABELS[role] || role}</strong></p>
+        <p>Rol asignado: <strong>${template.name}</strong></p>
         <p>Haz clic en el siguiente enlace para activar tu cuenta:</p>
         <a href="${activationUrl}" style="background: #00d4aa; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
           Activar mi cuenta
@@ -106,7 +100,7 @@ export async function inviteUser(email: string, role: Role) {
       action: 'user.invited',
       entity: 'user',
       entityId: invitation.id,
-      details: { email: emailLower, role },
+      details: { email: emailLower, role: template.slug, roleName: template.name },
     },
   });
 
@@ -156,12 +150,17 @@ export async function activateAccount(token: string, name: string, password: str
 
   const passwordHash = await bcrypt.hash(password, 10);
 
+  const roleTemplate = await prisma.roleTemplate.findFirst({
+    where: { tenantId: invitation.tenantId, slug: invitation.role },
+  });
+
   const user = await prisma.admin.create({
     data: {
       email: invitation.email,
       name,
       password: passwordHash,
-      role: invitation.role,
+      role: invitation.role as Role,
+      roleTemplateId: roleTemplate?.id ?? null,
       status: 'active',
       tenantId: invitation.tenantId,
       invitedBy: invitation.invitedBy,
@@ -190,9 +189,9 @@ export async function activateAccount(token: string, name: string, password: str
 }
 
 /**
- * Cambiar rol de un usuario
+ * Cambiar rol de un usuario (usa RoleTemplate)
  */
-export async function changeUserRole(userId: string, newRole: Role) {
+export async function changeUserRole(userId: string, roleTemplateId: string) {
   const session = await auth();
   if (!session?.user) {
     return { success: false, error: 'No autenticado' };
@@ -202,8 +201,12 @@ export async function changeUserRole(userId: string, newRole: Role) {
     return { success: false, error: 'Sin permisos para gestionar usuarios' };
   }
 
-  if (!isValidRole(newRole)) {
-    return { success: false, error: 'Rol inválido' };
+  const template = await prisma.roleTemplate.findFirst({
+    where: { id: roleTemplateId, tenantId: session.user.tenantId },
+  });
+
+  if (!template) {
+    return { success: false, error: 'Rol no encontrado' };
   }
 
   const user = await prisma.admin.findUnique({
@@ -232,9 +235,14 @@ export async function changeUserRole(userId: string, newRole: Role) {
     }
   }
 
+  const oldRole = user.role;
+
   await prisma.admin.update({
     where: { id: userId },
-    data: { role: newRole },
+    data: {
+      role: template.slug as Role,
+      roleTemplateId: template.id,
+    },
   });
 
   await prisma.auditLog.create({
@@ -245,7 +253,7 @@ export async function changeUserRole(userId: string, newRole: Role) {
       action: 'user.role_changed',
       entity: 'user',
       entityId: userId,
-      details: { oldRole: user.role, newRole },
+      details: { oldRole, newRole: template.slug, roleTemplateId: template.id },
     },
   });
 
@@ -376,11 +384,15 @@ export async function listUsers() {
       email: true,
       name: true,
       role: true,
+      roleTemplateId: true,
       status: true,
       lastLoginAt: true,
       createdAt: true,
       invitedAt: true,
       activatedAt: true,
+      roleTemplate: {
+        select: { id: true, name: true, slug: true },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -418,4 +430,25 @@ export async function listPendingInvitations() {
   });
 
   return { success: true, invitations };
+}
+
+/**
+ * Listar RoleTemplates del tenant (para selector de Gestión de Usuarios)
+ */
+export async function listRoleTemplates() {
+  const session = await auth();
+  if (!session?.user) {
+    return { success: false, error: 'No autenticado', templates: [] };
+  }
+  if (!hasPermission(session.user.role as Role, PERMISSIONS.MANAGE_USERS)) {
+    return { success: false, error: 'Sin permisos', templates: [] };
+  }
+
+  const templates = await prisma.roleTemplate.findMany({
+    where: { tenantId: session.user.tenantId },
+    select: { id: true, name: true, slug: true, isSystem: true },
+    orderBy: [{ isSystem: 'desc' }, { name: 'asc' }],
+  });
+
+  return { success: true, templates };
 }

@@ -18,44 +18,63 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { changeUserRole, toggleUserStatus } from '@/app/(app)/opai/actions/users';
-import { MoreVertical, Shield, UserCheck, UserX } from 'lucide-react';
+import { MoreVertical, UserCheck, UserX } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ROLES, type Role } from '@/lib/rbac';
+
+interface RoleTemplate {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 interface User {
   id: string;
   email: string;
   name: string;
   role: string;
+  roleTemplateId: string | null;
   status: string;
   lastLoginAt: Date | null;
   createdAt: Date;
+  roleTemplate?: { id: string; name: string; slug: string } | null;
 }
 
 interface Props {
   users: User[];
+  roleTemplates: RoleTemplate[];
   currentUserId: string;
   currentUserRole: string;
 }
 
-export default function UsersTable({ users, currentUserId, currentUserRole }: Props) {
+const ROLE_BADGE_VARIANTS: Record<string, 'default' | 'secondary' | 'outline'> = {
+  owner: 'default',
+  admin: 'secondary',
+  editor: 'outline',
+  viewer: 'outline',
+};
+
+export default function UsersTable({ users, roleTemplates, currentUserId, currentUserRole }: Props) {
   const [loading, setLoading] = useState<string | null>(null);
   const [roleChanging, setRoleChanging] = useState<string | null>(null);
 
-  const getRoleBadge = (role: string) => {
-    const config: Record<string, { variant: 'default' | 'secondary' | 'outline'; label: string }> = {
-      owner: { variant: 'default', label: 'Propietario' },
-      admin: { variant: 'secondary', label: 'Admin' },
-      editor: { variant: 'outline', label: 'Editor' },
-      solo_documentos: { variant: 'outline', label: 'Solo Documentos' },
-      solo_crm: { variant: 'outline', label: 'Solo CRM' },
-      solo_ops: { variant: 'outline', label: 'Solo Ops' },
-      solo_payroll: { variant: 'outline', label: 'Solo Payroll' },
-      viewer: { variant: 'outline', label: 'Visualizador' },
-    };
-    const cfg = config[role] || config.viewer;
-    return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
+  const getRoleDisplay = (user: User) => {
+    if (user.roleTemplate) return user.roleTemplate.name;
+    const t = roleTemplates.find((r) => r.slug === user.role);
+    if (t) return t.name;
+    return user.role;
+  };
+
+  const getRoleBadge = (user: User) => {
+    const label = getRoleDisplay(user);
+    const variant = ROLE_BADGE_VARIANTS[user.role] ?? 'outline';
+    const isOrphaned = !user.roleTemplate && user.roleTemplateId;
+    return (
+      <Badge variant={variant} className={isOrphaned ? 'border-amber-500/50' : ''}>
+        {label}
+        {isOrphaned && ' (obsoleto)'}
+      </Badge>
+    );
   };
 
   const getStatusBadge = (status: string) => {
@@ -75,9 +94,9 @@ export default function UsersTable({ users, currentUserId, currentUserRole }: Pr
     window.location.reload();
   };
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
+  const handleRoleChange = async (userId: string, roleTemplateId: string) => {
     setRoleChanging(userId);
-    await changeUserRole(userId, newRole as Role);
+    await changeUserRole(userId, roleTemplateId);
     setRoleChanging(null);
     window.location.reload();
   };
@@ -115,26 +134,27 @@ export default function UsersTable({ users, currentUserId, currentUserRole }: Pr
                   <div className="text-right">
                     {!isCurrentUser && canChangeRole && user.status === 'active' ? (
                       <Select
-                        value={user.role}
-                        onValueChange={(newRole) => handleRoleChange(user.id, newRole)}
+                        value={
+                          user.roleTemplateId ??
+                          roleTemplates.find((t) => t.slug === user.role)?.id ??
+                          ''
+                        }
+                        onValueChange={(id) => handleRoleChange(user.id, id)}
                         disabled={roleChanging === user.id}
                       >
                         <SelectTrigger className="w-[160px]">
-                          <SelectValue />
+                          <SelectValue placeholder="Seleccionar rol" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value={ROLES.VIEWER}>Visualizador</SelectItem>
-                          <SelectItem value={ROLES.SOLO_DOCUMENTOS}>Solo Documentos</SelectItem>
-                          <SelectItem value={ROLES.SOLO_CRM}>Solo CRM</SelectItem>
-                          <SelectItem value={ROLES.SOLO_OPS}>Solo Ops</SelectItem>
-                          <SelectItem value={ROLES.SOLO_PAYROLL}>Solo Payroll</SelectItem>
-                          <SelectItem value={ROLES.EDITOR}>Editor</SelectItem>
-                          <SelectItem value={ROLES.ADMIN}>Admin</SelectItem>
-                          <SelectItem value={ROLES.OWNER}>Propietario</SelectItem>
+                          {roleTemplates.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     ) : (
-                      getRoleBadge(user.role)
+                      getRoleBadge(user)
                     )}
                   </div>
                 </div>
@@ -235,26 +255,27 @@ export default function UsersTable({ users, currentUserId, currentUserRole }: Pr
                 <td className="px-6 py-4">
                   {!isCurrentUser && canChangeRole && user.status === 'active' ? (
                     <Select
-                      value={user.role}
-                      onValueChange={(newRole) => handleRoleChange(user.id, newRole)}
+                      value={
+                        user.roleTemplateId ??
+                        roleTemplates.find((t) => t.slug === user.role)?.id ??
+                        ''
+                      }
+                      onValueChange={(id) => handleRoleChange(user.id, id)}
                       disabled={roleChanging === user.id}
                     >
                       <SelectTrigger className="w-[140px]">
-                        <SelectValue />
+                        <SelectValue placeholder="Seleccionar rol" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={ROLES.VIEWER}>Visualizador</SelectItem>
-                        <SelectItem value={ROLES.SOLO_DOCUMENTOS}>Solo Documentos</SelectItem>
-                        <SelectItem value={ROLES.SOLO_CRM}>Solo CRM</SelectItem>
-                        <SelectItem value={ROLES.SOLO_OPS}>Solo Ops</SelectItem>
-                        <SelectItem value={ROLES.SOLO_PAYROLL}>Solo Payroll</SelectItem>
-                        <SelectItem value={ROLES.EDITOR}>Editor</SelectItem>
-                        <SelectItem value={ROLES.ADMIN}>Admin</SelectItem>
-                        <SelectItem value={ROLES.OWNER}>Propietario</SelectItem>
+                        {roleTemplates.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   ) : (
-                    getRoleBadge(user.role)
+                    getRoleBadge(user)
                   )}
                 </td>
                 <td className="px-6 py-4">{getStatusBadge(user.status)}</td>

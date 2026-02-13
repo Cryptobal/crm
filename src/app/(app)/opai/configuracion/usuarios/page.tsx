@@ -5,7 +5,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { hasPermission, PERMISSIONS, type Role } from "@/lib/rbac";
-import { listUsers, listPendingInvitations } from "@/app/(app)/opai/actions/users";
+import { listUsers, listPendingInvitations, listRoleTemplates } from "@/app/(app)/opai/actions/users";
 import { PageHeader } from "@/components/opai";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import UsersTable from "@/components/usuarios/UsersTable";
@@ -32,14 +32,18 @@ export default async function UsuariosConfigPage() {
     redirect("/opai/inicio");
   }
 
-  const usersResult = await listUsers();
-  const invitationsResult = await listPendingInvitations();
+  const [usersResult, invitationsResult, templatesResult] = await Promise.all([
+    listUsers(),
+    listPendingInvitations(),
+    listRoleTemplates(),
+  ]);
 
   const users = usersResult.success && usersResult.users ? usersResult.users : [];
   const invitations =
     invitationsResult.success && invitationsResult.invitations
       ? invitationsResult.invitations
       : [];
+  const roleTemplates = templatesResult.success && templatesResult.templates ? templatesResult.templates : [];
 
   return (
     <>
@@ -50,7 +54,7 @@ export default async function UsuariosConfigPage() {
         actions={
           <div className="flex items-center gap-3">
             <RolesHelpCard />
-            <InviteUserButton />
+            <InviteUserButton roleTemplates={roleTemplates} />
           </div>
         }
       />
@@ -66,6 +70,7 @@ export default async function UsuariosConfigPage() {
           <CardContent className="p-0">
             <UsersTable
               users={users}
+              roleTemplates={roleTemplates}
               currentUserId={session.user.id}
               currentUserRole={session.user.role}
             />

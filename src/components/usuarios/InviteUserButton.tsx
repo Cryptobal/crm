@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,13 +19,30 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { inviteUser } from '@/app/(app)/opai/actions/users';
-import { ROLES, type Role } from '@/lib/rbac';
 import { Plus } from 'lucide-react';
 
-export default function InviteUserButton() {
+interface RoleTemplate {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface Props {
+  roleTemplates: RoleTemplate[];
+}
+
+export default function InviteUserButton({ roleTemplates }: Props) {
+  const defaultSlug = roleTemplates.find((t) => t.slug === 'viewer')?.slug ?? roleTemplates[0]?.slug ?? 'viewer';
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<Role>(ROLES.VIEWER);
+  const [roleSlug, setRoleSlug] = useState(defaultSlug);
+
+  useEffect(() => {
+    if (open && roleTemplates.length > 0) {
+      const valid = roleTemplates.some((t) => t.slug === roleSlug);
+      if (!valid) setRoleSlug(roleTemplates.find((t) => t.slug === 'viewer')?.slug ?? roleTemplates[0].slug);
+    }
+  }, [open, roleTemplates, roleSlug]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -34,13 +51,13 @@ export default function InviteUserButton() {
     setError('');
     setLoading(true);
 
-    const result = await inviteUser(email, role);
+    const result = await inviteUser(email, roleSlug);
 
     setLoading(false);
 
     if (result.success) {
       setEmail('');
-      setRole(ROLES.VIEWER);
+      setRoleSlug(defaultSlug);
       setOpen(false);
       window.location.reload();
     } else {
@@ -76,19 +93,16 @@ export default function InviteUserButton() {
 
           <div>
             <Label htmlFor="role">Rol</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as Role)}>
+            <Select value={roleSlug} onValueChange={setRoleSlug}>
               <SelectTrigger className="mt-1.5">
-                <SelectValue />
+                <SelectValue placeholder="Seleccionar rol" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ROLES.VIEWER}>Visualizador</SelectItem>
-                <SelectItem value={ROLES.SOLO_DOCUMENTOS}>Solo Documentos</SelectItem>
-                <SelectItem value={ROLES.SOLO_CRM}>Solo CRM</SelectItem>
-                <SelectItem value={ROLES.SOLO_OPS}>Solo Ops</SelectItem>
-                <SelectItem value={ROLES.SOLO_PAYROLL}>Solo Payroll</SelectItem>
-                <SelectItem value={ROLES.EDITOR}>Editor</SelectItem>
-                <SelectItem value={ROLES.ADMIN}>Administrador</SelectItem>
-                <SelectItem value={ROLES.OWNER}>Propietario</SelectItem>
+                {roleTemplates.map((t) => (
+                  <SelectItem key={t.id} value={t.slug}>
+                    {t.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
