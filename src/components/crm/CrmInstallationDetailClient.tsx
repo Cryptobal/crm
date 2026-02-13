@@ -434,7 +434,7 @@ function StaffingSection({
   // Save (create or edit)
   const handleSave = async (data: PuestoFormData) => {
     const body = {
-      name: data.customName || undefined,
+      name: data.customName || `Puesto ${data.startTime}-${data.endTime}`,
       puestoTrabajoId: data.puestoTrabajoId || null,
       cargoId: data.cargoId || null,
       rolId: data.rolId || null,

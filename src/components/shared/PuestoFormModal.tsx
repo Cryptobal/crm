@@ -146,6 +146,10 @@ export function PuestoFormModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (form.weekdays.length === 0) {
+      alert("Debes seleccionar al menos un día de la semana");
+      return;
+    }
     setSaving(true);
     try {
       await onSave(form);
