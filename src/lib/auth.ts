@@ -35,8 +35,13 @@ declare module '@auth/core/jwt' {
     role: string;
     roleTemplateId?: string | null;
     tenantId: string;
+    /** Epoch ms — última vez que se refrescó role desde BD */
+    roleRefreshedAt?: number;
   }
 }
+
+/** Cada cuántos ms se refresca el rol desde BD (60s) */
+const ROLE_REFRESH_INTERVAL = 60 * 1000;
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -81,12 +86,34 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // Login inicial: guardar datos del usuario
       if (user) {
         token.id = user.id;
         token.role = user.role;
         token.roleTemplateId = user.roleTemplateId ?? null;
         token.tenantId = user.tenantId;
+        token.roleRefreshedAt = Date.now();
+        return token;
       }
+
+      // Refrescar rol desde BD periódicamente
+      const now = Date.now();
+      if (!token.roleRefreshedAt || now - token.roleRefreshedAt > ROLE_REFRESH_INTERVAL) {
+        try {
+          const admin = await prisma.admin.findUnique({
+            where: { id: token.id },
+            select: { role: true, roleTemplateId: true, status: true },
+          });
+          if (admin && admin.status === 'active') {
+            token.role = admin.role;
+            token.roleTemplateId = admin.roleTemplateId ?? null;
+          }
+        } catch {
+          // Si falla la BD, mantener el token actual
+        }
+        token.roleRefreshedAt = now;
+      }
+
       return token;
     },
     async session({ session, token }) {
