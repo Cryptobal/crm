@@ -1,3 +1,4 @@
+export { FinanceSubnav } from "./FinanceSubnav";
 export { RendicionesClient } from "./RendicionesClient";
 export { RendicionForm } from "./RendicionForm";
 export { RendicionDetail } from "./RendicionDetail";

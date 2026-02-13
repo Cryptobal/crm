@@ -197,7 +197,7 @@ export const SUBMODULE_META: SubmoduleMeta[] = [
   { key: "finance.aprobaciones", module: "finance", submodule: "aprobaciones", label: "Aprobaciones", href: "/finanzas/aprobaciones" },
   { key: "finance.pagos", module: "finance", submodule: "pagos", label: "Pagos", href: "/finanzas/pagos" },
   { key: "finance.reportes", module: "finance", submodule: "reportes", label: "Reportes", href: "/finanzas/reportes" },
-  { key: "finance.configuracion", module: "finance", submodule: "configuracion", label: "Configuración", href: "/finanzas/configuracion" },
+  { key: "finance.configuracion", module: "finance", submodule: "configuracion", label: "Configuración", href: "/opai/configuracion/finanzas" },
   // ── Config ──
   { key: "config.usuarios", module: "config", submodule: "usuarios", label: "Usuarios", href: "/opai/configuracion/usuarios" },
   { key: "config.integraciones", module: "config", submodule: "integraciones", label: "Integraciones", href: "/opai/configuracion/integraciones" },
@@ -695,6 +695,7 @@ export function pathToPermission(
   if (pathname.startsWith("/opai/configuracion/payroll")) return { module: "config", submodule: "payroll" };
   if (pathname.startsWith("/opai/configuracion/notificaciones")) return { module: "config", submodule: "notificaciones" };
   if (pathname.startsWith("/opai/configuracion/ops")) return { module: "config", submodule: "ops" };
+  if (pathname.startsWith("/opai/configuracion/finanzas")) return { module: "config", submodule: "finanzas" };
   if (pathname.startsWith("/opai/configuracion")) return { module: "config" };
 
   // Finance submodules
@@ -702,7 +703,6 @@ export function pathToPermission(
   if (pathname.startsWith("/finanzas/aprobaciones")) return { module: "finance", submodule: "aprobaciones" };
   if (pathname.startsWith("/finanzas/pagos")) return { module: "finance", submodule: "pagos" };
   if (pathname.startsWith("/finanzas/reportes")) return { module: "finance", submodule: "reportes" };
-  if (pathname.startsWith("/finanzas/configuracion")) return { module: "finance", submodule: "configuracion" };
   if (pathname === "/finanzas" || pathname.startsWith("/finanzas/")) return { module: "finance" };
 
   // Hub

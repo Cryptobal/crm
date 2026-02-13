@@ -10,17 +10,17 @@ import { getDefaultTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/opai";
 import { ConfigClient } from "@/components/finance/ConfigClient";
 
-export default async function ConfiguracionPage() {
+export default async function FinanzasConfiguracionPage() {
   const session = await auth();
   if (!session?.user) {
-    redirect("/opai/login?callbackUrl=/finanzas/configuracion");
+    redirect("/opai/login?callbackUrl=/opai/configuracion/finanzas");
   }
   const perms = await resolvePagePerms(session.user);
-  if (!hasModuleAccess(perms, "finance")) {
+  if (!hasModuleAccess(perms, "config")) {
     redirect("/hub");
   }
   if (!hasCapability(perms, "rendicion_configure")) {
-    redirect("/finanzas");
+    redirect("/opai/configuracion");
   }
 
   const tenantId = session.user.tenantId ?? (await getDefaultTenantId());
@@ -91,7 +91,7 @@ export default async function ConfiguracionPage() {
     <div className="space-y-6">
       <PageHeader
         title="Configuración de Finanzas"
-        description="Administra ítems, parámetros, aprobadores y reglas."
+        description="Administra ítems de rendición, parámetros de kilometraje, aprobadores y reglas."
       />
       <ConfigClient
         config={configData}

@@ -52,7 +52,8 @@ export type ConfigSubmoduleKey =
   | "crm"
   | "cpq"
   | "payroll"
-  | "ops";
+  | "ops"
+  | "finanzas";
 
 export type DocsSubmoduleKey =
   | "overview"
@@ -103,6 +104,7 @@ const ALL_CONFIG_SUBMODULES: ConfigSubmoduleKey[] = [
   "cpq",
   "payroll",
   "ops",
+  "finanzas",
 ];
 const ALL_DOCS_SUBMODULES: DocsSubmoduleKey[] = [
   "overview",

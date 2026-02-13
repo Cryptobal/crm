@@ -1,17 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { resolvePagePerms, hasModuleAccess } from "@/lib/permissions-server";
+import { resolvePagePerms, hasModuleAccess, hasCapability } from "@/lib/permissions-server";
 import { prisma } from "@/lib/prisma";
 import { getDefaultTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/opai";
+import { FinanceSubnav } from "@/components/finance";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Receipt,
   CheckCircle2,
   Wallet,
   BarChart3,
-  Settings,
 } from "lucide-react";
 
 export default async function FinanzasDashboardPage() {
@@ -48,6 +48,9 @@ export default async function FinanzasDashboardPage() {
     minimumFractionDigits: 0,
   });
 
+  const canApprove = hasCapability(perms, "rendicion_approve");
+  const canPay = hasCapability(perms, "rendicion_pay");
+
   const modules = [
     {
       href: "/finanzas/rendiciones",
@@ -57,6 +60,7 @@ export default async function FinanzasDashboardPage() {
       count: pendingRendiciones > 0 ? pendingRendiciones : null,
       countLabel: "pendiente(s)",
       color: "text-emerald-400 bg-emerald-400/10",
+      show: true,
     },
     {
       href: "/finanzas/aprobaciones",
@@ -66,6 +70,7 @@ export default async function FinanzasDashboardPage() {
       count: pendingApprovals > 0 ? pendingApprovals : null,
       countLabel: "por aprobar",
       color: "text-blue-400 bg-blue-400/10",
+      show: canApprove,
     },
     {
       href: "/finanzas/pagos",
@@ -75,6 +80,7 @@ export default async function FinanzasDashboardPage() {
       count: amountPending > 0 ? fmtCLP.format(amountPending) : null,
       countLabel: "por pagar",
       color: "text-purple-400 bg-purple-400/10",
+      show: canPay,
     },
     {
       href: "/finanzas/reportes",
@@ -84,15 +90,7 @@ export default async function FinanzasDashboardPage() {
       count: null,
       countLabel: null,
       color: "text-amber-400 bg-amber-400/10",
-    },
-    {
-      href: "/finanzas/configuracion",
-      title: "Configuración",
-      description: "Ítems, parámetros km, aprobadores y reglas.",
-      icon: Settings,
-      count: null,
-      countLabel: null,
-      color: "text-gray-400 bg-gray-400/10",
+      show: true,
     },
   ];
 
@@ -102,9 +100,10 @@ export default async function FinanzasDashboardPage() {
         title="Finanzas"
         description="Rendiciones de gastos, aprobaciones, pagos y reportes."
       />
+      <FinanceSubnav />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {modules.map((item) => (
+        {modules.filter((m) => m.show).map((item) => (
           <Link key={item.href} href={item.href}>
             <Card className="h-full transition-colors hover:bg-accent/40">
               <CardContent className="pt-5 flex items-start gap-3">
@@ -120,9 +119,7 @@ export default async function FinanzasDashboardPage() {
                   </p>
                   {item.count !== null && (
                     <p className="mt-2 text-xs text-primary">
-                      {typeof item.count === "number"
-                        ? `${item.count} ${item.countLabel}`
-                        : `${item.count} ${item.countLabel}`}
+                      {item.count} {item.countLabel}
                     </p>
                   )}
                 </div>

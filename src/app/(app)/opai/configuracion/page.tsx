@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Bot,
   ClipboardCheck,
+  Receipt,
 } from "lucide-react";
 
 type ConfigItem = {
@@ -135,6 +136,13 @@ const CONFIG_SECTIONS: ConfigSection[] = [
         title: "Operaciones",
         description: "Marcaciones, emails automáticos y parámetros",
         icon: ClipboardList,
+      },
+      {
+        submodule: "finanzas",
+        href: "/opai/configuracion/finanzas",
+        title: "Finanzas",
+        description: "Ítems de rendición, kilometraje, aprobadores y reglas",
+        icon: Receipt,
       },
     ],
   },

@@ -8,6 +8,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getDefaultTenantId } from "@/lib/tenant";
 import { PageHeader } from "@/components/opai";
+import { FinanceSubnav } from "@/components/finance";
 import { PagosClient } from "@/components/finance/PagosClient";
 
 export default async function PagosPage() {
@@ -95,6 +96,7 @@ export default async function PagosPage() {
         title="Pagos"
         description="Procesa pagos de rendiciones aprobadas."
       />
+      <FinanceSubnav />
       <PagosClient payments={paymentsData} pendingRendiciones={pendingData} />
     </div>
   );
