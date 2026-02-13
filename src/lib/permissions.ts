@@ -59,6 +59,7 @@ export const SUBMODULE_KEYS = {
     "ppc",
     "guardias",
     "rondas",
+    "control_nocturno",
   ] as const,
   crm: [
     "leads",
@@ -95,6 +96,7 @@ export const CAPABILITY_KEYS = [
   "manage_settings",
   "rondas_configure",
   "rondas_resolve_alerts",
+  "control_nocturno_approve",
 ] as const;
 export type CapabilityKey = (typeof CAPABILITY_KEYS)[number];
 
@@ -160,6 +162,7 @@ export const SUBMODULE_META: SubmoduleMeta[] = [
   { key: "ops.ppc", module: "ops", submodule: "ppc", label: "PPC", href: "/ops/ppc" },
   { key: "ops.guardias", module: "ops", submodule: "guardias", label: "Guardias", href: "/personas/guardias" },
   { key: "ops.rondas", module: "ops", submodule: "rondas", label: "Rondas", href: "/ops/rondas" },
+  { key: "ops.control_nocturno", module: "ops", submodule: "control_nocturno", label: "Control nocturno", href: "/ops/control-nocturno" },
   // ── CRM ──
   { key: "crm.leads", module: "crm", submodule: "leads", label: "Leads", href: "/crm/leads" },
   { key: "crm.accounts", module: "crm", submodule: "accounts", label: "Cuentas", href: "/crm/accounts" },
@@ -194,6 +197,7 @@ export const CAPABILITY_META: CapabilityMeta[] = [
   { key: "manage_settings", label: "Configuración global", description: "Puede modificar configuración general del sistema" },
   { key: "rondas_configure", label: "Configurar rondas", description: "Puede crear/editar checkpoints, plantillas y programación de rondas" },
   { key: "rondas_resolve_alerts", label: "Resolver alertas rondas", description: "Puede marcar como resueltas las alertas de rondas" },
+  { key: "control_nocturno_approve", label: "Aprobar control nocturno", description: "Puede aprobar o rechazar reportes de control nocturno" },
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -283,7 +287,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, RolePermissions> = {
       config: "none",
     },
     submodules: {},
-    capabilities: { te_approve: true, rondas_configure: true, rondas_resolve_alerts: true },
+    capabilities: { te_approve: true, rondas_configure: true, rondas_resolve_alerts: true, control_nocturno_approve: true },
   },
 
   reclutamiento: {
@@ -567,6 +571,7 @@ export function pathToPermission(
   if (pathname.startsWith("/ops/turnos-extra")) return { module: "ops", submodule: "turnos_extra" };
   if (pathname.startsWith("/ops/marcaciones")) return { module: "ops", submodule: "marcaciones" };
   if (pathname.startsWith("/ops/ppc")) return { module: "ops", submodule: "ppc" };
+  if (pathname.startsWith("/ops/control-nocturno")) return { module: "ops", submodule: "control_nocturno" };
   if (pathname.startsWith("/ops/rondas")) return { module: "ops", submodule: "rondas" };
   if (pathname.startsWith("/personas/guardias") || pathname.startsWith("/personas/lista-negra"))
     return { module: "ops", submodule: "guardias" };
@@ -641,6 +646,7 @@ export function apiPathToSubmodule(
     return { module: "ops", submodule: "pauta_mensual" };
   if (pathname.startsWith("/api/ops/asistencia")) return { module: "ops", submodule: "pauta_diaria" };
   if (pathname.startsWith("/api/ops/marcacion")) return { module: "ops", submodule: "marcaciones" };
+  if (pathname.startsWith("/api/ops/control-nocturno")) return { module: "ops", submodule: "control_nocturno" };
   if (pathname.startsWith("/api/ops/rondas")) return { module: "ops", submodule: "rondas" };
   if (pathname.startsWith("/api/te/")) return { module: "ops", submodule: "turnos_extra" };
   if (pathname.startsWith("/api/personas/guardias")) return { module: "ops", submodule: "guardias" };

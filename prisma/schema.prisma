@@ -879,6 +879,7 @@ model CrmInstallation {
   opsRondaTemplates    OpsRondaTemplate[]
   opsRondaAlertas      OpsAlertaRonda[]
   guardiasActuales     OpsGuardia[]           @relation("ops_guardia_current_installation")
+  opsControlNocturnoInstalaciones OpsControlNocturnoInstalacion[]
 
   @@index([tenantId], map: "idx_crm_installations_tenant")
   @@index([accountId], map: "idx_crm_installations_account")
@@ -1446,6 +1447,7 @@ model OpsGuardia {
   rondaEjecuciones      OpsRondaEjecucion[]
   rondaMarcaciones      OpsMarcacionCheckpoint[]
   rondaIncidentes       OpsRondaIncidente[]
+  controlNocturnoGuardias OpsControlNocturnoGuardia[]
 
   @@unique([tenantId, code], map: "uq_ops_guardias_tenant_code")
   @@index([tenantId], map: "idx_ops_guardias_tenant")
@@ -2084,6 +2086,105 @@ model OpsRondaIncidente {
   @@index([guardiaId], map: "idx_ops_ronda_incidente_guardia")
   @@index([status], map: "idx_ops_ronda_incidente_status")
   @@map("ronda_incidentes")
+  @@schema("ops")
+}
+
+// ============================================
+// OPS — CONTROL NOCTURNO (CENTRAL DE OPERACIONES)
+// ============================================
+
+model OpsControlNocturno {
+  id                   String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tenantId             String    @map("tenant_id")
+  date                 DateTime  @db.Date
+  centralOperatorName  String    @map("central_operator_name")
+  centralLabel         String?   @map("central_label")          // "Central II-36"
+  shiftStart           String    @default("19:00") @map("shift_start")
+  shiftEnd             String    @default("08:00") @map("shift_end")
+  status               String    @default("borrador")            // borrador, enviado, aprobado, rechazado
+  generalNotes         String?   @map("general_notes")
+  submittedAt          DateTime? @map("submitted_at") @db.Timestamptz(6)
+  submittedBy          String?   @map("submitted_by")
+  approvedAt           DateTime? @map("approved_at") @db.Timestamptz(6)
+  approvedBy           String?   @map("approved_by")
+  rejectedAt           DateTime? @map("rejected_at") @db.Timestamptz(6)
+  rejectedBy           String?   @map("rejected_by")
+  rejectionReason      String?   @map("rejection_reason")
+  createdBy            String    @map("created_by")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  instalaciones OpsControlNocturnoInstalacion[]
+
+  @@unique([tenantId, date, centralLabel], map: "uq_ops_control_nocturno_date_central")
+  @@index([tenantId], map: "idx_ops_control_nocturno_tenant")
+  @@index([tenantId, date], map: "idx_ops_control_nocturno_tenant_date")
+  @@index([status], map: "idx_ops_control_nocturno_status")
+  @@map("control_nocturno")
+  @@schema("ops")
+}
+
+model OpsControlNocturnoInstalacion {
+  id                   String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  controlNocturnoId    String    @map("control_nocturno_id") @db.Uuid
+  installationId       String?   @map("installation_id") @db.Uuid
+  installationName     String    @map("installation_name")
+  orderIndex           Int       @default(0) @map("order_index")
+  guardiasRequeridos   Int       @default(1) @map("guardias_requeridos")
+  guardiasPresentes    Int       @default(0) @map("guardias_presentes")
+  horaLlegadaTurnoDia  String?   @map("hora_llegada_turno_dia")
+  guardiaDiaNombres    String?   @map("guardia_dia_nombres")
+  statusInstalacion    String    @default("normal") @map("status_instalacion") // normal, novedad, critico, no_aplica
+  notes                String?
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  controlNocturno OpsControlNocturno     @relation(fields: [controlNocturnoId], references: [id], onDelete: Cascade)
+  installation    CrmInstallation?       @relation(fields: [installationId], references: [id], onDelete: SetNull)
+  guardias        OpsControlNocturnoGuardia[]
+  rondas          OpsControlNocturnoRonda[]
+
+  @@index([controlNocturnoId], map: "idx_ops_cn_instalacion_control")
+  @@index([installationId], map: "idx_ops_cn_instalacion_installation")
+  @@map("control_nocturno_instalaciones")
+  @@schema("ops")
+}
+
+model OpsControlNocturnoGuardia {
+  id                      String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  controlInstalacionId    String    @map("control_instalacion_id") @db.Uuid
+  guardiaId               String?   @map("guardia_id") @db.Uuid
+  guardiaNombre           String    @map("guardia_nombre")
+  isExtra                 Boolean   @default(false) @map("is_extra")
+  horaLlegada             String?   @map("hora_llegada")
+  fotoEvidenciaUrl        String?   @map("foto_evidencia_url")
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  controlInstalacion OpsControlNocturnoInstalacion @relation(fields: [controlInstalacionId], references: [id], onDelete: Cascade)
+  guardia            OpsGuardia?                    @relation(fields: [guardiaId], references: [id], onDelete: SetNull)
+
+  @@index([controlInstalacionId], map: "idx_ops_cn_guardia_instalacion")
+  @@index([guardiaId], map: "idx_ops_cn_guardia_guardia")
+  @@map("control_nocturno_guardias")
+  @@schema("ops")
+}
+
+model OpsControlNocturnoRonda {
+  id                      String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  controlInstalacionId    String    @map("control_instalacion_id") @db.Uuid
+  rondaNumber             Int       @map("ronda_number")          // 1-12
+  horaEsperada            String    @map("hora_esperada")         // "20:00", "21:00"...
+  horaMarcada             String?   @map("hora_marcada")          // hora real
+  status                  String    @default("pendiente")          // pendiente, completada, omitida, no_aplica
+  ejecucionRondaId        String?   @map("ejecucion_ronda_id") @db.Uuid
+  notes                   String?
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  controlInstalacion OpsControlNocturnoInstalacion @relation(fields: [controlInstalacionId], references: [id], onDelete: Cascade)
+
+  @@unique([controlInstalacionId, rondaNumber], map: "uq_ops_cn_ronda_inst_number")
+  @@index([controlInstalacionId], map: "idx_ops_cn_ronda_instalacion")
+  @@map("control_nocturno_rondas")
   @@schema("ops")
 }
 

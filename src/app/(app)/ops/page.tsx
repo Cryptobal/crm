@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   ShieldUser,
   UserRoundCheck,
+  Moon,
 } from "lucide-react";
 
 export default async function OpsDashboardPage() {
@@ -102,6 +103,14 @@ export default async function OpsDashboardPage() {
       icon: ShieldAlert,
       count: ppcCount > 0 ? ppcCount : null,
       color: "text-amber-400 bg-amber-400/10",
+    },
+    {
+      href: "/ops/control-nocturno",
+      title: "Control nocturno",
+      description: "Reportes nocturnos de la central de operaciones: rondas, asistencia y novedades.",
+      icon: Moon,
+      count: null,
+      color: "text-indigo-400 bg-indigo-400/10",
     },
     {
       href: "/personas/guardias",

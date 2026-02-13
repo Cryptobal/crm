@@ -12,4 +12,6 @@ export * from "./GuardiaDetailClient";
 export * from "./ListaNegraClient";
 export * from "./OpsMarcacionesClient";
 export * from "./OpsConfigClient";
+export * from "./OpsControlNocturnoListClient";
+export * from "./OpsControlNocturnoDetailClient";
 export * from "./rondas";
