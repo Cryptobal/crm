@@ -1,0 +1,31 @@
+import Link from 'next/link';
+import { KpiCard } from '@/components/opai/KpiCard';
+import type { KpiLinkCardProps } from '../_lib/hub-types';
+
+export function HubKpiLinkCard({
+  href,
+  title,
+  value,
+  description,
+  icon,
+  trend,
+  trendValue,
+  variant = 'default',
+  titleInfoTooltip,
+}: KpiLinkCardProps) {
+  return (
+    <Link href={href} className="block min-w-0">
+      <KpiCard
+        title={title}
+        value={value}
+        description={description}
+        icon={icon}
+        trend={trend}
+        trendValue={trendValue}
+        variant={variant}
+        titleInfoTooltip={titleInfoTooltip}
+        className="h-full cursor-pointer transition-all hover:ring-2 hover:ring-primary/25"
+      />
+    </Link>
+  );
+}
