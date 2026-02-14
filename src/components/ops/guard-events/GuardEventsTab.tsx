@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -543,11 +542,11 @@ function EventCreateForm({
           <Label className="text-xs">
             {isAmonestacion ? "Descripción / motivo" : "Motivo / observación"}
           </Label>
-          <Textarea
+          <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={2}
-            className="text-sm"
+            className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             placeholder={
               isAmonestacion
                 ? "Descripción de la amonestación..."
@@ -561,11 +560,11 @@ function EventCreateForm({
       {subtype && (
         <div className="space-y-1.5">
           <Label className="text-xs">Notas internas (no visible al guardia)</Label>
-          <Textarea
+          <textarea
             value={internalNotes}
             onChange={(e) => setInternalNotes(e.target.value)}
             rows={2}
-            className="text-sm"
+            className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             placeholder="Notas internas..."
           />
         </div>
