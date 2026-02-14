@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, unauthorized, resolveApiPerms } from "@/lib/api-auth";
-import { ensureOpsAccess, createOpsAuditLog } from "@/lib/ops";
 import { hasCapability } from "@/lib/permissions";
+import { ensureOpsAccess, createOpsAuditLog } from "@/lib/ops";
 import { sendControlNocturnoEmail } from "@/lib/control-nocturno-email";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -298,7 +298,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-/* ── DELETE ── */
+/* ── DELETE (solo admin/propietario) ── */
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
@@ -306,6 +306,14 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     if (!ctx) return unauthorized();
     const forbidden = await ensureOpsAccess(ctx);
     if (forbidden) return forbidden;
+
+    const perms = await resolveApiPerms(ctx);
+    if (!hasCapability(perms, "control_nocturno_delete")) {
+      return NextResponse.json(
+        { success: false, error: "Solo administradores y propietarios pueden eliminar reportes" },
+        { status: 403 },
+      );
+    }
 
     const { id } = await params;
 

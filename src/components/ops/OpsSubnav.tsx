@@ -35,33 +35,28 @@ const OPS_ITEMS = [
 
 function filterByPermissions(perms: RolePermissions) {
   return OPS_ITEMS.filter((item) => {
-    if (!item.subKey) return true; // "Inicio" siempre visible si tiene acceso al módulo
+    if (!item.subKey) return true;
     return canView(perms, "ops", item.subKey);
   });
 }
 
 /**
  * OpsSubnav - Navegación del módulo Ops con buscador global.
- * Desktop: pills + buscador a la derecha. Móvil: solo buscador.
- * Filtra items según permisos del usuario.
+ * Tabs y buscador siempre en filas separadas para evitar superposición.
  */
 export function OpsSubnav({ className }: { className?: string } = {}) {
   const pathname = usePathname();
   const permissions = usePermissions();
   const visibleItems = filterByPermissions(permissions);
 
-  // En la ficha de detalle de un guardia, ocultar el buscador para que no tape
-  // el menú de acciones (tres puntitos) ni el texto de la barra.
   const isGuardiaDetailPage = pathname?.match(/^\/personas\/guardias\/[^/]+$/);
   const showSearch = !isGuardiaDetailPage;
 
   return (
-    <nav className={cn("mb-6 space-y-3", className)}>
-      <div className="sm:hidden">
-        {showSearch && <OpsGlobalSearch />}
-      </div>
-      <div className="hidden sm:flex sm:items-center sm:gap-3">
-        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
+    <nav className={cn("mb-6 space-y-2", className)}>
+      {/* Tabs — desktop */}
+      <div className="hidden sm:block">
+        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
           {visibleItems.map((item) => {
             const isActive =
               pathname === item.href || pathname?.startsWith(item.href + "/");
@@ -83,8 +78,12 @@ export function OpsSubnav({ className }: { className?: string } = {}) {
             );
           })}
         </div>
-        {showSearch && <OpsGlobalSearch className="w-64 shrink-0 max-w-[16rem]" />}
       </div>
+
+      {/* Buscador — siempre debajo de los tabs, nunca en la misma fila */}
+      {showSearch && (
+        <OpsGlobalSearch className="w-full sm:max-w-xs" />
+      )}
     </nav>
   );
 }

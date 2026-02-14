@@ -38,6 +38,33 @@ function escapeHtml(str: string | null | undefined): string {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/** Parsea guardiaDiaNombres (JSON o legacy) y retorna { nombres, horas } para PDF */
+function parseRelevoDiaForPdf(
+  guardiaDiaNombres: string | null,
+  horaLlegadaTurnoDia: string | null
+): { nombres: string; horas: string } {
+  if (!guardiaDiaNombres?.trim()) {
+    return { nombres: "—", horas: escapeHtml(horaLlegadaTurnoDia) || "—" };
+  }
+  const s = guardiaDiaNombres.trim();
+  if (s.startsWith("[")) {
+    try {
+      const arr = JSON.parse(s) as Array<{ nombre?: string; hora?: string | null }>;
+      if (Array.isArray(arr) && arr.length > 0) {
+        const nombres = arr.map((x) => escapeHtml(typeof x.nombre === "string" ? x.nombre : "")).join("<br/>");
+        const horas = arr.map((x) => escapeHtml(typeof x.hora === "string" ? x.hora : "") || "—").join("<br/>");
+        return { nombres: nombres || "—", horas: horas || "—" };
+      }
+    } catch {
+      /* fallback */
+    }
+  }
+  return {
+    nombres: escapeHtml(s),
+    horas: escapeHtml(horaLlegadaTurnoDia) || "—",
+  };
+}
+
 /* ── GET ── */
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
@@ -91,6 +118,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           .join("");
 
         const instBg = INST_STATUS_BG[inst.statusInstalacion] || INST_STATUS_BG.normal;
+        const relevoDia = parseRelevoDiaForPdf(inst.guardiaDiaNombres, inst.horaLlegadaTurnoDia);
 
         // Collect notes for this installation (installation + rounds)
         const hasInstNotes = inst.notes;
@@ -110,8 +138,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           <td style="padding:4px;border:1px solid #333;font-size:9px">${guardiaNames || "—"}</td>
           <td style="text-align:center;padding:4px;border:1px solid #333;font-size:9px">${horaLlegada}</td>
           ${rondaCells}
-          <td style="text-align:center;padding:4px;border:1px solid #333;font-size:9px">${escapeHtml(inst.horaLlegadaTurnoDia) || "—"}</td>
-          <td style="padding:4px;border:1px solid #333;font-size:9px">${escapeHtml(inst.guardiaDiaNombres) || "—"}</td>
+          <td style="text-align:center;padding:4px;border:1px solid #333;font-size:9px">${relevoDia.horas}</td>
+          <td style="padding:4px;border:1px solid #333;font-size:9px">${relevoDia.nombres}</td>
         </tr>`;
       })
       .join("");

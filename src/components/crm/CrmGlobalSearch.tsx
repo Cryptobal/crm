@@ -118,7 +118,7 @@ export function CrmGlobalSearch({ className }: { className?: string }) {
   const showDropdown = open && query.trim().length >= 2;
 
   return (
-    <div ref={containerRef} className={cn("relative", className)}>
+    <div ref={containerRef} className={cn("relative z-10", className)}>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <input
@@ -137,7 +137,7 @@ export function CrmGlobalSearch({ className }: { className?: string }) {
       </div>
 
       {showDropdown && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border border-border bg-card shadow-xl max-h-[400px] overflow-y-auto">
+        <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg border border-border bg-card shadow-xl max-h-[400px] overflow-y-auto">
           {results.length === 0 && !loading && (
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
               Sin resultados para &ldquo;{query}&rdquo;

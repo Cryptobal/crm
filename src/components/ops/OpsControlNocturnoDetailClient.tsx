@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCanEdit, useHasCapability } from "@/lib/permissions-context";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { GuardiaSearchInput } from "@/components/ops/GuardiaSearchInput";
 import {
   Moon,
   Loader2,
@@ -54,6 +56,8 @@ type GuardiaItem = {
   horaLlegada: string | null;
 };
 
+type RelevoDiaItem = { nombre: string; hora: string | null };
+
 type InstalacionItem = {
   id: string;
   installationId: string | null;
@@ -67,6 +71,8 @@ type InstalacionItem = {
   notes: string | null;
   guardias: GuardiaItem[];
   rondas: RondaItem[];
+  /** Lista de guardias de relevo mañana (derivada de guardiaDiaNombres/hora) */
+  relevoDiaList?: RelevoDiaItem[];
 };
 
 type Reporte = {
@@ -134,6 +140,46 @@ const RONDA_STATUS_COLORS: Record<string, string> = {
   no_aplica: "bg-zinc-500/15 text-zinc-500 border-zinc-600",
 };
 
+/** Parsea guardiaDiaNombres a lista. Soporta JSON array o legacy string único. */
+function parseRelevoDiaList(
+  guardiaDiaNombres: string | null,
+  horaLlegadaTurnoDia: string | null
+): RelevoDiaItem[] {
+  if (!guardiaDiaNombres?.trim()) {
+    return horaLlegadaTurnoDia ? [{ nombre: "", hora: horaLlegadaTurnoDia }] : [];
+  }
+  const s = guardiaDiaNombres.trim();
+  if (s.startsWith("[")) {
+    try {
+      const arr = JSON.parse(s) as Array<{ nombre?: string; hora?: string | null }>;
+      if (Array.isArray(arr)) {
+        return arr.map((x) => ({
+          nombre: typeof x.nombre === "string" ? x.nombre : "",
+          hora: typeof x.hora === "string" ? x.hora : null,
+        }));
+      }
+    } catch {
+      /* fallback */
+    }
+  }
+  return [{ nombre: s, hora: horaLlegadaTurnoDia }];
+}
+
+/** Serializa relevoDiaList a guardiaDiaNombres y horaLlegadaTurnoDia. */
+function serializeRelevoDiaList(list: RelevoDiaItem[]): {
+  guardiaDiaNombres: string | null;
+  horaLlegadaTurnoDia: string | null;
+} {
+  if (list.length === 0) return { guardiaDiaNombres: null, horaLlegadaTurnoDia: null };
+  if (list.length === 1 && !list[0].nombre && list[0].hora) {
+    return { guardiaDiaNombres: null, horaLlegadaTurnoDia: list[0].hora };
+  }
+  return {
+    guardiaDiaNombres: JSON.stringify(list),
+    horaLlegadaTurnoDia: list[0]?.hora ?? null,
+  };
+}
+
 /** Auto-format time input: "2005" → "20:05", "8" → "8", "20" → "20:", "205" → "20:5" */
 function formatTimeInput(raw: string): string {
   // Strip everything except digits and colon
@@ -180,6 +226,9 @@ export function OpsControlNocturnoDetailClient({ reporteId }: Props) {
   // Permissions from context (works with any role, including custom RoleTemplates)
   const canEditCN = useCanEdit("ops", "control_nocturno");
   const canApproveCN = useHasCapability("control_nocturno_approve");
+  const canDeleteCN = useHasCapability("control_nocturno_delete");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const isEditable = canEditCN && (reporte?.status === "borrador" || reporte?.status === "rechazado");
   const canApprove = canApproveCN;
@@ -193,10 +242,15 @@ export function OpsControlNocturnoDetailClient({ reporteId }: Props) {
       const res = await fetch(`/api/ops/control-nocturno/${reporteId}`);
       const json = await res.json();
       if (json.success) {
-        setReporte(json.data);
+        const data = json.data as Reporte;
+        data.instalaciones = data.instalaciones.map((i) => ({
+          ...i,
+          relevoDiaList: parseRelevoDiaList(i.guardiaDiaNombres, i.horaLlegadaTurnoDia),
+        }));
+        setReporte(data);
         // Auto-expand first installation on mobile
-        if (json.data.instalaciones.length > 0) {
-          setExpandedInst(json.data.instalaciones[0].id);
+        if (data.instalaciones.length > 0) {
+          setExpandedInst(data.instalaciones[0].id);
         }
       }
     } catch {
@@ -222,12 +276,16 @@ export function OpsControlNocturnoDetailClient({ reporteId }: Props) {
           generalNotes: reporte.generalNotes,
           centralOperatorName: reporte.centralOperatorName,
           centralLabel: reporte.centralLabel,
-          instalaciones: reporte.instalaciones.map((inst) => ({
+          instalaciones: reporte.instalaciones.map((inst) => {
+            const { guardiaDiaNombres, horaLlegadaTurnoDia } = inst.relevoDiaList?.length
+              ? serializeRelevoDiaList(inst.relevoDiaList)
+              : { guardiaDiaNombres: inst.guardiaDiaNombres, horaLlegadaTurnoDia: inst.horaLlegadaTurnoDia };
+            return {
             id: inst.id,
             guardiasRequeridos: inst.guardiasRequeridos,
             guardiasPresentes: inst.guardiasPresentes,
-            horaLlegadaTurnoDia: inst.horaLlegadaTurnoDia,
-            guardiaDiaNombres: inst.guardiaDiaNombres,
+            horaLlegadaTurnoDia,
+            guardiaDiaNombres,
             statusInstalacion: inst.statusInstalacion,
             notes: inst.notes,
             guardias: inst.guardias.map((g) => ({
@@ -243,13 +301,19 @@ export function OpsControlNocturnoDetailClient({ reporteId }: Props) {
               status: r.status,
               notes: r.notes,
             })),
-          })),
+          };
+        }),
           ...extra,
         }),
       });
       const json = await res.json();
       if (json.success) {
-        setReporte(json.data);
+        const data = json.data as Reporte;
+        data.instalaciones = data.instalaciones.map((i) => ({
+          ...i,
+          relevoDiaList: parseRelevoDiaList(i.guardiaDiaNombres, i.horaLlegadaTurnoDia),
+        }));
+        setReporte(data);
         const msgs: Record<string, string> = {
           save: "Guardado",
           submit: "Reporte enviado",
@@ -332,6 +396,54 @@ export function OpsControlNocturnoDetailClient({ reporteId }: Props) {
     markDirty();
   }, [markDirty]);
 
+  const addRelevoDia = useCallback((instId: string) => {
+    setReporte((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        instalaciones: prev.instalaciones.map((i) => {
+          if (i.id !== instId) return i;
+          const list = i.relevoDiaList ?? parseRelevoDiaList(i.guardiaDiaNombres, i.horaLlegadaTurnoDia);
+          return { ...i, relevoDiaList: [...list, { nombre: "", hora: null }] };
+        }),
+      };
+    });
+    markDirty();
+  }, [markDirty]);
+
+  const removeRelevoDia = useCallback((instId: string, idx: number) => {
+    setReporte((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        instalaciones: prev.instalaciones.map((i) => {
+          if (i.id !== instId) return i;
+          const list = i.relevoDiaList ?? parseRelevoDiaList(i.guardiaDiaNombres, i.horaLlegadaTurnoDia);
+          const newList = list.filter((_, i) => i !== idx);
+          return { ...i, relevoDiaList: newList };
+        }),
+      };
+    });
+    markDirty();
+  }, [markDirty]);
+
+  const updateRelevoDia = useCallback((instId: string, idx: number, patch: Partial<RelevoDiaItem>) => {
+    setReporte((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        instalaciones: prev.instalaciones.map((i) => {
+          if (i.id !== instId) return i;
+          const list = i.relevoDiaList ?? parseRelevoDiaList(i.guardiaDiaNombres, i.horaLlegadaTurnoDia);
+          const newList = [...list];
+          newList[idx] = { ...newList[idx], ...patch };
+          return { ...i, relevoDiaList: newList };
+        }),
+      };
+    });
+    markDirty();
+  }, [markDirty]);
+
   const updateRonda = useCallback((instId: string, rondaId: string, patch: Partial<RondaItem>) => {
     setReporte((prev) => {
       if (!prev) return prev;
@@ -364,6 +476,25 @@ export function OpsControlNocturnoDetailClient({ reporteId }: Props) {
   }, [dirty, isEditable, doSave]);
 
   /* ── Export PDF ── */
+
+  const handleDelete = useCallback(async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/ops/control-nocturno/${reporteId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Reporte eliminado");
+        setDeleteConfirmOpen(false);
+        router.push("/ops/control-nocturno");
+      } else {
+        toast.error(json.error || "Error al eliminar");
+      }
+    } catch {
+      toast.error("Error al eliminar reporte");
+    } finally {
+      setDeleting(false);
+    }
+  }, [reporteId, router]);
 
   const handleExportPdf = useCallback(async () => {
     setExporting(true);
@@ -432,6 +563,17 @@ export function OpsControlNocturnoDetailClient({ reporteId }: Props) {
               >
                 {STATUS_LABELS[reporte.status] || reporte.status}
               </span>
+              {canDeleteCN && reporte.status !== "aprobado" && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  title="Eliminar reporte"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="ghost"
@@ -598,13 +740,16 @@ export function OpsControlNocturnoDetailClient({ reporteId }: Props) {
                           <div key={g.id || `new-${gIdx}`} className="flex items-center gap-2">
                             {isEditable ? (
                               <>
-                                <Input
+                                <GuardiaSearchInput
                                   value={g.guardiaNombre}
-                                  onChange={(e) =>
-                                    updateGuardia(inst.id, gIdx, { guardiaNombre: e.target.value })
+                                  onChange={(patch) =>
+                                    updateGuardia(inst.id, gIdx, {
+                                      guardiaNombre: patch.guardiaNombre,
+                                      guardiaId: patch.guardiaId ?? undefined,
+                                    })
                                   }
-                                  placeholder="Nombre guardia"
-                                  className="h-8 text-xs flex-1"
+                                  placeholder="Buscar guardia o escribir nombre"
+                                  className="h-8 text-xs"
                                 />
                                 <Input
                                   value={g.horaLlegada || ""}
@@ -708,41 +853,75 @@ export function OpsControlNocturnoDetailClient({ reporteId }: Props) {
                     </div>
                   </div>
 
-                  {/* ── Turno de día ── */}
+                  {/* ── Relevo mañana (múltiples guardias) ── */}
                   <div>
-                    <p className="text-xs font-semibold flex items-center gap-1.5 mb-2">
-                      <Building2 className="h-3.5 w-3.5 text-orange-400" />
-                      Relevo mañana
-                    </p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold flex items-center gap-1.5">
+                        <Building2 className="h-3.5 w-3.5 text-orange-400" />
+                        Relevo mañana
+                      </p>
+                      {isEditable && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => addRelevoDia(inst.id)}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Agregar
+                        </Button>
+                      )}
+                    </div>
                     {isEditable ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground">Guardia día</Label>
-                          <Input
-                            value={inst.guardiaDiaNombres || ""}
-                            onChange={(e) => updateInst(inst.id, { guardiaDiaNombres: e.target.value || null })}
-                            placeholder="Nombre"
-                            className="h-8 text-xs mt-0.5"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-[10px] text-muted-foreground">Hora llegada</Label>
-                          <Input
-                            value={inst.horaLlegadaTurnoDia || ""}
-                            onChange={(e) => updateInst(inst.id, { horaLlegadaTurnoDia: formatTimeInput(e.target.value) || null })}
-                            placeholder="HH:MM"
-                            className="h-8 text-xs mt-0.5"
-                            maxLength={5}
-                          />
-                        </div>
+                      <div className="space-y-2">
+                        {(inst.relevoDiaList ?? parseRelevoDiaList(inst.guardiaDiaNombres, inst.horaLlegadaTurnoDia)).length === 0 ? (
+                          <p className="text-xs text-muted-foreground italic">Sin guardias de relevo</p>
+                        ) : (
+                          (inst.relevoDiaList ?? parseRelevoDiaList(inst.guardiaDiaNombres, inst.horaLlegadaTurnoDia)).map((r, rIdx) => (
+                            <div key={rIdx} className="flex items-center gap-2">
+                              <GuardiaSearchInput
+                                value={r.nombre}
+                                onChange={(patch) =>
+                                  updateRelevoDia(inst.id, rIdx, { nombre: patch.guardiaNombre })
+                                }
+                                placeholder="Buscar guardia o escribir nombre"
+                                className="h-8 text-xs flex-1"
+                              />
+                              <Input
+                                value={r.hora || ""}
+                                onChange={(e) =>
+                                  updateRelevoDia(inst.id, rIdx, {
+                                    hora: formatTimeInput(e.target.value) || null,
+                                  })
+                                }
+                                placeholder="HH:MM"
+                                className="h-8 text-xs w-16 text-center"
+                                maxLength={5}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeRelevoDia(inst.id, rIdx)}
+                                className="shrink-0 p-1 text-muted-foreground hover:text-red-400 transition-colors"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))
+                        )}
                       </div>
                     ) : (
-                      <div className="flex items-center gap-3 text-sm">
-                        <span>{inst.guardiaDiaNombres || "—"}</span>
-                        {inst.horaLlegadaTurnoDia && (
-                          <span className="text-xs text-muted-foreground">
-                            {inst.horaLlegadaTurnoDia}
-                          </span>
+                      <div className="space-y-1">
+                        {(inst.relevoDiaList ?? parseRelevoDiaList(inst.guardiaDiaNombres, inst.horaLlegadaTurnoDia)).length === 0 ? (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        ) : (
+                          (inst.relevoDiaList ?? parseRelevoDiaList(inst.guardiaDiaNombres, inst.horaLlegadaTurnoDia)).map((r, rIdx) => (
+                            <div key={rIdx} className="flex items-center gap-2 text-sm">
+                              <span>{r.nombre || "—"}</span>
+                              {r.hora && (
+                                <span className="text-xs text-muted-foreground">{r.hora}</span>
+                              )}
+                            </div>
+                          ))
                         )}
                       </div>
                     )}
@@ -943,6 +1122,20 @@ export function OpsControlNocturnoDetailClient({ reporteId }: Props) {
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* ── Confirmar eliminación ── */}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Eliminar reporte"
+        description="¿Estás seguro de que deseas eliminar este reporte de control nocturno? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        onConfirm={handleDelete}
+        variant="destructive"
+        loading={deleting}
+        loadingLabel="Eliminando…"
+      />
 
       {/* ── Modal rechazo ── */}
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
